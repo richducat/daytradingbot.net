@@ -3,7 +3,7 @@
   "source": "live-simmer",
   "sourceType": "api",
   "fallbackReason": null,
-  "updatedAt": "2026-07-09T20:30:07.444Z",
+  "updatedAt": "2026-07-09T23:32:33.807Z",
   "stale": false,
   "summary": {
     "status": "DEGRADED",
@@ -23,7 +23,7 @@
         "count": 1
       }
     ],
-    "lastSuccessfulFillAt": "2026-07-09T20:30:07.444Z"
+    "lastSuccessfulFillAt": "2026-07-09T23:32:33.807Z"
   },
   "account": {
     "balanceUsdc": 5.12,
@@ -36,8 +36,8 @@
     "bySource": {
       "sdk:elon-tweets": {
         "realized_pnl": 68.86,
-        "unrealized_pnl": -33.35,
-        "exposure": 46.65,
+        "unrealized_pnl": -26.2,
+        "exposure": 53.8,
         "positions": 12,
         "trade_count": 195
       },
@@ -99,7 +99,7 @@
   "providerHealth": {
     "status": "OK",
     "degraded": false,
-    "lastCheckedAt": "2026-07-09T20:30:07.444Z",
+    "lastCheckedAt": "2026-07-09T23:32:33.807Z",
     "baseUrl": "https://api.simmer.markets",
     "trackedLaneCount": 12,
     "untrackedSourceCount": 0
@@ -110,7 +110,7 @@
       "name": "Bluechip",
       "mode": "active",
       "status": "MONITORING",
-      "lastCycleAt": "2026-07-09T20:20:03.511685+00:00",
+      "lastCycleAt": "2026-07-09T23:20:33.099777+00:00",
       "lastReasonCode": "REVIEW_ONLY",
       "lastErrorClass": null,
       "lastSuccessfulFillAt": null,
@@ -176,7 +176,7 @@
         "sourceTags": [
           "robinhood:equities"
         ],
-        "lastActivityAt": "2026-07-09T20:20:03.511685+00:00"
+        "lastActivityAt": "2026-07-09T23:20:33.099777+00:00"
       },
       "sourceTags": [
         "robinhood:equities"
@@ -826,7 +826,7 @@
   ],
   "recentActions": [
     {
-      "timestamp": "2026-07-09T20:30:07.444Z",
+      "timestamp": "2026-07-09T23:32:33.807Z",
       "laneId": "kalshi-divergence",
       "message": "Kalshi Divergence is carrying Will Callum Turner be the next James Bond - Callum Turner?",
       "details": {
@@ -840,7 +840,7 @@
       }
     },
     {
-      "timestamp": "2026-07-09T20:30:07.444Z",
+      "timestamp": "2026-07-09T23:32:33.807Z",
       "laneId": "kalshi-divergence",
       "message": "Kalshi Divergence is carrying Will Trump recognize Somaliland?",
       "details": {
@@ -854,7 +854,7 @@
       }
     },
     {
-      "timestamp": "2026-07-09T20:30:07.444Z",
+      "timestamp": "2026-07-09T23:32:33.807Z",
       "laneId": "kalshi-divergence",
       "message": "Kalshi Divergence is carrying Will Tom Hardy be casted in the next Miami Vice - Tom Hardy?",
       "details": {
