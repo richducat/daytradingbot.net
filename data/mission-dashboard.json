@@ -1,0 +1,79 @@
+{
+  "generatedAt": "2026-07-09T20:30:07.000Z",
+  "topPriorities": [
+    {
+      "id": "p1",
+      "text": "Overhaul intake front-end: mandatory fields + conversion flow",
+      "status": "urgent"
+    },
+    {
+      "id": "p2",
+      "text": "Reconcile master action list: done vs pending with owners",
+      "status": "pending"
+    },
+    {
+      "id": "p3",
+      "text": "Fix dashboard cron integration warning (openclaw ENOENT)",
+      "status": "urgent"
+    },
+    {
+      "id": "p4",
+      "text": "Daily CRM integrity check (duplicates, stage drift, missing docs)",
+      "status": "pending"
+    },
+    {
+      "id": "p5",
+      "text": "Prepare weekly KPI + operations digest",
+      "status": "pending"
+    }
+  ],
+  "metrics": {
+    "mrr": "$124,500",
+    "calls": "42/50",
+    "conversion": "18.5%"
+  },
+  "pipeline": [
+    {
+      "stage": "Discovery",
+      "count": 12,
+      "value": "$45k"
+    },
+    {
+      "stage": "Demo",
+      "count": 8,
+      "value": "$80k"
+    },
+    {
+      "stage": "Negotiation",
+      "count": 3,
+      "value": "$120k"
+    }
+  ],
+  "missedComms": [
+    {
+      "type": "Call",
+      "from": "Helen Evans",
+      "time": "Filing scheduling follow-up",
+      "urgent": true
+    },
+    {
+      "type": "Email",
+      "from": "Dr. Martinez",
+      "time": "IMO follow-up needed",
+      "urgent": true
+    },
+    {
+      "type": "Task",
+      "from": "Jerry",
+      "time": "Weekend roster pending",
+      "urgent": false
+    }
+  ],
+  "schedulingConflicts": [
+    {
+      "time": "14:00",
+      "event1": "Lab Team pharma review",
+      "event2": "Client intake follow-up block"
+    }
+  ]
+}

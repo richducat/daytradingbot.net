@@ -1,0 +1,183 @@
+{
+  "generatedAt": "2026-07-09T16:14:34.194314-04:00",
+  "days": [
+    {
+      "date": "2026-07-09",
+      "cycles": 14,
+      "reviewed": 6,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "GOOGL"
+      ],
+      "url": "https://eb28.co/tape/2026-07-09/"
+    },
+    {
+      "date": "2026-07-07",
+      "cycles": 61,
+      "reviewed": 61,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AMD",
+        "NVDA",
+        "TSLA",
+        "QQQ"
+      ],
+      "url": "https://eb28.co/tape/2026-07-07/"
+    },
+    {
+      "date": "2026-07-06",
+      "cycles": 94,
+      "reviewed": 7,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "MSFT"
+      ],
+      "url": "https://eb28.co/tape/2026-07-06/"
+    },
+    {
+      "date": "2026-07-02",
+      "cycles": 51,
+      "reviewed": 35,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AMD",
+        "TSLA",
+        "NVDA",
+        "GOOGL",
+        "QQQ"
+      ],
+      "url": "https://eb28.co/tape/2026-07-02/"
+    },
+    {
+      "date": "2026-07-01",
+      "cycles": 90,
+      "reviewed": 62,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "NVDA",
+        "AMD",
+        "QQQ"
+      ],
+      "url": "https://eb28.co/tape/2026-07-01/"
+    },
+    {
+      "date": "2026-06-30",
+      "cycles": 96,
+      "reviewed": 0,
+      "placed": 0,
+      "live": false,
+      "symbols": [],
+      "url": "https://eb28.co/tape/2026-06-30/"
+    },
+    {
+      "date": "2026-06-29",
+      "cycles": 84,
+      "reviewed": 4,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AMD"
+      ],
+      "url": "https://eb28.co/tape/2026-06-29/"
+    },
+    {
+      "date": "2026-06-26",
+      "cycles": 90,
+      "reviewed": 110,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "NVDA",
+        "QQQ",
+        "AMD",
+        "GOOGL"
+      ],
+      "url": "https://eb28.co/tape/2026-06-26/"
+    },
+    {
+      "date": "2026-06-25",
+      "cycles": 93,
+      "reviewed": 117,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AAPL",
+        "GOOGL",
+        "NVDA",
+        "MSFT"
+      ],
+      "url": "https://eb28.co/tape/2026-06-25/"
+    },
+    {
+      "date": "2026-06-24",
+      "cycles": 65,
+      "reviewed": 40,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "TSLA",
+        "AMD",
+        "MSFT"
+      ],
+      "url": "https://eb28.co/tape/2026-06-24/"
+    },
+    {
+      "date": "2026-06-23",
+      "cycles": 54,
+      "reviewed": 160,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "NVDA",
+        "TSLA",
+        "QQQ",
+        "AMD"
+      ],
+      "url": "https://eb28.co/tape/2026-06-23/"
+    },
+    {
+      "date": "2026-06-17",
+      "cycles": 61,
+      "reviewed": 45,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "MSFT",
+        "GOOGL",
+        "TSLA"
+      ],
+      "url": "https://eb28.co/tape/2026-06-17/"
+    },
+    {
+      "date": "2026-06-16",
+      "cycles": 32,
+      "reviewed": 47,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AMD",
+        "MSFT",
+        "NVDA",
+        "TSLA",
+        "QQQ"
+      ],
+      "url": "https://eb28.co/tape/2026-06-16/"
+    },
+    {
+      "date": "2026-06-12",
+      "cycles": 2,
+      "reviewed": 1,
+      "placed": 0,
+      "live": false,
+      "symbols": [
+        "AAPL"
+      ],
+      "url": "https://eb28.co/tape/2026-06-12/"
+    }
+  ]
+}

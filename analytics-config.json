@@ -1,0 +1,4 @@
+{
+  "_instructions": "Paste a GA4 measurement ID (looks like G-XXXXXXXXXX) to activate analytics on every page — no rebuild needed. Create one free at analytics.google.com. Leave empty to keep analytics off.",
+  "ga4MeasurementId": ""
+}

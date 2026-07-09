@@ -1,0 +1,152 @@
+{
+  "source": "docs/data/activity-feed.json",
+  "workspace": "/Users/richardducat/.openclaw/workspace-ocdev",
+  "count": 24,
+  "generatedAt": "2026-07-09T20:30:05.855Z",
+  "items": [
+    {
+      "id": "mem-0",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "User priority explicitly set: (1) make money first, (2) everything else second; requested rapid revenue-engine deployment and accepted broad skills installation/testing.",
+      "type": "info"
+    },
+    {
+      "id": "mem-1",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Telegram channel was connected and pairing approved for user id `1401224993` on profile `ocdev`; trading coordination moved into direct Telegram chat.",
+      "type": "info"
+    },
+    {
+      "id": "mem-2",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "SkillsMP/ClawHub installs completed for broad trading stack:",
+      "type": "info"
+    },
+    {
+      "id": "mem-3",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Previously installed: `polymarket-copytrading`, `polymarket-ai-divergence`, `polymarket-fast-loop`, `polymarket-mert-sniper`, `polymarket-signal-sniper`, `polymarket-weather-trader`, `prediction-trade-journal`, `trading-research`, `ccxt`, `simmer-x402`, plus ops/security skills.",
+      "type": "info"
+    },
+    {
+      "id": "mem-4",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Additional installs this session: `polymarket-autotrader`, `polymarket-scout`, `funding-rate-trader`, `kalshi-trading`, and later `polymarket-wallet-xray` (after retry).",
+      "type": "info"
+    },
+    {
+      "id": "mem-5",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "User requested weather-trader specifically; confirmed installed and available.",
+      "type": "info"
+    },
+    {
+      "id": "mem-6",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Key infrastructure recovery:",
+      "type": "info"
+    },
+    {
+      "id": "mem-7",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Identified `freeopenclawtrader.com` pipeline via Vercel project `ticker-site` and GitHub repo `richducat/ticker-site`.",
+      "type": "info"
+    },
+    {
+      "id": "mem-8",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Discovered old updater depended on machine-local simmer creds path; patched to env-based auth and added scheduled GitHub workflow.",
+      "type": "info"
+    },
+    {
+      "id": "mem-9",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Also restored live site behavior by routing `ticker-site` traffic back to `api.freeopenclawtrader.com` to match historical working setup.",
+      "type": "info"
+    },
+    {
+      "id": "mem-10",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Simmer dashboard findings and live-trading blockers resolved/diagnosed:",
+      "type": "info"
+    },
+    {
+      "id": "mem-11",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Agent wallet now READY, Simmer-managed wallet active (`0x42bFb8E89FF7d8e5a7a93F59a8FbCa93403Ced71`).",
+      "type": "info"
+    },
+    {
+      "id": "mem-12",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Major blocker observed: managed wallet had POL gas but 0 USDC.e at one point; later funds available after position closing.",
+      "type": "info"
+    },
+    {
+      "id": "mem-13",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Persistent backend setting issue observed repeatedly: effective limits still behaved as `max_trades_per_day=1` and `max_position_usd=1.0` despite attempted UI/API changes.",
+      "type": "info"
+    },
+    {
+      "id": "mem-14",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Trading actions executed:",
+      "type": "info"
+    },
+    {
+      "id": "mem-15",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Copytrading was run live in some passes (including successful executions in sim/live contexts depending on venue path).",
+      "type": "info"
+    },
+    {
+      "id": "mem-16",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Open polymarket positions were force-closed on user request; state reached 0 open positions with freed USDC balance (~$15.69 reported).",
+      "type": "info"
+    },
+    {
+      "id": "mem-17",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Attempted redeploy into BTC lane hit cooldown and/or platform limits in several runs.",
+      "type": "info"
+    },
+    {
+      "id": "mem-18",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Best-performing historical lane identified from trade history: copytrading on **Bitcoin Up/Down (mostly NO)**.",
+      "type": "info"
+    },
+    {
+      "id": "mem-19",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Queried trade history for source `sdk:copytrading` + market text containing “Bitcoin Up or Down”.",
+      "type": "info"
+    },
+    {
+      "id": "mem-20",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "Found 13 entries, 4 filled trades, 9 zero-share attempts; filled notional around $13.1491.",
+      "type": "info"
+    },
+    {
+      "id": "mem-21",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "User asked for unattended reliability so trading does not stall when user is away; agreed direction:",
+      "type": "info"
+    },
+    {
+      "id": "mem-22",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "implement execution reliability layer (preflight settings sync, wallet readiness checks, cooldown-aware routing, retry/failsafe logic).",
+      "type": "warning"
+    },
+    {
+      "id": "mem-23",
+      "timestamp": "2026-07-09T20:30:05.855Z",
+      "message": "User began sharing a 12-strategy “agent hedge fund” screenshot/prompt set; all images were received and acknowledged as basis for multi-agent orchestration design.",
+      "type": "info"
+    }
+  ]
+}
