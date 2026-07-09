@@ -1,0 +1,1267 @@
+{
+  "cap": {
+    "maxNewPerDay": 1,
+    "maxRefreshPerDay": 2,
+    "note": "Growth capped per Google's March 2026 scaled-content enforcement: 1-3 changed pages/day, every page carries first-party tape data."
+  },
+  "entries": [
+    {
+      "slug": "is-an-ai-trading-bot-safe",
+      "question": "Is an AI trading bot safe?",
+      "title": "Is an AI Trading Bot Safe? A Plain-English Checklist",
+      "primaryKeyword": "is an AI trading bot safe",
+      "shortAnswer": "An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries risk of loss, no matter how good the software is.",
+      "sections": [
+        {
+          "heading": "The three safety questions that actually matter",
+          "body": [
+            "Safety in automated trading is not about how smart the model is. It is about what the software is physically able to do to your accounts, and how fast you can stop it. Before anything else, ask: where does my money sit, what can the bot reach, and what happens when I hit stop?",
+            "A well-built desk keeps your dollars at your own broker, runs inside an isolated sub-account it cannot escape, and starts in a paper mode where no real order is placed. Our own Bluechip desk works this way, and we publish its full activity log so anyone can inspect what 'safe' looks like in practice."
+          ],
+          "bullets": [
+            "Custody: your money should stay in your own brokerage account — the vendor should never hold funds.",
+            "Isolation: the bot should live in a dedicated sub-account that cannot touch the rest of your balance.",
+            "Control: one kill switch, held by you, that stops everything immediately.",
+            "Paper first: the default mode should place zero real orders until you deliberately go live."
+          ]
+        },
+        {
+          "heading": "Red flags that end the conversation",
+          "body": [
+            "Regulators have warned repeatedly about AI-branded trading products that are really just marketing for fraud. The CFTC has flagged the rise of AI hype in trading scams, and FINRA publishes ongoing alerts about imposter and account-takeover schemes.",
+            "If a vendor asks for your brokerage password, asks you to wire funds to them, hides how the software works, or leads with certainty about outcomes, walk away. Honest tools describe their limits; only scams describe a sure thing."
+          ],
+          "bullets": [
+            "Requests for your brokerage login credentials instead of an official, revocable API connection.",
+            "Any language of certainty — trading outcomes are never certain.",
+            "No visible track record, or screenshots you cannot independently verify.",
+            "Pressure to act fast, recruit friends, or move the conversation to a private messaging app."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Can an AI trading bot empty my account?",
+          "answer": "Only if you give it the permissions to do so. A bot confined to an isolated sub-account with a small balance can only ever lose what is in that compartment — which is exactly why isolation should be non-negotiable."
+        },
+        {
+          "question": "Is the AI part what makes bots risky?",
+          "answer": "No. The risk lives in permissions, custody, and market exposure. A simple rules-based bot with your full account password is far more dangerous than a sophisticated one locked in a $50 sub-account."
+        },
+        {
+          "question": "How do I check what a bot actually did?",
+          "answer": "Demand a journal. Every decision — including the boring ones where nothing happened — should be written to a log you can read. We publish ours daily so buyers can see the standard before spending anything."
+        }
+      ],
+      "sources": [
+        {
+          "label": "CFTC customer advisory: criminals' increasing use of generative AI in fraud",
+          "url": "https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AI_Fraud.html"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "how-do-trading-bot-scams-work",
+        "should-a-trading-bot-know-your-password",
+        "what-is-a-kill-switch-in-automated-trading"
+      ],
+      "status": "published",
+      "queueOrder": 1,
+      "datePublished": "2026-07-09",
+      "dateModified": "2026-07-09"
+    },
+    {
+      "slug": "are-trading-bots-legal-in-the-us",
+      "question": "Are trading bots legal in the US?",
+      "title": "Are Trading Bots Legal in the US? What Retail Traders Should Know",
+      "primaryKeyword": "are trading bots legal in the US",
+      "shortAnswer": "Yes — using software to place trades in your own brokerage account is legal in the United States, and brokers increasingly offer official APIs built for exactly that. What the law restricts is how the trading is done (no market manipulation, no trading on stolen information) and how products are marketed (no false claims). The legal question is almost never the bot; it is the behavior and the sales pitch around it.",
+      "sections": [
+        {
+          "heading": "What is legal, and what is regulated",
+          "body": [
+            "Automated and algorithmic trading has been a normal part of US markets for decades — most volume on US exchanges is machine-driven. Retail traders are allowed to automate their own accounts, and brokers like Robinhood now publish official agentic APIs as the sanctioned front door for software agents.",
+            "Regulation focuses on conduct. Manipulative strategies (spoofing, layering, wash trading) are illegal whether a human or a bot executes them. Selling advice or managing other people's money triggers registration requirements. And marketing a bot with invented performance claims can be securities fraud even when the software itself is legal."
+          ],
+          "bullets": [
+            "Automating your own account through an official broker API: legal.",
+            "Manipulative order patterns (spoofing, wash trades): illegal, human or machine.",
+            "Managing other people's money without registration: illegal in most cases.",
+            "Marketing with fabricated results: actionable fraud regardless of the underlying software."
+          ]
+        },
+        {
+          "heading": "Why the broker's terms matter as much as the law",
+          "body": [
+            "Even where the law is silent, your broker's terms of service govern what automation is allowed. Screen-scraping bots that log in with your password typically violate those terms and can get your account closed — apart from being a security nightmare.",
+            "This is why official agent APIs matter: they define what software may do, keep the broker's own compliance checks in the loop, and give you a revocable connection instead of a shared password. Our desk connects only through Robinhood's official Agentic Trading API, and every order still passes the broker-side review step. Robinhood does not endorse or sponsor EB28 — we simply use the public front door they built."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Do I need a license to run a trading bot on my own account?",
+          "answer": "No license is required to automate trading in your own personal account. Licensing and registration questions arise when you trade other people's money or sell personalized investment advice."
+        },
+        {
+          "question": "Are trading bots regulated by the SEC or FINRA?",
+          "answer": "The bots themselves are not licensed products, but the trading they do falls under the same SEC, FINRA, and exchange rules as human trading, and brokers must supervise the order flow reaching the market."
+        },
+        {
+          "question": "Can a broker ban my bot even if it is legal?",
+          "answer": "Yes. Brokers set their own automation terms, which is why using an official API — rather than a password-based workaround — is the difference between a supported setup and a banned one."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "CFTC learning resources for customers",
+          "url": "https://www.cftc.gov/learnandprotect/learningresources"
+        }
+      ],
+      "related": [
+        "robinhood-agentic-trading-api-explained",
+        "what-rules-apply-to-retail-algorithmic-trading",
+        "is-a-trading-bot-the-same-as-financial-advice"
+      ],
+      "status": "published",
+      "queueOrder": 2,
+      "datePublished": "2026-07-09",
+      "dateModified": "2026-07-09"
+    },
+    {
+      "slug": "robinhood-agentic-trading-api-explained",
+      "question": "What is Robinhood's Agentic Trading API?",
+      "title": "Robinhood's Agentic Trading API, Explained in Plain English",
+      "primaryKeyword": "Robinhood agentic trading API explained",
+      "shortAnswer": "Robinhood's Agentic Trading API is the official interface that lets software agents interact with a Robinhood account — inside a dedicated agentic sub-account, with the broker's own review and suitability checks still in the loop. It replaces the old gray area of password-sharing bots with a sanctioned, revocable, auditable connection. It is infrastructure, not an endorsement of any particular bot that uses it.",
+      "sections": [
+        {
+          "heading": "How the agentic model works",
+          "body": [
+            "Instead of handing software your login, you create a dedicated agentic sub-account inside your Robinhood account. An authorized agent connects to that compartment through the official API. The agent can see quotes, prepare orders, and submit them — but the rest of your money sits outside the compartment, physically out of reach.",
+            "Critically, the broker stays in the loop. Orders pass Robinhood's own broker-side checks, quotes come with required market-data disclosures, and there is a formal review step: the API can be used in a mode where every order is only prepared for review, never placed, until a human confirms. Our Bluechip desk runs in exactly that review-only mode on the public tape."
+          ],
+          "bullets": [
+            "Dedicated sub-account: the agent lives in one compartment, not your whole balance.",
+            "Broker-side checks: suitability alerts and order checks run on Robinhood's side, not the vendor's.",
+            "Review step: orders can be prepared as previews requiring explicit human confirmation.",
+            "Revocable: shut off the connection at the broker level at any time."
+          ]
+        },
+        {
+          "heading": "What the API is not",
+          "body": [
+            "An official API is plumbing, not a seal of approval. Any developer can build on it, which means good desks and bad ones will both exist. Robinhood does not endorse or sponsor third-party software that connects through it — including ours — and no one should imply otherwise.",
+            "It is also not a performance feature. Connecting through an official API says nothing about whether a strategy is any good; it only tells you the connection is sanctioned, isolated, and supervised. Judge the strategy by its public record, not by its plumbing."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Does using the official API mean Robinhood approved the bot?",
+          "answer": "No. The API is open infrastructure. Robinhood does not endorse or sponsor the third-party agents that connect through it, and any vendor claiming otherwise is misrepresenting the relationship."
+        },
+        {
+          "question": "Can an agent connected via the API reach my whole account?",
+          "answer": "No — that is the point of the agentic sub-account. The agent operates inside a compartment you create and fund deliberately; your main balance stays outside it."
+        },
+        {
+          "question": "What is the review step in the agentic API?",
+          "answer": "Orders can be prepared as previews with full quote data and broker checks attached, requiring explicit confirmation before anything is placed. Software can run indefinitely in this review-only mode, which is how our own desk operates publicly."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "what-is-review-only-mode-in-agentic-trading",
+        "should-a-trading-bot-have-its-own-account",
+        "are-trading-bots-legal-in-the-us"
+      ],
+      "status": "published",
+      "queueOrder": 3,
+      "datePublished": "2026-07-09",
+      "dateModified": "2026-07-09"
+    },
+    {
+      "slug": "how-to-verify-a-trading-bots-track-record",
+      "question": "How do you verify a trading bot's track record?",
+      "title": "How to Verify a Trading Bot's Track Record (Before Spending a Dime)",
+      "primaryKeyword": "verify a trading bot track record",
+      "shortAnswer": "Demand a continuous, timestamped, public record that includes the losing days — not a screenshot, not a highlight reel, not a backtest. A verifiable track record is published as it happens, covers every decision including the quiet ones, and can be cross-checked against something the vendor cannot edit after the fact. If the record only exists in the vendor's marketing, it is not a record.",
+      "sections": [
+        {
+          "heading": "The verification checklist",
+          "body": [
+            "The core test is simple: could the vendor have fabricated this after the fact? Screenshots fail that test instantly. Backtests fail it by construction — they are simulations tuned with hindsight. Even live results fail it when the vendor only shows you selected windows.",
+            "What passes: a tape. A continuously published journal, updated as decisions happen, with quiet days and losing entries printed in the same font as the good ones. We publish one for our own desk — every cycle, every review, every day — precisely so buyers have something to check before they believe a word we say."
+          ],
+          "bullets": [
+            "Continuity: the record covers every day since it started, with no unexplained gaps.",
+            "Timestamps: entries appear as they happen, not batched after outcomes are known.",
+            "Completeness: quiet days and losing days are printed, not edited out.",
+            "Independence: the history is committed somewhere the vendor cannot silently rewrite, like a public git history."
+          ]
+        },
+        {
+          "heading": "Questions that expose a fake record",
+          "body": [
+            "Ask where the losing days are — every real strategy has them, and a record without them has been curated. Ask to see the specific dates when nothing happened; discipline shows up as boring entries, and fabricated records rarely bother to fake boredom.",
+            "Ask how you could verify an entry independently: does the journal reference real quotes, real timestamps, real broker review checks? And ask what the record looked like before you asked — archives, commit histories, and third-party caches make honest vendors easy to confirm and dishonest ones easy to catch."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Are backtests worthless?",
+          "answer": "Not worthless — they are how strategies get designed. But a backtest is a simulation shaped with hindsight, so it is evidence about the design process, never proof of live behavior."
+        },
+        {
+          "question": "What about verified P&L services?",
+          "answer": "Third-party verification helps, but check what is actually verified: some services only confirm that a screenshot matches an account statement for a chosen window, which still allows cherry-picking the window."
+        },
+        {
+          "question": "Why do you publish your own desk's quiet days?",
+          "answer": "Because a tape that skips boring days is a highlight reel. Our daily pages print every cycle, including the many days where the desk reviewed setups and placed nothing — that restraint is part of the record."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        }
+      ],
+      "related": [
+        "are-trading-bot-screenshots-real",
+        "what-is-a-public-trade-tape",
+        "is-an-ai-trading-bot-safe"
+      ],
+      "status": "queued",
+      "queueOrder": 4,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-is-paper-trading-mode",
+      "question": "What is paper trading mode?",
+      "title": "What Is Paper Trading Mode, and Why Should a Bot Start There?",
+      "primaryKeyword": "what is paper trading mode",
+      "shortAnswer": "Paper trading mode is a full dress rehearsal: the software watches real market prices and records every decision it would make, but no real order is placed and no real money moves. For automated trading it is the single most important safety feature, because it lets you audit exactly how a bot behaves — its discipline, its frequency, its judgment — with zero dollars at risk.",
+      "sections": [
+        {
+          "heading": "What paper mode actually tests",
+          "body": [
+            "A bot in paper mode runs its entire loop against live data: scanning, deciding, sizing, journaling. The only thing removed is execution. That means you can measure everything that matters about its behavior — how often it acts, what it flags, how it responds to a volatile day — before a single real dollar is exposed.",
+            "It also tests the vendor. Software that launches straight into live trading, or makes paper mode hard to find, is telling you what it prioritizes. A desk built safety-first starts on paper by default and makes going live a deliberate, separate act. Ours starts on paper and cannot go live until the operator personally flips the switch."
+          ]
+        },
+        {
+          "heading": "The limits of paper results",
+          "body": [
+            "Paper mode is a behavioral audit, not a preview of results. Real execution involves fills, spreads, and slippage that simulations approximate at best, and a strategy's paper record does not tell you what live trading will do.",
+            "Treat paper mode as a trust-building period: read the journal, check the reasoning on individual entries, watch how it handles a bad day. Graduate to live mode — if ever — only when the behavior itself has convinced you, and even then with small size and a kill switch in reach."
+          ],
+          "bullets": [
+            "Paper mode measures behavior, discipline, and process quality.",
+            "It does not predict live outcomes — fills and slippage are real-world effects.",
+            "The right sequence: paper by default, live only by explicit choice, small size first."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "How long should a bot run on paper before going live?",
+          "answer": "Long enough that you have personally read its journal through several different market conditions — including at least one ugly day. Time matters less than the variety of conditions you have observed."
+        },
+        {
+          "question": "Is paper trading the same as backtesting?",
+          "answer": "No. A backtest replays the past with hindsight; paper mode makes real-time decisions on live data without executing. Paper mode is much harder to fake, which is why it is better evidence."
+        },
+        {
+          "question": "Does your own desk run on paper?",
+          "answer": "Yes — the Bluechip desk on our public tape runs in review-only paper mode, journaling every decision. The daily pages on this site are generated from that journal."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "CFTC learning resources for customers",
+          "url": "https://www.cftc.gov/learnandprotect/learningresources"
+        }
+      ],
+      "related": [
+        "what-is-review-only-mode-in-agentic-trading",
+        "can-you-stop-a-trading-bot-instantly",
+        "how-to-verify-a-trading-bots-track-record"
+      ],
+      "status": "queued",
+      "queueOrder": 5,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "can-a-trading-bot-promise-results",
+      "question": "Can a trading bot promise you results?",
+      "title": "Can a Trading Bot Promise You Results? No — Here's Why",
+      "primaryKeyword": "can a trading bot promise results",
+      "shortAnswer": "No. Markets are uncertain, trading involves risk of loss, and no software — however sophisticated — can promise what an uncertain market will do. Honest vendors sell tools, discipline, and transparency; the word 'guaranteed' next to any number in trading marketing is a reliable sign you are reading a scam.",
+      "sections": [
+        {
+          "heading": "Why certainty claims are always false",
+          "body": [
+            "Every trade is a bet against other participants, many of them professionals with more information and faster infrastructure. Outcomes depend on future prices, and future prices are not knowable. That is not a limitation of today's AI — it is the structure of markets.",
+            "This is why regulators treat certainty language as a fraud signal. The CFTC has warned specifically about AI-flavored pitches that dress up old scams in new vocabulary, and the SEC's investor alerts repeatedly flag the same pattern: the sales page is confident precisely because the product cannot be."
+          ]
+        },
+        {
+          "heading": "What honest trading software can offer",
+          "body": [
+            "A legitimate desk sells things it can actually control: safety architecture, isolation, journaling, a kill switch, disciplined rules, and a public record of behavior. Those are real, checkable, and valuable — and none of them are outcome claims.",
+            "That is the deal we offer with our own software: we publish the full tape, quiet days and losing entries included, and we tell every buyer plainly that trading involves risk of loss and outcomes belong to the market. Anything more confident than that would be a lie."
+          ],
+          "bullets": [
+            "Control what is controllable: process, safety, transparency.",
+            "Publish behavior; never predict outcomes.",
+            "Treat certainty in trading marketing as disqualifying."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What phrasing should make me close the tab?",
+          "answer": "Any pitch built on certainty: fixed monthly outcomes, 'never a down month', or urgency around a sure thing. Real trading tools describe process and risk; only scams describe certainty."
+        },
+        {
+          "question": "Isn't a strong track record a kind of promise?",
+          "answer": "No. A genuine record describes the past. Honest vendors present it with the standard caveat that past activity does not predict future results — and mean it."
+        },
+        {
+          "question": "So what should I evaluate instead of promised outcomes?",
+          "answer": "Safety architecture, custody, isolation, the kill switch, the completeness of the public record, and whether the vendor's incentives depend on your trading volume."
+        }
+      ],
+      "sources": [
+        {
+          "label": "CFTC customer advisory: criminals' increasing use of generative AI in fraud",
+          "url": "https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AI_Fraud.html"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "how-do-trading-bot-scams-work",
+        "how-to-verify-a-trading-bots-track-record",
+        "are-trading-bot-screenshots-real"
+      ],
+      "status": "queued",
+      "queueOrder": 6,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-is-a-kill-switch-in-automated-trading",
+      "question": "What is a kill switch in automated trading?",
+      "title": "What Is a Kill Switch in Automated Trading (and Who Should Hold It)?",
+      "primaryKeyword": "kill switch automated trading",
+      "shortAnswer": "A kill switch is a single control that stops all automated trading activity immediately — no queue, no wind-down period, no support ticket. In a well-designed retail desk the operator holds it personally, it works even when everything else is broken, and flipping it is boring: the system just stops. If a vendor cannot show you the kill switch before you buy, do not buy.",
+      "sections": [
+        {
+          "heading": "What a real kill switch looks like",
+          "body": [
+            "The test of a kill switch is not the button — it is the architecture behind it. A real one sits between the strategy and the broker, so that when it is off, orders physically cannot flow, regardless of what the strategy thinks it wants to do. It fails closed: if the switch's state is unknown, nothing trades.",
+            "It also needs to be yours. A kill switch on the vendor's server, operated by the vendor's staff during the vendor's business hours, is a customer-service process, not a safety control. Our own desk stack runs the switch locally with the operator, alongside two narrower controls: one switch to go live, one switch to fall back to paper."
+          ],
+          "bullets": [
+            "Sits in the order path, not in the strategy's good intentions.",
+            "Fails closed: uncertainty means stop.",
+            "Held by the operator, not the vendor.",
+            "Independent of the strategy process, so a hung bot can still be stopped."
+          ]
+        },
+        {
+          "heading": "The professional precedent",
+          "body": [
+            "Kill switches are not a hobbyist invention — they are standard market infrastructure. Exchanges provide them to member firms, and risk controls that can halt an algorithm are a baseline expectation in institutional trading, reinforced by rules like the SEC's market access requirements after several famous runaway-algorithm incidents.",
+            "Retail deserves the same architecture at smaller scale. When you evaluate any automated trading product, ask to see the stop control demonstrated live — a vendor proud of its safety design will show you; a vendor selling excitement will change the subject."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Is closing the app a kill switch?",
+          "answer": "No. If the bot runs on a server, closing your app changes nothing. The switch has to stop the thing that actually talks to the broker."
+        },
+        {
+          "question": "What about revoking API access at the broker?",
+          "answer": "That is an excellent backstop, and one reason official broker APIs beat password-sharing: you can cut the connection at the broker level even if the vendor's software misbehaves."
+        },
+        {
+          "question": "Does your desk really stop instantly?",
+          "answer": "Yes — the runner is gated: every cycle checks the switch before it can act, and the switch state blocks order flow, not just new decisions. Stopping is the most-tested path in the stack."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "can-you-stop-a-trading-bot-instantly",
+        "is-an-ai-trading-bot-safe",
+        "what-is-paper-trading-mode"
+      ],
+      "status": "queued",
+      "queueOrder": 7,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "how-do-trading-bot-scams-work",
+      "question": "How do trading bot scams work?",
+      "title": "How Trading Bot Scams Work: The Playbook, Step by Step",
+      "primaryKeyword": "trading bot scams",
+      "shortAnswer": "Most trading bot scams never trade at all — the 'bot' is a story used to collect deposits. The playbook is consistent: manufactured social proof, screenshots of results you cannot verify, pressure to fund quickly, and a withdrawal process that mysteriously breaks once your money is in. The AI label changed the vocabulary, not the scam.",
+      "sections": [
+        {
+          "heading": "The standard playbook",
+          "body": [
+            "Step one is borrowed trust: a friend's hacked account, a celebrity deepfake, a polished influencer, or a romance contact who 'happens' to trade. Step two is the demonstration — screenshots, a slick dashboard, sometimes a small early withdrawal that works perfectly, all designed to make the operation feel real.",
+            "Step three is escalation: bigger deposits, VIP tiers, tax or unlock fees. Step four is the exit — withdrawals stall, support goes quiet, the site disappears. The CFTC and FINRA both document this arc across thousands of cases; the trading bot is set dressing for a deposit-collection scheme."
+          ],
+          "bullets": [
+            "Contact through social media, dating apps, or messaging groups you did not seek out.",
+            "Results shown only as screenshots or inside the scammer's own app.",
+            "Deposits requested in crypto, gift cards, or wires to personal accounts.",
+            "A working small withdrawal early — the most expensive trust signal you will ever receive.",
+            "Fees required to unlock your own money. Real brokers never do this."
+          ]
+        },
+        {
+          "heading": "How legitimate products differ structurally",
+          "body": [
+            "The clean separation is custody. A legitimate software vendor never takes deposits: you buy software, and your money stays at your own regulated broker, in your own account, reachable only by you. If the product's flow involves sending funds to the vendor or its 'platform', you are not buying software — you are making an unsecured loan to a stranger.",
+            "The second separation is verifiability. Legitimate desks publish continuous records and invite inspection before purchase; scams show curated evidence and demand commitment first. When in doubt, check the firm and its people against FINRA BrokerCheck and the SEC's action lists, and assume urgency is itself the red flag."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "The bot let me withdraw a small amount. Doesn't that prove it's real?",
+          "answer": "The opposite — the working small withdrawal is a standard scam investment. It costs the operator a little to unlock much larger deposits from you and everyone you tell."
+        },
+        {
+          "question": "What if the trading dashboard shows my balance growing?",
+          "answer": "A dashboard is a web page; the numbers can be anything. Balances only mean something at a regulated broker in an account under your own name."
+        },
+        {
+          "question": "Where do I report a suspected trading bot scam?",
+          "answer": "The CFTC (cftc.gov/complaint), the SEC (sec.gov/tcr), FINRA, and the FBI's IC3 all take reports. Report even if you feel foolish — patterns across reports are how these operations get shut down."
+        }
+      ],
+      "sources": [
+        {
+          "label": "CFTC customer advisory: criminals' increasing use of generative AI in fraud",
+          "url": "https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AI_Fraud.html"
+        },
+        {
+          "label": "FINRA: signs of imposter investment scams",
+          "url": "https://www.finra.org/investors/insights/be-alert-signs-imposter-investment-scams"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "is-an-ai-trading-bot-safe",
+        "can-a-trading-bot-promise-results",
+        "are-trading-bot-screenshots-real"
+      ],
+      "status": "queued",
+      "queueOrder": 8,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "how-do-trading-bot-vendors-charge",
+      "question": "How do trading bot vendors charge, and why does it matter?",
+      "title": "How Trading Bot Vendors Charge — and What Each Model Tells You",
+      "primaryKeyword": "trading bot pricing models",
+      "shortAnswer": "The pricing model tells you whose side the vendor is on. Flat license fees and subscriptions keep incentives clean: the vendor is paid for software, not for your activity. Fee structures tied to your trading volume, deposits routed through the vendor, or opaque 'performance' cuts create incentives to make you trade more — or are not software businesses at all.",
+      "sections": [
+        {
+          "heading": "The main models, ranked by incentive alignment",
+          "body": [
+            "A one-time license or a plain subscription is the cleanest structure: the vendor's revenue does not change whether you trade once a month or a hundred times a day. This is how we price our own desk — one flat license, no cut of anything, no subscription.",
+            "Volume-linked models deserve more suspicion. A vendor paid per trade, per contract, or through broker rebates benefits when you churn. Performance-fee models sound aligned but usually are not for retail: they capture upside while you alone hold the downside, and legitimate performance-fee arrangements normally live inside regulated advisory relationships, not software licenses."
+          ],
+          "bullets": [
+            "Flat license / subscription: cleanest — revenue independent of your activity.",
+            "Per-trade or rebate-linked: vendor benefits from your churn; scrutinize hard.",
+            "Performance cut on software: usually a regulatory and incentive red flag for retail.",
+            "Deposits to the vendor: not a pricing model — a custody red flag that overrides everything else."
+          ]
+        },
+        {
+          "heading": "Questions to ask before paying anything",
+          "body": [
+            "Ask the vendor to complete this sentence: 'We get paid when ___.' If the honest answer involves your trading activity, your deposits, or recruiting others, price that into your trust accordingly. Then ask what happens when you stop paying — good software degrades gracefully or keeps working; hostage models that lock your data or positions are telling you who owns whom.",
+            "Finally, ask what the total cost of operation is: subscriptions, data fees, VPS hosting, and the trading costs the strategy itself generates. A cheap license driving an expensive trading pattern is not cheap."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Is a free trading bot safe to use?",
+          "answer": "Free means the business model is somewhere you cannot see it — data harvesting, order-flow arrangements, upsells, or outright fraud. Free plus custody of your funds is the worst combination."
+        },
+        {
+          "question": "Why do you charge a one-time license instead of a subscription?",
+          "answer": "So the incentive statement stays one sentence: we are paid for software, once, and nothing about your subsequent trading changes what we receive."
+        },
+        {
+          "question": "Are performance fees ever legitimate?",
+          "answer": "Yes — inside regulated advisory and fund structures with disclosure and qualification rules. Attached to a retail software license, they usually signal a vendor acting like an unregistered fund."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "what-does-not-a-fund-mean-for-trading-software",
+        "how-do-trading-bot-scams-work",
+        "is-a-trading-bot-the-same-as-financial-advice"
+      ],
+      "status": "queued",
+      "queueOrder": 9,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "should-a-trading-bot-have-its-own-account",
+      "question": "Should a trading bot have its own account?",
+      "title": "Should a Trading Bot Have Its Own Account? Yes — Here's the Architecture",
+      "primaryKeyword": "trading bot separate account",
+      "shortAnswer": "Yes, always. A bot should live in a dedicated, isolated compartment — a sub-account or separate account — funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from 'my savings' to 'the $50 I put in the compartment', and any vendor who resists this structure is asking for more access than the job requires.",
+      "sections": [
+        {
+          "heading": "Why isolation is the single highest-value safety feature",
+          "body": [
+            "Software fails in creative ways: bugs, bad data, unexpected market conditions, or plain misdesign. You cannot audit every line of a vendor's code, but you can cap the blast radius. An isolated account with a deliberate balance is a structural guarantee that no failure mode, however exotic, reaches beyond it.",
+            "This is why Robinhood's agentic architecture is built around a dedicated sub-account: the agent operates inside a compartment you create, and the rest of your money is not merely off-limits by policy — it is unreachable by construction. Our Bluechip desk requires this setup; there is no supported way to point it at a main account."
+          ],
+          "bullets": [
+            "Blast radius: worst case is capped at the compartment's balance.",
+            "Clean accounting: the compartment's history is entirely the bot's record.",
+            "Psychological clarity: money in the compartment is money you decided to put at risk.",
+            "Instant defunding: emptying the compartment is a kill switch the broker enforces."
+          ]
+        },
+        {
+          "heading": "How to size the compartment",
+          "body": [
+            "Fund it with an amount whose complete loss would annoy you but change nothing about your life. During any evaluation period, smaller is smarter — our own desk trades $5 fractional clips during its beta precisely so the compartment can stay small while still generating a real, checkable record.",
+            "Resist the urge to scale up because the record looks good. Scale decisions should follow time and variety of conditions observed, not recent results — and the compartment structure means you can always scale deliberately, rather than being scaled by enthusiasm."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Isn't a separate account a hassle?",
+          "answer": "It is one setup step, and it replaces an unbounded risk with a bounded one. No other single decision in automated trading buys as much safety for as little effort."
+        },
+        {
+          "question": "What if a vendor says isolation isn't necessary?",
+          "answer": "That vendor is asking for more access than the job requires, which is itself the answer. Decline."
+        },
+        {
+          "question": "Can I run multiple bots in one compartment?",
+          "answer": "You can, but you lose per-bot accountability — the journal of each strategy gets tangled with the others. One compartment per strategy keeps every record clean."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        }
+      ],
+      "related": [
+        "robinhood-agentic-trading-api-explained",
+        "is-an-ai-trading-bot-safe",
+        "what-is-a-kill-switch-in-automated-trading"
+      ],
+      "status": "queued",
+      "queueOrder": 10,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-is-a-public-trade-tape",
+      "question": "What is a public trade tape?",
+      "title": "What Is a Public Trade Tape? The Transparency Standard for Trading Bots",
+      "primaryKeyword": "public trade tape trading bot",
+      "shortAnswer": "A public trade tape is a continuously published record of every decision a trading operation makes — entries, exits, passes, and quiet days — visible to anyone, as it happens. It is the strongest transparency standard a trading product can adopt, because it removes the vendor's ability to curate the story after outcomes are known.",
+      "sections": [
+        {
+          "heading": "What belongs on a tape",
+          "body": [
+            "The word comes from the ticker tape era, when trades printed to paper in real time and anyone could read the strip. A modern tape does the same job: it prints the operation's activity as a running public log — not a monthly summary, not a curated case study, but the raw sequence including the days when nothing happened.",
+            "Completeness is what separates a tape from marketing. Our own tape prints every cycle of the Bluechip desk: the setups it prepared for review, the orders it placed (and the long stretches when that number is zero), plus the fund dashboard's own warnings when something is degraded. If we only showed you the flattering parts, it would not be a tape."
+          ],
+          "bullets": [
+            "Every decision, timestamped, in sequence — including passes and quiet days.",
+            "Published as it happens, not after outcomes are known.",
+            "Losses and warnings printed in the same font as everything else.",
+            "An archive that cannot be silently rewritten — ours lives in a public git history."
+          ]
+        },
+        {
+          "heading": "How to read someone's tape critically",
+          "body": [
+            "Start with the gaps: does the record cover every day, or does it start conveniently after a rough patch? Check granularity: a tape of monthly summaries hides everything interesting. Then read a boring day closely — the entries where a desk decided not to act reveal its discipline better than any winning entry.",
+            "Finally, check that the tape connects to reality: real timestamps, real quotes, plausible frequencies. A tape is evidence, not proof — but it is evidence a vendor must produce continuously in public, which makes it the hardest signal to fake for long."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Is a live dashboard the same as a tape?",
+          "answer": "A dashboard shows current state; a tape preserves history. You need both: the dashboard for what is true now, the tape for what has been true all along."
+        },
+        {
+          "question": "Why would a vendor publish losing days voluntarily?",
+          "answer": "Because it is the only way to be believed by careful buyers. A record with losses in it is evidence; a record without them is advertising."
+        },
+        {
+          "question": "Where is your tape?",
+          "answer": "The live dashboard is at daytradingbot.net/fundmanager, and the daily archive — one page per market day, generated from the desk journal — is at daytradingbot.net/tape."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        }
+      ],
+      "related": [
+        "how-to-verify-a-trading-bots-track-record",
+        "are-trading-bot-screenshots-real",
+        "what-is-paper-trading-mode"
+      ],
+      "status": "queued",
+      "queueOrder": 11,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "is-a-trading-bot-the-same-as-financial-advice",
+      "question": "Is a trading bot the same as financial advice?",
+      "title": "Is a Trading Bot Financial Advice? Where the Line Actually Sits",
+      "primaryKeyword": "is a trading bot financial advice",
+      "shortAnswer": "No — and the distinction matters legally and practically. Software that executes rules you chose to run is a tool, like a spreadsheet; personalized recommendations about what you specifically should do with your money is advice, a regulated activity. A legitimate bot vendor sells the tool and refuses to cross that line; be wary of any product that blurs it.",
+      "sections": [
+        {
+          "heading": "The regulatory line in plain English",
+          "body": [
+            "US regulation broadly distinguishes between publishing tools or general information and giving individualized investment advice for compensation. The second category triggers adviser registration, fiduciary duties, and supervision. Software vendors live in the first category — as long as they actually behave like it.",
+            "The practical test: does the product tell you what to do with your particular money? A bot executing a fixed, disclosed ruleset that you chose to deploy is your decision, automated. A service that evaluates your situation and steers you into positions is functioning as an adviser, whatever its marketing says."
+          ]
+        },
+        {
+          "heading": "Why honest vendors stay firmly on the tool side",
+          "body": [
+            "We build trading software, and we hold the line deliberately: we never tell anyone what to buy, we make no predictions, and the desk's written rules are readable by the operator who runs them. The operator decides whether to run the desk at all, on paper or live, and holds every switch.",
+            "When you evaluate any bot, read the vendor's language. 'Our software follows these rules, you decide whether to run it' is a tool. 'Our AI knows what you should be holding' is advice-shaped marketing from someone who almost certainly is not registered to give it — which tells you about their relationship with rules generally."
+          ],
+          "bullets": [
+            "Tool: fixed disclosed rules, operator decides, no personalization.",
+            "Advice: individualized recommendations, a regulated activity.",
+            "Red flag: advice-shaped claims from a vendor with no registration."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Does automating my trades create advice?",
+          "answer": "No — automating your own decisions in your own account is not advice. The regulated category is other people directing your money or recommending positions specifically to you."
+        },
+        {
+          "question": "Are robo-advisers the same as trading bots?",
+          "answer": "No. Robo-advisers are registered investment advisers using automation to deliver a regulated advisory service. Trading bots are execution tools that stay outside that relationship."
+        },
+        {
+          "question": "Is anything on this site investment advice?",
+          "answer": "No. Everything we publish — including our tape and these answer pages — is general information about how trading software works. We never make recommendations about your money."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        }
+      ],
+      "related": [
+        "are-trading-bots-legal-in-the-us",
+        "what-does-not-a-fund-mean-for-trading-software",
+        "what-rules-apply-to-retail-algorithmic-trading"
+      ],
+      "status": "queued",
+      "queueOrder": 12,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "how-much-money-does-automated-trading-require",
+      "question": "How much money do you need to try automated trading?",
+      "title": "How Much Money Do You Need to Try Automated Trading? Less Than You Think",
+      "primaryKeyword": "how much money to start automated trading",
+      "shortAnswer": "With fractional shares, meaningfully less than most people assume: a bot can run a real, fully-journaled process with tens of dollars in an isolated sub-account — and on paper mode, with zero. The right starting amount is not a strategy question, it is a safety question: only money whose total loss you can absorb without consequence belongs in the compartment.",
+      "sections": [
+        {
+          "heading": "The honest budget for getting started",
+          "body": [
+            "Paper mode costs nothing and produces the most valuable early output: a journal of real decisions on live data. There is no reason to fund anything until you have read weeks of that journal and still want to proceed.",
+            "When funding, fractional shares changed the arithmetic. A desk trading $5 fractional clips — which is how our own Bluechip desk runs its beta — can operate a complete, disciplined process in a sub-account holding less than a dinner out. The point of starting small is not timidity; it is that process quality is observable at any size, so you should pay the minimum tuition to observe it."
+          ],
+          "bullets": [
+            "Paper mode: $0, and where every evaluation should start.",
+            "Small live compartment: enough for the strategy's smallest position size, a few times over.",
+            "Never: rent money, emergency funds, or borrowed money. Trading involves risk of loss at every size."
+          ]
+        },
+        {
+          "heading": "Beware the minimum-deposit pitch",
+          "body": [
+            "Reverse the framing when a vendor sets the number. Products that require large minimum deposits 'to work properly' are telling you their economics need your capital at risk — a structure that benefits from your size, not your safety. Legitimate software works identically on a small compartment.",
+            "Watch also for tiered pitches where bigger deposits unlock better features or 'VIP strategies'. That is a deposit-maximization funnel, and the CFTC's fraud advisories describe exactly where it leads."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Can you run a real test with only $20 or $50?",
+          "answer": "Yes — with fractional shares a desk can execute its full process at that scale, and the journal it produces is just as informative as one from a large account."
+        },
+        {
+          "question": "Do results at small size scale up?",
+          "answer": "Process behavior scales; outcomes may not, because fills and liquidity effects grow with size. Scale slowly and treat each size increase as a new evaluation."
+        },
+        {
+          "question": "Why does your desk trade $5 clips?",
+          "answer": "Deliberate smallness during beta: it keeps every operator's worst case tiny while still generating a complete public record of real decisions."
+        }
+      ],
+      "sources": [
+        {
+          "label": "CFTC learning resources for customers",
+          "url": "https://www.cftc.gov/learnandprotect/learningresources"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "should-a-trading-bot-have-its-own-account",
+        "what-is-paper-trading-mode",
+        "what-happens-when-a-trading-bot-loses-money"
+      ],
+      "status": "queued",
+      "queueOrder": 13,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-happens-when-a-trading-bot-loses-money",
+      "question": "What happens when a trading bot loses money?",
+      "title": "What Happens When a Trading Bot Loses Money? The Part Nobody Markets",
+      "primaryKeyword": "trading bot loses money",
+      "shortAnswer": "The losses are yours — fully, immediately, and with no recourse to the vendor in any legitimate software arrangement. Every real strategy has losing days, so the useful questions are structural: is the worst case capped by an isolated account, does the bot's risk framework limit each position, and does its journal make the loss explainable rather than mysterious.",
+      "sections": [
+        {
+          "heading": "Whose loss is it, and what bounds it",
+          "body": [
+            "Buying trading software is buying a tool: the vendor is paid for the tool, and market outcomes — both directions — belong to the operator. Any arrangement claiming the vendor absorbs your downside is either a regulated product wearing a costume or a fraud building trust before an exit.",
+            "What you control is the bound. An isolated sub-account caps the absolute worst case at the compartment balance. Position sizing caps each individual mistake — a desk trading $5 fractional clips cannot have a catastrophic single trade. And a kill switch caps duration: when behavior looks wrong, you stop it now, not after support answers."
+          ],
+          "bullets": [
+            "Vendor liability: none, in any honest software arrangement — plan accordingly.",
+            "Absolute bound: the isolated compartment's balance.",
+            "Per-trade bound: position sizing rules you can read before running.",
+            "Duration bound: your kill switch."
+          ]
+        },
+        {
+          "heading": "A losing day on a well-run desk",
+          "body": [
+            "On a desk with a real journal, a losing day is a legible event: which position, on which signal, under which rule, closed by which decision. You can trace it, judge whether the process was followed, and decide whether the rules still deserve to run. That is what 'losses included' means on our public tape — losing entries print in the same font as everything else.",
+            "The alternative is the mysterious loss: a balance that dropped for reasons the product cannot explain. Treat explainability as a purchase criterion — a bot that cannot show its reasoning on a losing day was never showing you its reasoning at all."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Can I get a refund from the vendor after losses?",
+          "answer": "Refund policies cover the software license, not trading outcomes. Our own guarantee, for example, refunds the license if you cannot get the desk running — it does not and cannot cover what markets do."
+        },
+        {
+          "question": "Can a bot lose more than what's in its account?",
+          "answer": "In a cash-funded, long-only compartment, losses are bounded by the balance. Margin, options, and short exposure can exceed it — which is a strong argument for keeping automated experiments in unleveraged cash accounts."
+        },
+        {
+          "question": "Does a losing week mean the bot is broken?",
+          "answer": "Not by itself — variance produces losing stretches in valid strategies. What distinguishes broken from unlucky is the journal: rule violations and unexplainable entries are defects; explained losses within stated risk are the cost of participation."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        }
+      ],
+      "related": [
+        "how-much-money-does-automated-trading-require",
+        "what-is-a-public-trade-tape",
+        "can-a-trading-bot-promise-results"
+      ],
+      "status": "queued",
+      "queueOrder": 14,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "can-you-stop-a-trading-bot-instantly",
+      "question": "Can you stop a trading bot instantly?",
+      "title": "Can You Stop a Trading Bot Instantly? Only If It Was Built to Stop",
+      "primaryKeyword": "stop a trading bot instantly",
+      "shortAnswer": "Only if stopping was designed in from the start. A properly built desk stops in one action, from anywhere, in seconds — the switch sits in the order path, so 'off' means orders physically cannot flow. Products where stopping means emailing support, waiting for a wind-down, or hunting through settings have told you their priorities; believe them.",
+      "sections": [
+        {
+          "heading": "What instant stopping requires architecturally",
+          "body": [
+            "Stopping fast is an architecture, not a button. The stop control has to live between the strategy and the broker connection, checked before any order can move, so that a confused, hung, or misbehaving strategy is still stoppable. It has to fail closed — if the system cannot read the switch, it must not trade. And it has to be reachable when you are panicking on a phone, not just from a terminal at home.",
+            "Our own desk stack is built around exactly this: a gated runner that checks the global kill switch every cycle, one switch to go live, one switch back to paper. Stopping is the most exercised code path in the system, on purpose."
+          ],
+          "bullets": [
+            "In the order path: off means no order flow, regardless of strategy state.",
+            "Fails closed: unknown switch state means stop.",
+            "Reachable: works from your phone in seconds, not your desk in minutes.",
+            "Layered: strategy pause, desk kill switch, broker-level API revocation, compartment defunding."
+          ]
+        },
+        {
+          "heading": "The stop test to run before you buy",
+          "body": [
+            "Ask any vendor to demonstrate the stop, live, mid-cycle. Time it. Then ask the follow-ups: what happens to open orders when the switch flips? What happens to open positions? Can the bot restart itself, or does resuming require a deliberate human act? The answers should be immediate, specific, and boring.",
+            "Also rehearse your own layers: know how to flip the desk switch, how to revoke the API connection at the broker, and how to defund the compartment. Three independent ways to stop, none of which depend on the vendor being awake."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What happens to open positions when I stop a bot?",
+          "answer": "Stopping halts new activity; existing positions remain yours to manage in your brokerage account. A good desk documents this explicitly so there are no surprises."
+        },
+        {
+          "question": "Can a bot restart itself after I stop it?",
+          "answer": "It must not. Resuming should require the same deliberate human action as going live in the first place — anything that un-stops itself does not have a kill switch, it has a snooze button."
+        },
+        {
+          "question": "Is broker-level revocation enough on its own?",
+          "answer": "It is a strong backstop, but you want it as the second layer, not the only one — the desk's own switch is faster and does not depend on finding a settings page under stress."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "what-is-a-kill-switch-in-automated-trading",
+        "should-a-trading-bot-have-its-own-account",
+        "what-is-paper-trading-mode"
+      ],
+      "status": "queued",
+      "queueOrder": 15,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "are-trading-bot-screenshots-real",
+      "question": "Are trading bot screenshots real?",
+      "title": "Are Trading Bot Screenshots Real? How Results Get Cherry-Picked",
+      "primaryKeyword": "trading bot screenshots fake",
+      "shortAnswer": "Treat every results screenshot as marketing until proven otherwise — even authentic ones are usually cherry-picked, and fabricated ones are trivial to produce. A screenshot shows one chosen moment from one chosen account; what you need is the whole sequence, published continuously, somewhere the vendor cannot edit history. No screenshot survives that comparison.",
+      "sections": [
+        {
+          "heading": "The three layers of screenshot deception",
+          "body": [
+            "Layer one is fabrication: broker interfaces can be faked with demo accounts, browser dev tools, or image editing in minutes, and generative tools have made this effortless. Layer two is selection: a real account's best week, screenshotted, with the surrounding months omitted. Layer three is survivorship: run twenty accounts with different settings, screenshot the winner, delete the rest.",
+            "None of these require the vendor to lie about any individual image. That is what makes screenshots such durable marketing — each one can be 'real' while the impression they create is false."
+          ],
+          "bullets": [
+            "Fabrication: demo accounts and edited images, indistinguishable at a glance.",
+            "Selection: true images of untypical moments.",
+            "Survivorship: the winning account of many, presented as the only one.",
+            "The tell: precision about one moment, vagueness about the sequence."
+          ]
+        },
+        {
+          "heading": "What evidence actually holds up",
+          "body": [
+            "Continuity beats snapshots. A record published as a running sequence — every day, in order, including the flat and losing stretches — removes the selection degrees of freedom that make screenshots meaningless. If the history lives in something like a public git log, editing the past becomes visible, which is the property a screenshot can never have.",
+            "This is why our tape is the argument we lead with: not because the numbers are always flattering (a real tape's numbers routinely are not), but because the format itself is the honesty. Ask any vendor showing you a screenshot one question: where is the rest of the sequence?"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What about video of live trading instead of screenshots?",
+          "answer": "Video raises the production bar but changes nothing structural — it is still one selected window from one selected account. Sequence and continuity are what matter."
+        },
+        {
+          "question": "A vendor showed me their broker statement. Is that solid?",
+          "answer": "Better than a screenshot, still selectable. One statement is one month of one account. Ask for continuity: every month since inception, or a live continuously-published record."
+        },
+        {
+          "question": "Are the numbers on your own tape flattering?",
+          "answer": "Often not — the live dashboard prints negative test results and degraded-status warnings when they happen. That is deliberate: a record only counts as evidence if it prints when it hurts."
+        }
+      ],
+      "sources": [
+        {
+          "label": "CFTC customer advisory: criminals' increasing use of generative AI in fraud",
+          "url": "https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AI_Fraud.html"
+        },
+        {
+          "label": "FINRA: signs of imposter investment scams",
+          "url": "https://www.finra.org/investors/insights/be-alert-signs-imposter-investment-scams"
+        }
+      ],
+      "related": [
+        "how-to-verify-a-trading-bots-track-record",
+        "what-is-a-public-trade-tape",
+        "how-do-trading-bot-scams-work"
+      ],
+      "status": "queued",
+      "queueOrder": 16,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-rules-apply-to-retail-algorithmic-trading",
+      "question": "What rules apply to retail algorithmic trading?",
+      "title": "What Rules Apply to Retail Algorithmic Trading? A Field Guide",
+      "primaryKeyword": "retail algorithmic trading rules",
+      "shortAnswer": "Your bot trades under the same rulebook as your finger: securities laws against manipulation and fraud, FINRA and exchange rules enforced through your broker, plus account-level rules like the pattern day trader thresholds. There is no separate license for retail automation — but there is also no automation exemption from any rule that binds human trading.",
+      "sections": [
+        {
+          "heading": "The rules most likely to touch a retail bot",
+          "body": [
+            "Market-conduct rules top the list: manipulative patterns like spoofing or wash trading are illegal regardless of intent or automation, and a badly designed bot can produce them accidentally — rapid order/cancel loops are a classic hazard. Your broker supervises the order flow and will restrict accounts that generate problematic patterns.",
+            "Account-level rules matter day to day. The pattern day trader rule flags margin accounts making four or more day trades in five business days below the equity threshold; frequent-trading rules on both the broker's side and yours can bite an active bot. Cash accounts sidestep some of this at the cost of settlement timing."
+          ],
+          "bullets": [
+            "Anti-manipulation rules apply to accidental patterns, not just intent.",
+            "Pattern day trader rule: automated frequency can trip it quickly in margin accounts.",
+            "Broker terms of service: the operative rulebook for what automation is permitted at all.",
+            "Tax records: every automated trade is a taxable event you must be able to account for."
+          ]
+        },
+        {
+          "heading": "Where the compliance burden actually sits",
+          "body": [
+            "Practically, your broker is the enforcement layer: their systems monitor order flow, apply the suitability and market-access checks, and decide what automated behavior their terms permit. This is a real advantage of official agent APIs — the broker's checks run on every order by construction, rather than being bypassed by a password-sharing bot.",
+            "The vendor's obligations are about honesty: no fabricated results, no advice without registration, no operating as an unregistered fund. As the operator, your job is simpler but real: run software whose behavior you can read, inside your broker's terms, with records you keep."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Can I accidentally break market rules with a bot?",
+          "answer": "Yes — rapid order-and-cancel behavior can resemble manipulation regardless of your intent, which is one reason to favor slow, small, well-journaled strategies and brokers whose checks stay in the loop."
+        },
+        {
+          "question": "Does the pattern day trader rule apply to bots?",
+          "answer": "It applies to the account, not the trader's species. An automated strategy making frequent same-day round trips in a margin account will trip it exactly as a human would."
+        },
+        {
+          "question": "Is this section legal advice?",
+          "answer": "No — it is general orientation. Rules change and situations differ; for decisions that matter, read the primary sources linked below or consult a securities attorney."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "CFTC learning resources for customers",
+          "url": "https://www.cftc.gov/learnandprotect/learningresources"
+        }
+      ],
+      "related": [
+        "are-trading-bots-legal-in-the-us",
+        "is-a-trading-bot-the-same-as-financial-advice",
+        "robinhood-agentic-trading-api-explained"
+      ],
+      "status": "queued",
+      "queueOrder": 17,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-is-review-only-mode-in-agentic-trading",
+      "question": "What is review-only mode in agentic trading?",
+      "title": "What Is Review-Only Mode in Agentic Trading? The Human-in-the-Loop Layer",
+      "primaryKeyword": "review-only mode agentic trading",
+      "shortAnswer": "Review-only mode is a step beyond paper trading: the agent prepares real orders through the broker's actual API — real quotes, real suitability checks, real order previews — but stops at the review step, where nothing executes without explicit human confirmation. It proves the entire pipeline works end-to-end while keeping a human decision between the software and every dollar.",
+      "sections": [
+        {
+          "heading": "How review-only differs from paper mode",
+          "body": [
+            "Paper mode simulates; review-only mode rehearses with the real machinery. In Robinhood's agentic architecture, an order can be submitted for preview: the broker returns the live quote data, runs its order checks and suitability alerts, and produces the exact confirmation a human would see — but placement requires a separate, deliberate call that review-only mode never makes.",
+            "That distinction matters for trust. A paper journal proves the strategy's logic; a review-only journal proves the whole integration — authentication, market data, order construction, broker checks — is real and working, with zero execution risk. Our Bluechip desk runs its public beta in exactly this mode: the tape you see is real broker-side machinery, stopping one step short of placement, every time."
+          ],
+          "bullets": [
+            "Real API, real quotes, real broker checks — no execution.",
+            "Every prepared order is journaled with its full review payload.",
+            "Going live is a separate mode requiring a deliberate operator decision.",
+            "The strictest form of human-in-the-loop: the loop cannot be closed by software."
+          ]
+        },
+        {
+          "heading": "What a review-only tape teaches you",
+          "body": [
+            "Reading a review-only journal shows you the desk's judgment at full fidelity: which dips it flagged, how it sized the order, what the broker's checks said, what the quote context was at that moment. You learn its temperament — how often it acts, what it ignores — before any capital is exposed.",
+            "It also creates the cleanest possible upgrade path. Because the pipeline is already real, going live changes exactly one thing: the final confirmation step. There is no new integration to trust, no simulation-to-reality gap to cross — just the same machinery, now permitted to complete."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Is review-only mode the same as the broker asking for confirmation?",
+          "answer": "It uses that machinery, but as a standing policy: the desk is configured so every order stops at the preview stage indefinitely, making 'prepare but never place' the mode itself rather than a per-order choice."
+        },
+        {
+          "question": "Why run a public beta in review-only mode?",
+          "answer": "It maximizes what the public record proves — real pipeline, real decisions, real broker checks — while keeping execution risk at exactly zero during the period when trust is still being established."
+        },
+        {
+          "question": "Can I keep a desk in review-only mode forever?",
+          "answer": "Yes, and it is a legitimate way to use one: a fully-instrumented second opinion that flags setups and drafts orders while you retain every final decision."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA investor insights",
+          "url": "https://www.finra.org/investors/insights"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "robinhood-agentic-trading-api-explained",
+        "what-is-paper-trading-mode",
+        "what-is-a-public-trade-tape"
+      ],
+      "status": "queued",
+      "queueOrder": 18,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "should-a-trading-bot-know-your-password",
+      "question": "Should a trading bot know your brokerage password?",
+      "title": "Should a Trading Bot Know Your Brokerage Password? Never",
+      "primaryKeyword": "trading bot brokerage password",
+      "shortAnswer": "Never. A bot holding your password is indistinguishable from the bot's author holding your password — full account access, invisible to you, revocable only by changing credentials. Official broker APIs exist precisely to replace this: scoped, isolated, auditable connections you can revoke at the broker level without touching your login.",
+      "sections": [
+        {
+          "heading": "What password access actually grants",
+          "body": [
+            "Your brokerage login is not a trading permission — it is everything: transfers, linked bank accounts, personal information, security settings. Software holding those credentials can do anything you can do, and so can anyone who compromises that software. The bot's security becomes your account's security, and you have no way to audit either.",
+            "Password-sharing also breaks the broker's ability to protect you. Their systems cannot distinguish the bot from you, terms of service are typically violated (jeopardizing the account itself), and fraud protections may not cover activity conducted with credentials you handed over voluntarily."
+          ],
+          "bullets": [
+            "Full-account scope: transfers and settings, not just trades.",
+            "Invisible: the broker sees you, not the software.",
+            "Revocation means changing your password and hoping nothing was persisted.",
+            "Terms-of-service violations can forfeit both the account and its protections."
+          ]
+        },
+        {
+          "heading": "The API alternative, and the rule of thumb",
+          "body": [
+            "Official agent APIs invert every one of those properties: the connection is scoped to what the API permits, confined (in Robinhood's agentic design) to a dedicated sub-account, visible to the broker as software with the broker's checks applied to each order, and revocable at the broker level in one action while your login stays yours.",
+            "The rule of thumb is absolute: a vendor whose setup instructions include 'enter your brokerage username and password' has disqualified themselves, whatever else is attractive about the product. Our own desk cannot be configured with credentials at all — the official API connection is the only path it supports."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "What about read-only password access for tracking?",
+          "answer": "Credential-sharing has no read-only mode — the password grants what the password grants. Use official data connections with scoped tokens for portfolio tracking."
+        },
+        {
+          "question": "Are API keys risky too?",
+          "answer": "They carry scoped risk: a leaked key allows what the key allows, which is exactly why scoping and sub-account isolation matter. Store keys properly and revoke any you cannot account for."
+        },
+        {
+          "question": "How do I undo password access I already gave a bot?",
+          "answer": "Change the password immediately, enable two-factor authentication, review linked banks and recent activity, and tell your broker — then move any future automation to an official API connection."
+        }
+      ],
+      "sources": [
+        {
+          "label": "FINRA: customer account takeovers",
+          "url": "https://www.finra.org/investors/insights/customer-account-takeovers"
+        },
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        }
+      ],
+      "related": [
+        "robinhood-agentic-trading-api-explained",
+        "is-an-ai-trading-bot-safe",
+        "how-do-trading-bot-scams-work"
+      ],
+      "status": "queued",
+      "queueOrder": 19,
+      "datePublished": null,
+      "dateModified": null
+    },
+    {
+      "slug": "what-does-not-a-fund-mean-for-trading-software",
+      "question": "What does 'not a fund' mean for trading software?",
+      "title": "What 'Not a Fund' Means for Trading Software — and Why It Protects You",
+      "primaryKeyword": "trading software not a fund",
+      "shortAnswer": "'Not a fund' means the vendor never holds, pools, or manages your money: you buy software, your dollars stay at your own broker in an account only you control, and the vendor cannot touch them. It is the structural line between a tool and an investment product — and between a purchase whose worst case is the license fee and a deposit whose worst case is everything.",
+      "sections": [
+        {
+          "heading": "The structural difference, concretely",
+          "body": [
+            "A fund pools investor money under a manager's control — a heavily regulated arrangement (registration, disclosure, custody rules, audits) because the manager can lose or take what investors handed over. Trading software touches none of this: there is no pooling, no custody, no discretion over your account. The vendor is paid a license fee; the money that trades is yours, at your broker, behind your login.",
+            "The practical consequence is that the vendor's failure modes shrink to software problems. If we vanished tomorrow, our customers' brokerage accounts would be exactly as full as the day before — the worst case of trusting a software vendor is the license fee, not the balance. That is the deliberate design of Bluechip: we never hold customer money, full stop."
+          ],
+          "bullets": [
+            "Fund: pooled money, manager discretion, regulated custody. Software: your account, your control, a license fee.",
+            "Vendor disappearance risk: a fund can take balances down with it; a software vendor cannot.",
+            "Regulatory posture: managing pooled money without registration is illegal — 'not a fund' is a legal boundary, not a slogan."
+          ]
+        },
+        {
+          "heading": "How to verify the claim",
+          "body": [
+            "Follow the money path in the onboarding. Legitimate software onboarding never includes a deposit to the vendor: you pay for a license (a normal purchase through a normal payment processor), then connect the software to your own brokerage account. If any step involves funding a wallet, a platform balance, or an account the vendor controls, the 'software' is functioning as an unregistered fund regardless of what it calls itself.",
+            "Check the exit too: you should be able to stop using the software and lose nothing but the tool. Positions, cash, and account history all live at your broker and remain untouched. Anything you cannot walk away from cleanly was never just software."
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "Is 'we never hold your money' verifiable or just marketing?",
+          "answer": "Verifiable: walk through the actual money flow. If every dollar moves only between your bank and your own brokerage account, the claim holds; the moment a vendor account appears in the path, it does not."
+        },
+        {
+          "question": "Why do scams prefer the fund-like structure?",
+          "answer": "Custody is the whole game — once your money sits with them, everything after is theater. Software that never touches money has nothing to abscond with, which is exactly why the structure protects you."
+        },
+        {
+          "question": "Does 'not a fund' mean no regulation applies?",
+          "answer": "No — anti-fraud law still covers how the software is marketed, and the trading it automates follows all normal market rules. What is absent is the custody relationship, which is where the deepest risks live."
+        }
+      ],
+      "sources": [
+        {
+          "label": "SEC / Investor.gov alerts and bulletins",
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins"
+        },
+        {
+          "label": "CFTC learning resources for customers",
+          "url": "https://www.cftc.gov/learnandprotect/learningresources"
+        }
+      ],
+      "related": [
+        "how-do-trading-bot-vendors-charge",
+        "is-a-trading-bot-the-same-as-financial-advice",
+        "is-an-ai-trading-bot-safe"
+      ],
+      "status": "queued",
+      "queueOrder": 20,
+      "datePublished": null,
+      "dateModified": null
+    }
+  ]
+}

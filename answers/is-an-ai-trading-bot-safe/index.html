@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Is an AI Trading Bot Safe? A Plain-English Checklist | EB28 Answers</title>
+  <meta name="description" content="An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries r" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <link rel="canonical" href="https://daytradingbot.net/answers/is-an-ai-trading-bot-safe/" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:site_name" content="DayTradingBot.net" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Is an AI Trading Bot Safe? A Plain-English Checklist | EB28 Answers" />
+  <meta property="og:description" content="An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries r" />
+  <meta property="og:url" content="https://daytradingbot.net/answers/is-an-ai-trading-bot-safe/" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc; --ink: #0f172a; --muted: #475569; --soft: #64748b;
+      --line: #e2e8f0; --card: #ffffff; --accent: #ea580c; --accent-dark: #c2410c;
+      --blue-bg: #dbeafe; --blue-ink: #1e3a8a; --amber-bg: #fef3c7; --amber-hover: #fde68a;
+      --amber-ink: #78350f; --emerald: #059669; --dark: #0f172a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--ink); line-height: 1.65; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem; }
+    .site-header { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.92); backdrop-filter: blur(6px); }
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 0; }
+    .brand { display: inline-flex; align-items: center; gap: .65rem; text-decoration: none;
+      font-weight: 700; letter-spacing: -.01em; font-size: 1.05rem; }
+    .brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem;
+      height: 2.25rem; border-radius: .75rem; background: var(--dark); color: #fff; font-size: .85rem; font-weight: 800; }
+    .brand span.sub { color: var(--soft); font-weight: 400; }
+    .nav-links { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; font-size: .9rem; color: var(--muted); }
+    .nav-links a { text-decoration: none; }
+    .nav-links a:hover { color: var(--accent); }
+    .banner { display: block; background: var(--amber-bg); color: var(--amber-ink); text-align: center;
+      padding: .65rem 1rem; font-size: .9rem; font-weight: 500; text-decoration: none; }
+    .banner:hover { background: var(--amber-hover); }
+    .hero { padding: 3.25rem 0 2.25rem; }
+    .pill { display: inline-block; border-radius: 999px; background: var(--blue-bg); color: var(--blue-ink);
+      padding: .3rem .85rem; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    h1 { margin: 1rem 0 0; font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+    .lead { max-width: 46rem; margin: 1.1rem 0 0; color: var(--muted); font-size: 1.1rem; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.25rem; color: var(--muted); font-size: .88rem; }
+    .meta-chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: .3rem .8rem; font-weight: 600; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .9rem; margin: 1.9rem 0 0; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1rem 1.1rem;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .stat b { display: block; font-size: 1.7rem; letter-spacing: -.02em; }
+    .stat span { color: var(--soft); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    .section { padding: 2.1rem 0; }
+    .eyebrow { margin: 0 0 .8rem; color: var(--accent-dark); font-size: .74rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .12em; }
+    h2 { font-size: 1.5rem; letter-spacing: -.01em; margin: 0 0 .8rem; }
+    h3 { font-size: 1.1rem; margin: 1.4rem 0 .4rem; }
+    p { margin: .7rem 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1.4rem;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .card p { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; }
+    a.card { display: flex; flex-direction: column; text-decoration: none; }
+    a.card:hover { border-color: #fdba74; box-shadow: 0 10px 24px rgba(15,23,42,.08); }
+    a.card .kicker { color: var(--accent-dark); font-size: .7rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .1em; margin-bottom: .6rem; }
+    a.card h3 { margin: 0; font-size: 1.05rem; line-height: 1.35; }
+    a.card .read { margin-top: auto; padding-top: .9rem; color: var(--accent-dark); font-weight: 700; font-size: .9rem; }
+    .tapepanel { background: var(--dark); border-radius: 1.5rem; padding: 1.5rem; color: #e2e8f0;
+      box-shadow: 0 18px 40px rgba(15,23,42,.18); }
+    .tapepanel .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+      border-bottom: 1px solid #334155; padding-bottom: .8rem; margin-bottom: .4rem; }
+    .tapepanel .panel-title { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: #94a3b8; }
+    .livechip { display: inline-flex; align-items: center; gap: .45rem; border-radius: 999px;
+      background: rgba(16,185,129,.15); color: #34d399; padding: .3rem .75rem; font-size: .68rem;
+      font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .livechip i { width: .45rem; height: .45rem; border-radius: 999px; background: #34d399; }
+    .tapeline { display: flex; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid rgba(51,65,85,.6);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .84rem; line-height: 1.55; }
+    .tapeline:last-child { border-bottom: 0; }
+    .tapeline .t { color: #64748b; white-space: nowrap; }
+    .tapeline .sym { color: #fbbf24; font-weight: 700; }
+    .shortanswer { border-left: 4px solid var(--accent); background: #fff7ed; border-radius: 1rem;
+      padding: 1.1rem 1.3rem; margin: 1.6rem 0 0; font-size: 1.08rem; }
+    .shortanswer .label { display: block; color: var(--accent-dark); font-size: .72rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .12em; margin-bottom: .35rem; }
+    ul { padding-left: 1.25rem; }
+    li { margin: .4rem 0; color: var(--muted); }
+    .btn { display: inline-flex; align-items: center; gap: .5rem; border-radius: 999px; background: var(--accent);
+      color: #fff; padding: .75rem 1.4rem; font-weight: 700; text-decoration: none; font-size: .95rem; }
+    .btn:hover { background: var(--accent-dark); }
+    .btn.ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+    .btn.ghost:hover { background: var(--bg); }
+    .btnrow { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.4rem; }
+    .faq details { background: var(--card); border: 1px solid var(--line); border-radius: 1rem;
+      padding: 1rem 1.2rem; margin: .7rem 0; }
+    .faq summary { cursor: pointer; font-weight: 700; }
+    .faq p { color: var(--muted); margin-bottom: .2rem; }
+    .sources ul { list-style: none; padding: 0; }
+    .sources li { margin: .55rem 0; }
+    .sources a { color: var(--blue-ink); font-weight: 600; }
+    .disclaimer { border: 1px solid var(--line); background: var(--card); border-radius: 1rem;
+      padding: 1.1rem 1.3rem; color: var(--soft); font-size: .82rem; line-height: 1.6; margin: 2.2rem 0; }
+    .pagenav { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.8rem; }
+    footer.site-footer { border-top: 1px solid var(--line); margin-top: 2rem; padding: 2rem 0 2.6rem;
+      color: var(--soft); font-size: .85rem; }
+    .footer-inner { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; }
+    footer.site-footer a { color: var(--muted); }
+    @media (max-width: 700px) {
+      .nav { flex-direction: column; align-items: flex-start; gap: .4rem; }
+      .tapeline { flex-direction: column; gap: .1rem; }
+    }
+    </style>
+  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is an AI trading bot safe?", "acceptedAnswer": {"@type": "Answer", "text": "An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries risk of loss, no matter how good the software is."}}, {"@type": "Question", "name": "Can an AI trading bot empty my account?", "acceptedAnswer": {"@type": "Answer", "text": "Only if you give it the permissions to do so. A bot confined to an isolated sub-account with a small balance can only ever lose what is in that compartment \u2014 which is exactly why isolation should be non-negotiable."}}, {"@type": "Question", "name": "Is the AI part what makes bots risky?", "acceptedAnswer": {"@type": "Answer", "text": "No. The risk lives in permissions, custody, and market exposure. A simple rules-based bot with your full account password is far more dangerous than a sophisticated one locked in a $50 sub-account."}}, {"@type": "Question", "name": "How do I check what a bot actually did?", "acceptedAnswer": {"@type": "Answer", "text": "Demand a journal. Every decision \u2014 including the boring ones where nothing happened \u2014 should be written to a log you can read. We publish ours daily so buyers can see the standard before spending anything."}}]}, {"@context": "https://schema.org", "@type": "Article", "headline": "Is an AI Trading Bot Safe? A Plain-English Checklist", "description": "An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries r", "datePublished": "2026-07-09", "dateModified": "2026-07-09", "mainEntityOfPage": "https://daytradingbot.net/answers/is-an-ai-trading-bot-safe/", "author": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}, "publisher": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://daytradingbot.net/"}, {"@type": "ListItem", "position": 2, "name": "Answers", "item": "https://daytradingbot.net/answers/"}, {"@type": "ListItem", "position": 3, "name": "Is an AI trading bot safe?", "item": "https://daytradingbot.net/answers/is-an-ai-trading-bot-safe/"}]}]</script>
+  <script>(function(){fetch('/analytics-config.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(cfg){var id=cfg&&String(cfg.ga4MeasurementId||'').trim();if(!id)return;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(id);document.head.appendChild(s);window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config',id);}).catch(function(){});})();</script>
+</head>
+<body>
+
+    <header class="site-header">
+      <div class="wrap nav">
+        <a class="brand" href="/">
+          <span class="brand-mark">DT</span>
+          <span>DayTradingBot <span class="sub">· by EB28</span></span>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="/fundmanager/">Live tape</a>
+          <a href="/tape/">Daily archive</a>
+          <a href="/weekly/">Weekly</a>
+          <a href="/answers/" style="color:var(--ink);font-weight:700">Answers</a>
+          <a href="/bluechip/">Bluechip</a>
+        </nav>
+      </div>
+    </header>
+    <a class="banner" href="/fundmanager/">📡 The tape is live right now — watch the desk work before you believe a word we say →</a>
+    
+<main>
+
+      <section class="hero wrap">
+        <span class="pill">EB28 Answers · retail trading trust</span>
+        <h1>Is an AI trading bot safe?</h1>
+        <div class="shortanswer">
+          <span class="label">Short answer</span>
+          An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but any bot that holds your money, knows your password, or cannot be shut off with one switch is a real hazard. Trading itself always carries risk of loss, no matter how good the software is.
+        </div>
+        <div class="meta-row">
+          <span class="meta-chip">Last updated July 9, 2026</span>
+          <span class="meta-chip">First published July 9, 2026</span>
+          <span class="meta-chip">Backed by our public tape</span>
+        </div>
+      </section>
+      <section class="section wrap"><h2>The three safety questions that actually matter</h2><p>Safety in automated trading is not about how smart the model is. It is about what the software is physically able to do to your accounts, and how fast you can stop it. Before anything else, ask: where does my money sit, what can the bot reach, and what happens when I hit stop?</p><p>A well-built desk keeps your dollars at your own broker, runs inside an isolated sub-account it cannot escape, and starts in a paper mode where no real order is placed. Our own Bluechip desk works this way, and we publish its full activity log so anyone can inspect what &#39;safe&#39; looks like in practice.</p><ul><li>Custody: your money should stay in your own brokerage account — the vendor should never hold funds.</li><li>Isolation: the bot should live in a dedicated sub-account that cannot touch the rest of your balance.</li><li>Control: one kill switch, held by you, that stops everything immediately.</li><li>Paper first: the default mode should place zero real orders until you deliberately go live.</li></ul></section><section class="section wrap"><h2>Red flags that end the conversation</h2><p>Regulators have warned repeatedly about AI-branded trading products that are really just marketing for fraud. The CFTC has flagged the rise of AI hype in trading scams, and FINRA publishes ongoing alerts about imposter and account-takeover schemes.</p><p>If a vendor asks for your brokerage password, asks you to wire funds to them, hides how the software works, or leads with certainty about outcomes, walk away. Honest tools describe their limits; only scams describe a sure thing.</p><ul><li>Requests for your brokerage login credentials instead of an official, revocable API connection.</li><li>Any language of certainty — trading outcomes are never certain.</li><li>No visible track record, or screenshots you cannot independently verify.</li><li>Pressure to act fast, recruit friends, or move the conversation to a private messaging app.</li></ul></section>
+      
+      <section class="section wrap">
+        <p class="eyebrow">First-party data — from our own desk</p>
+        <div class="tapepanel">
+          <div class="panel-head">
+            <span class="panel-title">The EB28 Bluechip tape, as of July 9, 2026</span>
+            <span class="livechip"><i></i>Public record</span>
+          </div>
+          <div class="tapeline"><span class="t">record</span><span>14 market days journaled ·
+            900 cycles run · 695 setups reviewed · 0 orders placed ·
+            mode: review-only (paper)</span></div>
+          <div class="tapeline"><span class="t">why</span><span>We publish this on every answer page because advice
+            about verifying trading software rings hollow without a record of our own to check. Quiet days and
+            warnings included.</span></div>
+          <div class="tapeline"><span class="t">check</span><span>Live dashboard: <a href="/fundmanager/"
+            style="color:#fbbf24">eb28.co/fundmanager</a> · daily archive: <a href="/tape/"
+            style="color:#fbbf24">eb28.co/tape</a></span></div>
+        </div>
+      </section>
+    
+      <section class="section wrap faq"><h2>More questions people ask</h2><details><summary>Can an AI trading bot empty my account?</summary><p>Only if you give it the permissions to do so. A bot confined to an isolated sub-account with a small balance can only ever lose what is in that compartment — which is exactly why isolation should be non-negotiable.</p></details><details><summary>Is the AI part what makes bots risky?</summary><p>No. The risk lives in permissions, custody, and market exposure. A simple rules-based bot with your full account password is far more dangerous than a sophisticated one locked in a $50 sub-account.</p></details><details><summary>How do I check what a bot actually did?</summary><p>Demand a journal. Every decision — including the boring ones where nothing happened — should be written to a log you can read. We publish ours daily so buyers can see the standard before spending anything.</p></details></section>
+      
+          <section class="section wrap sources">
+            <h2>Regulator resources and sources</h2>
+            <p>Independent, official reading — not affiliated with EB28:</p>
+            <ul><li><a href="https://www.cftc.gov/LearnAndProtect/AdvisoriesAndArticles/AI_Fraud.html" rel="noopener noreferrer" target="_blank">CFTC customer advisory: criminals&#39; increasing use of generative AI in fraud</a></li><li><a href="https://www.finra.org/investors/insights" rel="noopener noreferrer" target="_blank">FINRA investor insights</a></li><li><a href="https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins" rel="noopener noreferrer" target="_blank">SEC / Investor.gov alerts and bulletins</a></li></ul>
+          </section>
+        
+      
+      <section class="section wrap">
+        <div class="btnrow">
+          <a class="btn" href="/fundmanager/">Watch our live tape</a>
+          <a class="btn ghost" href="/answers/">All answers</a>
+          <a class="btn ghost" href="/bluechip/">The desk behind this site</a>
+        </div>
+      </section>
+    
+</main>
+<div class="wrap"><div class="disclaimer"><strong>Software, not advice.</strong> Bluechip (the desk behind DayTradingBot.net, by EB28) is licensed software that you install and operate yourself. Nothing on this page is investment advice, an offer, or a recommendation to buy or sell any security. Trading involves risk of loss: you can lose money, including everything you put in. Activity shown here is a record of past activity from our own desk and is not a prediction of future results. Robinhood and related marks belong to their owner, which does not endorse or sponsor EB28, Bluechip, or DayTradingBot.net.</div></div>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <span>© 2026 EB28 · DayTradingBot.net · Every number on this page comes from our own desk journal and public tape.</span>
+        <span><a href="/fundmanager/">Live tape</a> · <a href="/tape/">Daily archive</a> ·
+          <a href="/weekly/">Weekly</a> · <a href="/answers/">Answers</a> ·
+          <a href="https://eb28.co/blog/">EB28 blog</a> · <a href="/sitemap.xml">Sitemap</a></span>
+      </div>
+    </footer>
+    
+</body>
+</html>
