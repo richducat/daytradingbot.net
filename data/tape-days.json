@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-07-09T16:14:34.194314-04:00",
+  "generatedAt": "2026-07-09T19:27:30.052488-04:00",
   "days": [
     {
       "date": "2026-07-09",
-      "cycles": 14,
+      "cycles": 27,
       "reviewed": 6,
       "placed": 0,
       "live": false,
       "symbols": [
         "GOOGL"
       ],
-      "url": "https://eb28.co/tape/2026-07-09/"
+      "url": "https://daytradingbot.net/tape/2026-07-09/"
     },
     {
       "date": "2026-07-07",
@@ -24,7 +24,7 @@
         "TSLA",
         "QQQ"
       ],
-      "url": "https://eb28.co/tape/2026-07-07/"
+      "url": "https://daytradingbot.net/tape/2026-07-07/"
     },
     {
       "date": "2026-07-06",
@@ -35,7 +35,7 @@
       "symbols": [
         "MSFT"
       ],
-      "url": "https://eb28.co/tape/2026-07-06/"
+      "url": "https://daytradingbot.net/tape/2026-07-06/"
     },
     {
       "date": "2026-07-02",
@@ -50,7 +50,7 @@
         "GOOGL",
         "QQQ"
       ],
-      "url": "https://eb28.co/tape/2026-07-02/"
+      "url": "https://daytradingbot.net/tape/2026-07-02/"
     },
     {
       "date": "2026-07-01",
@@ -63,7 +63,7 @@
         "AMD",
         "QQQ"
       ],
-      "url": "https://eb28.co/tape/2026-07-01/"
+      "url": "https://daytradingbot.net/tape/2026-07-01/"
     },
     {
       "date": "2026-06-30",
@@ -72,7 +72,7 @@
       "placed": 0,
       "live": false,
       "symbols": [],
-      "url": "https://eb28.co/tape/2026-06-30/"
+      "url": "https://daytradingbot.net/tape/2026-06-30/"
     },
     {
       "date": "2026-06-29",
@@ -83,7 +83,7 @@
       "symbols": [
         "AMD"
       ],
-      "url": "https://eb28.co/tape/2026-06-29/"
+      "url": "https://daytradingbot.net/tape/2026-06-29/"
     },
     {
       "date": "2026-06-26",
@@ -97,7 +97,7 @@
         "AMD",
         "GOOGL"
       ],
-      "url": "https://eb28.co/tape/2026-06-26/"
+      "url": "https://daytradingbot.net/tape/2026-06-26/"
     },
     {
       "date": "2026-06-25",
@@ -111,7 +111,7 @@
         "NVDA",
         "MSFT"
       ],
-      "url": "https://eb28.co/tape/2026-06-25/"
+      "url": "https://daytradingbot.net/tape/2026-06-25/"
     },
     {
       "date": "2026-06-24",
@@ -124,7 +124,7 @@
         "AMD",
         "MSFT"
       ],
-      "url": "https://eb28.co/tape/2026-06-24/"
+      "url": "https://daytradingbot.net/tape/2026-06-24/"
     },
     {
       "date": "2026-06-23",
@@ -138,7 +138,7 @@
         "QQQ",
         "AMD"
       ],
-      "url": "https://eb28.co/tape/2026-06-23/"
+      "url": "https://daytradingbot.net/tape/2026-06-23/"
     },
     {
       "date": "2026-06-17",
@@ -151,7 +151,7 @@
         "GOOGL",
         "TSLA"
       ],
-      "url": "https://eb28.co/tape/2026-06-17/"
+      "url": "https://daytradingbot.net/tape/2026-06-17/"
     },
     {
       "date": "2026-06-16",
@@ -166,7 +166,7 @@
         "TSLA",
         "QQQ"
       ],
-      "url": "https://eb28.co/tape/2026-06-16/"
+      "url": "https://daytradingbot.net/tape/2026-06-16/"
     },
     {
       "date": "2026-06-12",
@@ -177,7 +177,7 @@
       "symbols": [
         "AAPL"
       ],
-      "url": "https://eb28.co/tape/2026-06-12/"
+      "url": "https://daytradingbot.net/tape/2026-06-12/"
     }
   ]
 }
