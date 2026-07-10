@@ -8,7 +8,7 @@
   <url><loc>https://daytradingbot.net/welcome/</loc></url>
   <url>
     <loc>https://daytradingbot.net/tape/</loc>
-    <lastmod>2026-07-09</lastmod>
+    <lastmod>2026-07-10</lastmod>
   </url>
   <url>
     <loc>https://daytradingbot.net/tape/2026-07-09/</loc>
@@ -89,5 +89,9 @@
   <url>
     <loc>https://daytradingbot.net/weekly/2026-07-05/</loc>
     <lastmod>2026-07-05</lastmod>
+  </url>
+  <url>
+    <loc>https://daytradingbot.net/tape/2026-07-10/</loc>
+    <lastmod>2026-07-10</lastmod>
   </url>
 </urlset>
