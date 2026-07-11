@@ -75,7 +75,7 @@
       "status": "published",
       "queueOrder": 1,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-09"
+      "dateModified": "2026-07-10"
     },
     {
       "slug": "are-trading-bots-legal-in-the-us",
@@ -141,7 +141,7 @@
       "status": "published",
       "queueOrder": 2,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-09"
+      "dateModified": "2026-07-10"
     },
     {
       "slug": "robinhood-agentic-trading-api-explained",
@@ -262,10 +262,10 @@
         "what-is-a-public-trade-tape",
         "is-an-ai-trading-bot-safe"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 4,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-10",
+      "dateModified": "2026-07-10"
     },
     {
       "slug": "what-is-paper-trading-mode",
