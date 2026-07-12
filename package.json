@@ -1,0 +1,29 @@
+{
+  "name": "daytradingbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DayTradingBot commercial desktop, web, and control-plane workspace",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "build": "pnpm build:web && pnpm build:api && pnpm build:desktop-ui && pnpm build:rust",
+    "build:web": "pnpm --filter @daytradingbot/web build",
+    "build:api": "pnpm --filter @daytradingbot/api build",
+    "build:desktop-ui": "pnpm --filter @daytradingbot/desktop build",
+    "build:rust": "cargo build --workspace --locked",
+    "check": "pnpm typecheck && pnpm test && pnpm lint:rust",
+    "dev:web": "pnpm --filter @daytradingbot/web dev",
+    "dev:api": "pnpm --filter @daytradingbot/api dev",
+    "dev:desktop": "pnpm --filter @daytradingbot/desktop tauri dev",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test && cargo test --workspace --locked",
+    "lint:rust": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+    "format:check": "pnpm -r --if-present format:check && cargo fmt --all -- --check",
+    "audit:prod": "pnpm audit --prod && cargo audit"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

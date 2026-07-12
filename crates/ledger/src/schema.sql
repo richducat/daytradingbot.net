@@ -1,0 +1,115 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS intents (
+    intent_id TEXT PRIMARY KEY,
+    source_event_id TEXT NOT NULL,
+    strategy_id TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    risk_scope TEXT NOT NULL,
+    account_scope TEXT NOT NULL,
+    instrument TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    purpose TEXT NOT NULL,
+    notional_micros INTEGER NOT NULL CHECK (notional_micros > 0),
+    state TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS risk_reservations (
+    intent_id TEXT PRIMARY KEY REFERENCES intents(intent_id),
+    risk_scope TEXT NOT NULL,
+    account_scope TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    venue_day TEXT NOT NULL,
+    opening_notional_micros INTEGER NOT NULL CHECK (opening_notional_micros >= 0),
+    exposure_micros INTEGER NOT NULL CHECK (exposure_micros >= 0),
+    active INTEGER NOT NULL CHECK (active IN (0, 1)),
+    reserved_at TEXT NOT NULL,
+    released_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS active_reservations_by_venue
+    ON risk_reservations(account_scope, venue, venue_day, active);
+
+CREATE TABLE IF NOT EXISTS daily_usage (
+    account_scope TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    venue_day TEXT NOT NULL,
+    opening_notional_micros INTEGER NOT NULL DEFAULT 0 CHECK (opening_notional_micros >= 0),
+    pnl_micros INTEGER NOT NULL DEFAULT 0,
+    pnl_observed_at TEXT,
+    PRIMARY KEY (account_scope, venue, venue_day)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    intent_id TEXT PRIMARY KEY REFERENCES intents(intent_id),
+    venue_order_id TEXT,
+    state TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS fills (
+    fill_id TEXT PRIMARY KEY,
+    intent_id TEXT NOT NULL REFERENCES intents(intent_id),
+    venue_fill_id TEXT NOT NULL,
+    quantity TEXT NOT NULL,
+    price TEXT NOT NULL,
+    notional_micros INTEGER NOT NULL CHECK (notional_micros > 0),
+    fee_micros INTEGER NOT NULL DEFAULT 0,
+    filled_at TEXT NOT NULL,
+    UNIQUE(intent_id, venue_fill_id)
+);
+
+CREATE TABLE IF NOT EXISTS lots (
+    lot_id TEXT PRIMARY KEY,
+    risk_scope TEXT NOT NULL,
+    account_scope TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    strategy_id TEXT NOT NULL,
+    instrument TEXT NOT NULL,
+    side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+    exposure_micros INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('open', 'closed')),
+    opened_at TEXT NOT NULL,
+    closed_at TEXT,
+    CHECK (
+        (status = 'open' AND exposure_micros > 0 AND closed_at IS NULL)
+        OR (status = 'closed' AND exposure_micros = 0 AND closed_at IS NOT NULL)
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_strategy_lot
+    ON lots(account_scope, venue, strategy_id, instrument)
+    WHERE status = 'open';
+
+CREATE TABLE IF NOT EXISTS venue_state (
+    account_scope TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    state TEXT NOT NULL,
+    eligibility_checked_at TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(account_scope, venue)
+);
+
+CREATE TABLE IF NOT EXISTS safety_state (
+    risk_scope TEXT NOT NULL,
+    account_scope TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    global_kill_switch INTEGER NOT NULL CHECK (global_kill_switch IN (0, 1)),
+    venue_paused INTEGER NOT NULL CHECK (venue_paused IN (0, 1)),
+    strategy_enabled INTEGER NOT NULL CHECK (strategy_enabled IN (0, 1)),
+    venue_eligible INTEGER NOT NULL CHECK (venue_eligible IN (0, 1)),
+    connector_healthy INTEGER NOT NULL CHECK (connector_healthy IN (0, 1)),
+    market_data_fresh INTEGER NOT NULL CHECK (market_data_fresh IN (0, 1)),
+    license_allows_entries INTEGER NOT NULL CHECK (license_allows_entries IN (0, 1)),
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY (account_scope, venue)
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id TEXT PRIMARY KEY,
+    intent_id TEXT REFERENCES intents(intent_id),
+    event_type TEXT NOT NULL,
+    detail_code TEXT,
+    occurred_at TEXT NOT NULL
+);

@@ -1,0 +1,18 @@
+[package]
+name = "daytradingbot-ledger"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono.workspace = true
+daytradingbot-contracts = { path = "../contracts" }
+daytradingbot-core = { path = "../core" }
+rusqlite.workspace = true
+rust_decimal.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"

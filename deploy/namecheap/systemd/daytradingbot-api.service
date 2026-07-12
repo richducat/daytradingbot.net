@@ -1,0 +1,37 @@
+[Unit]
+Description=DayTradingBot licensing and commerce API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=daytradingbot
+Group=daytradingbot
+WorkingDirectory=/srv/daytradingbot/api/current
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=20s
+Environment=NODE_ENV=production
+Environment=API_HOST=127.0.0.1
+Environment=API_PORT=3000
+Environment=PUBLIC_SITE_URL=https://daytradingbot.net
+Environment=STRIPE_PRICE_ID=CONFIGURE_AT_PROVISIONING
+Environment=DATABASE_URL_FILE=%d/database-url
+Environment=STRIPE_SECRET_KEY_FILE=%d/stripe-secret-key
+Environment=STRIPE_WEBHOOK_SECRET_FILE=%d/stripe-webhook-secret
+LoadCredential=database-url:/etc/daytradingbot/credentials/database-url
+LoadCredential=stripe-secret-key:/etc/daytradingbot/credentials/stripe-secret-key
+LoadCredential=stripe-webhook-secret:/etc/daytradingbot/credentials/stripe-webhook-secret
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

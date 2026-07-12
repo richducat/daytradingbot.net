@@ -1,0 +1,27 @@
+[package]
+name = "daytradingbot-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "DayTradingBot local trading and risk-control desktop application"
+
+[lib]
+name = "daytradingbot_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.6", features = [] }
+
+[dependencies]
+daytradingbot-contracts = { path = "../../../crates/contracts" }
+daytradingbot-core = { path = "../../../crates/core" }
+daytradingbot-ledger = { path = "../../../crates/ledger" }
+daytradingbot-licensing = { path = "../../../crates/licensing" }
+daytradingbot-release = { path = "../../../crates/release" }
+keyring = "4.1.4"
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2.11.5", features = [] }
+thiserror.workspace = true
+zeroize = "1.8.2"

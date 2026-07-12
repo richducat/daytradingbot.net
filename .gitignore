@@ -1,2 +1,18 @@
 scripts/__pycache__/
 *.pyc
+
+# Commercial rebuild
+node_modules/
+.pnpm-store/
+dist/
+target/
+.turbo/
+.vite/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/target/
