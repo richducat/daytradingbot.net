@@ -1,6 +1,23 @@
 {
-  "generatedAt": "2026-07-09T19:27:30.476636-04:00",
+  "generatedAt": "2026-07-12T17:00:05.843634-04:00",
   "recaps": [
+    {
+      "weekEnding": "2026-07-12",
+      "span": "July 6 \u2013 July 10, 2026",
+      "marketDays": 4,
+      "cycles": 296,
+      "reviewed": 75,
+      "placed": 0,
+      "symbols": [
+        "MSFT",
+        "AMD",
+        "NVDA",
+        "TSLA",
+        "QQQ",
+        "GOOGL"
+      ],
+      "live": false
+    },
     {
       "weekEnding": "2026-07-05",
       "span": "June 29 \u2013 July 3, 2026",
