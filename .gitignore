@@ -9,6 +9,7 @@ target/
 .turbo/
 .vite/
 *.log
+*.tsbuildinfo
 .DS_Store
 .env
 .env.*
