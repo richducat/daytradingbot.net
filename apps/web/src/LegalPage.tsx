@@ -13,9 +13,9 @@ const legalPages = {
   "/privacy/": {
     eyebrow: "Privacy notice",
     title: "Trading credentials stay local.",
-    intro: "The desktop stores venue credentials in the operating-system credential vault. The DayTradingBot control plane is not designed to receive broker credentials, positions, or order payloads.",
+    intro: "The desktop stores account credentials in your operating system's secure credential vault. DayTradingBot's purchase and license service is not designed to receive broker credentials, positions, or order details.",
     sections: [
-      ["Commerce data", "The control plane will process purchase status, customer email, license identifiers, device public keys, activation state, refund requests, and signed release metadata."],
+      ["Purchase and license data", "The purchase and license service will process purchase status, customer email, license identifiers, device public keys, activation state, refund requests, and signed release metadata."],
       ["Local trading data", "Venue credentials, local ledgers, strategy positions, and order history remain on the customer's device unless the customer deliberately exports and shares them for support."],
       ["Operational data", "Launch telemetry is limited to privacy-safe application health and license events. It must not include broker account numbers, API secrets, trade payloads, or position details."],
       ["Control and deletion", "Support and deletion requests will be handled through support@daytradingbot.net after the production mailbox and retention schedule pass the launch gate."],

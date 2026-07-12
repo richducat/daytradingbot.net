@@ -8,11 +8,10 @@ export const siteConfig = {
     maxGlobalExposureUsd: 200,
     maxDailyLossUsd: 10,
   },
-  venues: [
-    { name: "Robinhood", scope: "Long equities", gate: "Written integration clearance required" },
-    { name: "Coinbase", scope: "BTC and ETH spot", gate: "View + trade keys; transfers rejected" },
-    { name: "Kalshi", scope: "Event contracts", gate: "Account eligibility verified locally" },
-    { name: "Polymarket", scope: "Eligible regions only", gate: "Geoblock checked before each order" },
+  accounts: [
+    { name: "Coinbase", market: "Bitcoin and Ethereum", status: "Planned first connection" },
+    { name: "Kalshi", market: "Event markets", status: "Planned for eligible accounts" },
+    { name: "Polymarket", market: "Event markets", status: "Eligible regions only" },
+    { name: "Robinhood", market: "Stocks", status: "Pending written platform approval" },
   ],
 } as const;
-
