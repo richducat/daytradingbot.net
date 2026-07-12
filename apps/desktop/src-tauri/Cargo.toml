@@ -19,9 +19,11 @@ daytradingbot-core = { path = "../../../crates/core" }
 daytradingbot-ledger = { path = "../../../crates/ledger" }
 daytradingbot-licensing = { path = "../../../crates/licensing" }
 daytradingbot-release = { path = "../../../crates/release" }
+daytradingbot-venues = { path = "../../../crates/venues" }
 keyring = "4.1.4"
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2.11.5", features = [] }
 thiserror.workspace = true
-zeroize = "1.8.2"
+tokio.workspace = true
+zeroize.workspace = true

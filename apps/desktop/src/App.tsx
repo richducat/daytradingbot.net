@@ -15,6 +15,22 @@ type EntryLicenseStatus = {
   mode: "entry_enabled" | "close_only";
 };
 
+type KalshiOwnerDemoStatus = {
+  owner_import_available: boolean;
+  configured: boolean;
+  connection_state: "not_configured" | "read_only_ready" | "claim_required" | "trading_not_enabled";
+  provider: "simmer_dflow";
+  authenticated: boolean;
+  signing_key_available: boolean;
+  wallet_configured: boolean;
+  active_position_count: number;
+  has_spendable_balance: boolean;
+  has_open_exposure: boolean;
+  warning_count: number;
+  observed_at: string | null;
+  live_entries_available: false;
+};
+
 const fallbackPolicy: RiskPolicy = {
   max_opening_order_usd: "5.00",
   max_daily_opening_notional_usd: "25.00",
@@ -31,6 +47,22 @@ const venues = [
   ["Polymarket", "Eligible regions"],
 ] as const;
 
+const disconnectedKalshi: KalshiOwnerDemoStatus = {
+  owner_import_available: false,
+  configured: false,
+  connection_state: "not_configured",
+  provider: "simmer_dflow",
+  authenticated: false,
+  signing_key_available: false,
+  wallet_configured: false,
+  active_position_count: 0,
+  has_spendable_balance: false,
+  has_open_exposure: false,
+  warning_count: 0,
+  observed_at: null,
+  live_entries_available: false,
+};
+
 function money(value: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 }
@@ -42,6 +74,20 @@ export function App() {
     entries_allowed: false,
     mode: "close_only",
   });
+  const [kalshiDemo, setKalshiDemo] = useState<KalshiOwnerDemoStatus>(disconnectedKalshi);
+  const [kalshiSyncFailed, setKalshiSyncFailed] = useState(false);
+  const [kalshiImporting, setKalshiImporting] = useState(false);
+
+  const refreshKalshiDemo = () => {
+    return invoke<KalshiOwnerDemoStatus>("kalshi_owner_demo_status")
+      .then((result) => {
+        setKalshiDemo(result);
+        setKalshiSyncFailed(false);
+      })
+      .catch(() => {
+        setKalshiSyncFailed(true);
+      });
+  };
 
   useEffect(() => {
     let active = true;
@@ -63,6 +109,30 @@ export function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void invoke<KalshiOwnerDemoStatus>("kalshi_owner_demo_status")
+      .then((result) => {
+        if (active) {
+          setKalshiDemo(result);
+          setKalshiSyncFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) setKalshiSyncFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const importOwnerDemo = () => {
+    setKalshiImporting(true);
+    void invoke<boolean>("import_owner_demo_credentials")
+      .then(() => refreshKalshiDemo())
+      .finally(() => setKalshiImporting(false));
+  };
 
   return (
     <div className="app-shell">
@@ -105,15 +175,39 @@ export function App() {
             <p>Credentials remain in your operating-system vault.</p>
           </div>
           <div className="venue-table">
-            {venues.map(([name, scope]) => (
-              <div className="venue-item" key={name}>
+            {venues.map(([name, scope]) => {
+              const isKalshi = name === "Kalshi";
+              const verified = isKalshi && kalshiDemo.connection_state === "read_only_ready";
+              const stateLabel = isKalshi
+                ? kalshiSyncFailed
+                  ? "Sync unavailable"
+                  : verified
+                    ? "Read-only verified"
+                    : "Not connected"
+                : "Coming later";
+              return <div className={`venue-item ${verified ? "verified" : ""}`} key={name}>
                 <span className="venue-mark">{name.slice(0, 1)}</span>
-                <div><strong>{name}</strong><small>{scope}</small></div>
-                <span className="not-connected">Not connected</span>
-                <button type="button" disabled>Connect</button>
-              </div>
-            ))}
+                <div><strong>{name}</strong><small>{isKalshi ? `${scope} · owner demo via Simmer/DFlow` : scope}</small></div>
+                <span className={verified ? "verified-state" : "not-connected"}>{stateLabel}</span>
+                <button type="button" disabled>{verified ? "Synced" : "Connect"}</button>
+              </div>;
+            })}
           </div>
+        </section>
+
+        <section className="workspace-section demo-proof" aria-labelledby="demo-proof-heading">
+          <div className="section-title">
+            <div><p className="kicker">Private founder proof</p><h2 id="demo-proof-heading">Your Kalshi account, safely redacted</h2></div>
+            <p>This view verifies the existing connection without showing balances, wallet addresses, positions, market names, or credentials.</p>
+          </div>
+          <div className="proof-grid">
+            <div><span>Authentication</span><strong>{kalshiDemo.authenticated ? "Verified" : "Not verified"}</strong></div>
+            <div><span>Local signing key</span><strong>{kalshiDemo.signing_key_available ? "In OS vault" : "Not imported"}</strong></div>
+            <div><span>Active positions synced</span><strong>{kalshiDemo.authenticated ? kalshiDemo.active_position_count : "—"}</strong></div>
+            <div><span>Live entries</span><strong className="locked-copy">Locked</strong></div>
+          </div>
+          {kalshiDemo.owner_import_available && !kalshiDemo.configured ? <button className="owner-import" type="button" onClick={importOwnerDemo} disabled={kalshiImporting}>{kalshiImporting ? "Importing…" : "Use this Mac's existing owner connection"}</button> : null}
+          <p className="proof-note">Read-only account sync is the current acceptance stage. Order quoting, signing, submission, cancellation, and automation remain unavailable until their separate safety gates pass.</p>
         </section>
 
         <section className="workspace-section risk-panel">
