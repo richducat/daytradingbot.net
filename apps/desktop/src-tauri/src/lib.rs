@@ -4,9 +4,9 @@ pub use daytradingbot_release as release_verification;
 use daytradingbot_contracts::RiskPolicy;
 use daytradingbot_ledger::Ledger;
 use daytradingbot_licensing::LicenseGate;
+use daytradingbot_venues::robinhood::{RobinhoodAgenticClient, RobinhoodMcpError};
 use daytradingbot_venues::simmer::{SimmerConnectionState, SimmerKalshiClient};
-use serde::Serialize;
-#[cfg(not(debug_assertions))]
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
 use vault::{CredentialVault, VaultKey};
@@ -21,6 +21,154 @@ fn launch_policy() -> RiskPolicy {
 struct EntryLicenseStatus {
     entries_allowed: bool,
     mode: &'static str,
+}
+
+#[derive(Serialize)]
+struct RobinhoodOwnerDemoStatus {
+    owner_import_available: bool,
+    configured: bool,
+    connection_state: &'static str,
+    provider: &'static str,
+    authenticated: bool,
+    agentic_account_available: bool,
+    agentic_account_count: usize,
+    has_buying_power: bool,
+    observed_at: Option<String>,
+    live_entries_available: bool,
+}
+
+impl RobinhoodOwnerDemoStatus {
+    fn not_configured() -> Self {
+        Self {
+            owner_import_available: cfg!(debug_assertions),
+            configured: false,
+            connection_state: "not_configured",
+            provider: "robinhood_agentic_mcp",
+            authenticated: false,
+            agentic_account_available: false,
+            agentic_account_count: 0,
+            has_buying_power: false,
+            observed_at: None,
+            live_entries_available: false,
+        }
+    }
+
+    fn authentication_expired() -> Self {
+        Self {
+            configured: true,
+            connection_state: "authentication_expired",
+            ..Self::not_configured()
+        }
+    }
+
+    fn permission_denied() -> Self {
+        Self {
+            configured: true,
+            connection_state: "permission_denied",
+            ..Self::not_configured()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct StoredRobinhoodOAuthToken {
+    access_token: String,
+    expires_at: Option<f64>,
+}
+
+impl Drop for StoredRobinhoodOAuthToken {
+    fn drop(&mut self) {
+        self.access_token.zeroize();
+    }
+}
+
+fn parse_robinhood_oauth_token(raw: &str) -> Result<StoredRobinhoodOAuthToken, &'static str> {
+    let token: StoredRobinhoodOAuthToken =
+        serde_json::from_str(raw).map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+    if token.access_token.len() < 24 || token.access_token.chars().any(char::is_whitespace) {
+        return Err("ROBINHOOD_OWNER_CREDENTIAL_INVALID");
+    }
+    Ok(token)
+}
+
+fn reduce_robinhood_oauth_bundle(
+    raw: &str,
+) -> Result<(Zeroizing<Vec<u8>>, Option<f64>), &'static str> {
+    #[derive(Serialize)]
+    struct ReducedRobinhoodOAuthToken<'a> {
+        access_token: &'a str,
+        expires_at: Option<f64>,
+    }
+
+    let token = parse_robinhood_oauth_token(raw)?;
+    let expires_at = token.expires_at;
+    let reduced = serde_json::to_vec(&ReducedRobinhoodOAuthToken {
+        access_token: &token.access_token,
+        expires_at,
+    })
+    .map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+    Ok((Zeroizing::new(reduced), expires_at))
+}
+
+fn unix_now() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(f64::MAX, |duration| duration.as_secs_f64())
+}
+
+fn robinhood_token_is_current(expires_at: Option<f64>) -> bool {
+    expires_at.is_some_and(|expiry| expiry.is_finite() && expiry > unix_now() + 120.0)
+}
+
+/// Reads only the official MCP `get_accounts` tool and returns a privacy-safe
+/// proof that a dedicated Agentic account is reachable. No generic MCP tool
+/// name, market, quote, review, order, cancel, or transfer operation is exposed.
+#[tauri::command]
+async fn robinhood_owner_demo_status(
+    vault: tauri::State<'_, CredentialVault>,
+) -> Result<RobinhoodOwnerDemoStatus, &'static str> {
+    let Some(raw_bytes) = vault
+        .load_optional(VaultKey::RobinhoodOAuthToken)
+        .map_err(|_| "ROBINHOOD_OWNER_VAULT_UNAVAILABLE")?
+    else {
+        return Ok(RobinhoodOwnerDemoStatus::not_configured());
+    };
+    let raw = std::str::from_utf8(&raw_bytes).map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+    let token = parse_robinhood_oauth_token(raw)?;
+    if !robinhood_token_is_current(token.expires_at) {
+        return Ok(RobinhoodOwnerDemoStatus::authentication_expired());
+    }
+    let client = RobinhoodAgenticClient::new(Zeroizing::new(token.access_token.clone()))
+        .map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+    let snapshot = match client.read_owner_snapshot().await {
+        Ok(snapshot) => snapshot,
+        Err(RobinhoodMcpError::AuthenticationFailed) => {
+            return Ok(RobinhoodOwnerDemoStatus::authentication_expired());
+        }
+        Err(RobinhoodMcpError::PermissionDenied) => {
+            return Ok(RobinhoodOwnerDemoStatus::permission_denied());
+        }
+        Err(RobinhoodMcpError::RateLimited) => {
+            return Err("ROBINHOOD_OWNER_RATE_LIMITED");
+        }
+        Err(_) => return Err("ROBINHOOD_OWNER_PROVIDER_UNAVAILABLE"),
+    };
+    Ok(RobinhoodOwnerDemoStatus {
+        owner_import_available: cfg!(debug_assertions),
+        configured: true,
+        connection_state: if snapshot.agentic_account_available {
+            "read_only_ready"
+        } else {
+            "no_agentic_account"
+        },
+        provider: "robinhood_agentic_mcp",
+        authenticated: snapshot.authenticated,
+        agentic_account_available: snapshot.agentic_account_available,
+        agentic_account_count: snapshot.agentic_account_count,
+        has_buying_power: snapshot.has_buying_power,
+        observed_at: Some(snapshot.observed_at.to_rfc3339()),
+        live_entries_available: false,
+    })
 }
 
 #[tauri::command]
@@ -230,6 +378,55 @@ fn import_owner_demo_credentials(
     }
 }
 
+#[cfg(debug_assertions)]
+fn import_robinhood_owner_connection_into(vault: &CredentialVault) -> Result<(), &'static str> {
+    let home = std::path::PathBuf::from(
+        std::env::var_os("HOME").ok_or("ROBINHOOD_OWNER_IMPORT_UNAVAILABLE")?,
+    );
+    let token_path = home.join(".hermes/mcp-tokens/robinhood.json");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&token_path)
+            .map_err(|_| "ROBINHOOD_OWNER_IMPORT_UNAVAILABLE")?
+            .permissions()
+            .mode();
+        if mode & 0o077 != 0 {
+            return Err("ROBINHOOD_OWNER_IMPORT_INSECURE");
+        }
+    }
+    let raw = Zeroizing::new(
+        std::fs::read_to_string(token_path).map_err(|_| "ROBINHOOD_OWNER_IMPORT_UNAVAILABLE")?,
+    );
+    let (reduced, expires_at) = reduce_robinhood_oauth_bundle(&raw)?;
+    if !robinhood_token_is_current(expires_at) {
+        return Err("ROBINHOOD_OWNER_AUTHENTICATION_EXPIRED");
+    }
+    vault
+        .store(VaultKey::RobinhoodOAuthToken, &reduced)
+        .map_err(|_| "ROBINHOOD_OWNER_VAULT_UNAVAILABLE")?;
+    Ok(())
+}
+
+/// One-time migration of the owner's already-authorized Robinhood Agentic MCP
+/// OAuth session into the OS vault. Release builds never read Hermes files.
+#[tauri::command]
+fn import_robinhood_owner_connection(
+    vault: tauri::State<'_, CredentialVault>,
+) -> Result<bool, &'static str> {
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = vault;
+        Err("ROBINHOOD_OWNER_IMPORT_UNAVAILABLE")
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        import_robinhood_owner_connection_into(&vault)?;
+        Ok(true)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -240,6 +437,7 @@ pub fn run() {
             {
                 let vault = app.state::<CredentialVault>();
                 let _ = import_owner_demo_credentials_into(&vault);
+                let _ = import_robinhood_owner_connection_into(&vault);
             }
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
@@ -251,9 +449,39 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             launch_policy,
             entry_license_status,
+            robinhood_owner_demo_status,
             kalshi_owner_demo_status,
-            import_owner_demo_credentials
+            import_owner_demo_credentials,
+            import_robinhood_owner_connection
         ])
         .run(tauri::generate_context!())
         .expect("failed to run DayTradingBot desktop application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn robinhood_vault_bundle_excludes_refresh_token() {
+        let raw = serde_json::json!({
+            "access_token": "owner-access-token-that-is-long-enough",
+            "refresh_token": "refresh-must-never-be-imported",
+            "expires_at": unix_now() + 3600.0
+        })
+        .to_string();
+        let (reduced, _) = reduce_robinhood_oauth_bundle(&raw).expect("valid owner token");
+        let reduced = std::str::from_utf8(&reduced).expect("JSON is UTF-8");
+        assert!(reduced.contains("access_token"));
+        assert!(!reduced.contains("refresh_token"));
+        assert!(!reduced.contains("refresh-must-never-be-imported"));
+    }
+
+    #[test]
+    fn robinhood_token_requires_a_finite_future_expiry() {
+        assert!(!robinhood_token_is_current(None));
+        assert!(!robinhood_token_is_current(Some(f64::INFINITY)));
+        assert!(!robinhood_token_is_current(Some(unix_now() - 1.0)));
+        assert!(robinhood_token_is_current(Some(unix_now() + 3600.0)));
+    }
 }

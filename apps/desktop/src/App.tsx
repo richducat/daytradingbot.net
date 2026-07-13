@@ -15,6 +15,19 @@ type EntryLicenseStatus = {
   mode: "entry_enabled" | "close_only";
 };
 
+type RobinhoodOwnerDemoStatus = {
+  owner_import_available: boolean;
+  configured: boolean;
+  connection_state: "not_configured" | "read_only_ready" | "authentication_expired" | "permission_denied" | "no_agentic_account";
+  provider: "robinhood_agentic_mcp";
+  authenticated: boolean;
+  agentic_account_available: boolean;
+  agentic_account_count: number;
+  has_buying_power: boolean;
+  observed_at: string | null;
+  live_entries_available: false;
+};
+
 type KalshiOwnerDemoStatus = {
   owner_import_available: boolean;
   configured: boolean;
@@ -65,6 +78,19 @@ const disconnectedKalshi: KalshiOwnerDemoStatus = {
   live_entries_available: false,
 };
 
+const disconnectedRobinhood: RobinhoodOwnerDemoStatus = {
+  owner_import_available: false,
+  configured: false,
+  connection_state: "not_configured",
+  provider: "robinhood_agentic_mcp",
+  authenticated: false,
+  agentic_account_available: false,
+  agentic_account_count: 0,
+  has_buying_power: false,
+  observed_at: null,
+  live_entries_available: false,
+};
+
 function money(value: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 }
@@ -76,6 +102,9 @@ export function App() {
     entries_allowed: false,
     mode: "close_only",
   });
+  const [robinhoodDemo, setRobinhoodDemo] = useState<RobinhoodOwnerDemoStatus>(disconnectedRobinhood);
+  const [robinhoodSyncFailed, setRobinhoodSyncFailed] = useState(false);
+  const [robinhoodImporting, setRobinhoodImporting] = useState(false);
   const [kalshiDemo, setKalshiDemo] = useState<KalshiOwnerDemoStatus>(disconnectedKalshi);
   const [kalshiSyncFailed, setKalshiSyncFailed] = useState(false);
   const [kalshiImporting, setKalshiImporting] = useState(false);
@@ -88,6 +117,17 @@ export function App() {
       })
       .catch(() => {
         setKalshiSyncFailed(true);
+      });
+  };
+
+  const refreshRobinhoodDemo = () => {
+    return invoke<RobinhoodOwnerDemoStatus>("robinhood_owner_demo_status")
+      .then((result) => {
+        setRobinhoodDemo(result);
+        setRobinhoodSyncFailed(false);
+      })
+      .catch(() => {
+        setRobinhoodSyncFailed(true);
       });
   };
 
@@ -106,6 +146,23 @@ export function App() {
       })
       .catch(() => {
         if (active) setCoreOnline(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void invoke<RobinhoodOwnerDemoStatus>("robinhood_owner_demo_status")
+      .then((result) => {
+        if (active) {
+          setRobinhoodDemo(result);
+          setRobinhoodSyncFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) setRobinhoodSyncFailed(true);
       });
     return () => {
       active = false;
@@ -134,6 +191,13 @@ export function App() {
     void invoke<boolean>("import_owner_demo_credentials")
       .then(() => refreshKalshiDemo())
       .finally(() => setKalshiImporting(false));
+  };
+
+  const importRobinhoodOwnerConnection = () => {
+    setRobinhoodImporting(true);
+    void invoke<boolean>("import_robinhood_owner_connection")
+      .then(() => refreshRobinhoodDemo())
+      .finally(() => setRobinhoodImporting(false));
   };
 
   return (
@@ -178,23 +242,51 @@ export function App() {
           </div>
           <div className="venue-table">
             {venues.map(([name, scope]) => {
+              const isRobinhood = name === "Robinhood";
               const isKalshi = name === "Kalshi";
-              const verified = isKalshi && kalshiDemo.connection_state === "read_only_ready";
-              const stateLabel = isKalshi
-                ? kalshiSyncFailed
+              const robinhoodVerified = isRobinhood && robinhoodDemo.connection_state === "read_only_ready";
+              const kalshiVerified = isKalshi && kalshiDemo.connection_state === "read_only_ready";
+              const verified = robinhoodVerified || kalshiVerified;
+              const stateLabel = isRobinhood
+                ? robinhoodSyncFailed
                   ? "Sync unavailable"
-                  : verified
+                  : robinhoodVerified
                     ? "Read-only verified"
-                    : "Not connected"
-                : "Coming later";
+                    : robinhoodDemo.connection_state === "authentication_expired"
+                      ? "Reconnect required"
+                      : robinhoodDemo.connection_state === "permission_denied"
+                        ? "Agentic access denied"
+                      : "Not connected"
+                : isKalshi
+                  ? kalshiSyncFailed
+                    ? "Sync unavailable"
+                    : kalshiVerified
+                      ? "Read-only verified"
+                      : "Not connected"
+                  : "Coming later";
               return <div className={`venue-item ${verified ? "verified" : ""}`} key={name}>
                 <span className="venue-mark">{name.slice(0, 1)}</span>
-                <div><strong>{name}</strong><small>{isKalshi ? `${scope} · owner demo via Simmer/DFlow` : scope}</small></div>
+                <div><strong>{name}</strong><small>{isRobinhood ? `${scope} · official Agentic MCP` : isKalshi ? `${scope} · owner demo via Simmer/DFlow` : scope}</small></div>
                 <span className={verified ? "verified-state" : "not-connected"}>{stateLabel}</span>
                 <button type="button" disabled>{verified ? "Synced" : "Connect"}</button>
               </div>;
             })}
           </div>
+        </section>
+
+        <section className="workspace-section demo-proof" aria-labelledby="robinhood-proof-heading">
+          <div className="section-title">
+            <div><p className="kicker">Private founder proof</p><h2 id="robinhood-proof-heading">Your Robinhood Agentic account, safely redacted</h2></div>
+            <p>This view verifies the official MCP connection without showing account numbers, balances, positions, orders, or OAuth credentials.</p>
+          </div>
+          <div className="proof-grid">
+            <div><span>Authentication</span><strong>{robinhoodDemo.authenticated ? "Verified" : "Not verified"}</strong></div>
+            <div><span>Dedicated Agentic account</span><strong>{robinhoodDemo.agentic_account_available ? "Verified" : "Not found"}</strong></div>
+            <div><span>Buying power</span><strong>{robinhoodDemo.authenticated ? robinhoodDemo.has_buying_power ? "Available" : "None" : "—"}</strong></div>
+            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
+          </div>
+          {robinhoodDemo.owner_import_available && !robinhoodDemo.configured ? <button className="owner-import" type="button" onClick={importRobinhoodOwnerConnection} disabled={robinhoodImporting}>{robinhoodImporting ? "Connecting…" : "Use this Mac's existing Robinhood Agentic connection"}</button> : null}
+          <p className="proof-note">Official Robinhood MCP only. The desktop can call only the read-only account proof; review, place, cancel, transfer, and generic MCP tool access are not exposed.</p>
         </section>
 
         <section className="workspace-section demo-proof" aria-labelledby="demo-proof-heading">

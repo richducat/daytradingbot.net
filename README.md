@@ -47,3 +47,22 @@ cargo run -p daytradingbot-desktop --example direct_kalshi_canary -- execute TIC
 ```
 
 Do not run `execute` from automation. The global autonomous-trading kill switch remains separate and off.
+
+## Robinhood Agentic founder proof
+
+The owner build can verify an existing Robinhood Agentic Trading OAuth session through Robinhood's official MCP endpoint. The native client has a fixed origin and a compile-time read-only surface: it can call only `get_accounts` and `get_portfolio`, verifies a dedicated `agentic_allowed` account, and returns only redacted booleans/counts to the webview. It has no review, place, cancel, transfer, scanner, watchlist, or generic MCP tool method.
+
+Debug builds may import the owner's existing `0600` Hermes OAuth session into the OS vault. Only the access token and finite expiry are retained; the refresh token is not imported. Release builds never read Hermes files. The current owner proof is therefore temporary and must fail closed when that access token expires. Commercial customer connection requires a native Robinhood OAuth authorization-code/PKCE flow and refresh-token rotation before Robinhood can move beyond read-only proof.
+
+Authenticate the existing owner session and import the reduced bundle without printing credentials or account data:
+
+```sh
+ROBINHOOD_OAUTH_TOKEN_PATH=~/.hermes/mcp-tokens/robinhood.json \
+cargo run -p daytradingbot-desktop --example import_robinhood_owner
+```
+
+The owner-only live read proof accepts an access token only through the process environment and prints no account identifiers or dollar values:
+
+```sh
+ROBINHOOD_ACCESS_TOKEN=... cargo run -p daytradingbot-venues --example robinhood_owner_probe
+```

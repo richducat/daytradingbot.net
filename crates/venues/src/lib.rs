@@ -8,6 +8,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 pub mod kalshi;
+pub mod robinhood;
 pub mod simmer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
