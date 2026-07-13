@@ -143,3 +143,22 @@ CREATE TABLE IF NOT EXISTS audit_events (
     detail_code TEXT,
     occurred_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS agent_activity (
+    event_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    mode TEXT NOT NULL CHECK (mode IN ('practice', 'real')),
+    event_kind TEXT NOT NULL CHECK (
+        event_kind IN (
+            'started', 'paused', 'market_check', 'signal', 'skipped',
+            'reviewed', 'order_submitted', 'filled', 'error'
+        )
+    ),
+    symbol TEXT,
+    amount_micros INTEGER CHECK (amount_micros IS NULL OR amount_micros >= 0),
+    message TEXT NOT NULL,
+    occurred_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS recent_agent_activity
+    ON agent_activity(occurred_at DESC);

@@ -11,6 +11,8 @@ DayTradingBot will not use Vercel or shared cPanel hosting. The founder release 
 - Namecheap Private Email Launch supplies `support@daytradingbot.net`; `licenses@` and `security@` are aliases.
 - Certbot manages the four TLS names. HSTS is introduced only after staged certificate and subdomain verification.
 
+The desktop trust anchor is the public Ed25519 key committed in `.cargo/config.toml`. The matching private key is an operator secret and must be installed on the VPS through a systemd credential; it must never be copied into the repository, website, installer, desktop vault, logs, or database.
+
 ## Data boundary
 
 The VPS stores purchases, seat reservations, hashed license secrets, activation public keys, signed lease metadata, release manifests, refund requests, and privacy-safe operational events. It never receives venue credentials, broker account numbers, customer positions, or customer order payloads.
@@ -22,4 +24,3 @@ This is intentionally a single-node topology for ten founding customers. Desktop
 ## Account-dependent gate
 
 The July 12, 2026 account inspection confirmed that Quasar VPS, PremiumDNS, and Private Email do not yet exist for DayTradingBot. Purchasing them requires checkout confirmation. Shared hosting is not an acceptable fallback for the licensing and Stripe webhook control plane.
-

@@ -49,6 +49,23 @@ describe("control-plane API", () => {
     expect(response.json()).toMatchObject({ error: "checkout_not_open" });
   });
 
+  it("keeps activation closed when the signing service is not configured", async () => {
+    const app = buildServer(config, { readinessCheck: async () => undefined });
+    servers.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/licenses/activate",
+      payload: {
+        licenseCode: "DTB-FOUNDER-TEST-0001",
+        devicePublicKey: Buffer.alloc(32, 4).toString("base64url"),
+        platform: "macos-universal",
+      },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "activation_unavailable" });
+  });
+
   it("rejects checkout requests without affirmative risk acceptance", async () => {
     const app = buildServer(config, { readinessCheck: async () => undefined });
     servers.push(app);
@@ -61,4 +78,3 @@ describe("control-plane API", () => {
     expect(response.statusCode).toBe(400);
   });
 });
-

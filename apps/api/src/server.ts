@@ -3,10 +3,17 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import type { ApiConfig } from "./config.js";
+import {
+  LicenseService,
+  LicenseServiceError,
+  PostgresLicenseRepository,
+  type DesktopPlatform,
+} from "./licensing.js";
 import { launchPolicy } from "./policy.js";
 
 type ServerDependencies = {
   readinessCheck?: () => Promise<void>;
+  licenseService?: LicenseService;
 };
 
 export function buildServer(config: ApiConfig, dependencies: ServerDependencies = {}): FastifyInstance {
@@ -19,6 +26,8 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
         "req.headers.stripe-signature",
         "res.headers.set-cookie",
         "*.apiKey",
+        "*.activationToken",
+        "*.licenseCode",
         "*.privateKey",
         "*.token",
       ],
@@ -36,6 +45,15 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
   const readinessCheck = dependencies.readinessCheck ?? (async () => {
     await pool?.query("SELECT 1");
   });
+  const licenseService = dependencies.licenseService ?? (
+    pool && config.LICENSE_SIGNING_PRIVATE_KEY_PEM && config.LICENSE_SECRET_PEPPER
+      ? new LicenseService(
+        new PostgresLicenseRepository(pool),
+        config.LICENSE_SIGNING_PRIVATE_KEY_PEM,
+        config.LICENSE_SECRET_PEPPER,
+      )
+      : undefined
+  );
 
   app.register(helmet, {
     contentSecurityPolicy: false,
@@ -60,6 +78,96 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
   });
 
   app.get("/v1/policy", async () => ({ version: 1, policy: launchPolicy }));
+
+  app.post(
+    "/v1/licenses/activate",
+    {
+      config: { rateLimit: { max: 8, timeWindow: "10 minutes" } },
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["licenseCode", "devicePublicKey", "platform"],
+          properties: {
+            licenseCode: { type: "string", minLength: 16, maxLength: 84 },
+            devicePublicKey: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+            platform: { type: "string", enum: ["windows-x64", "macos-universal"] },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!licenseService) {
+        return reply.code(503).send({
+          error: "activation_unavailable",
+          message: "App activation is temporarily unavailable.",
+        });
+      }
+      const body = request.body as {
+        licenseCode: string;
+        devicePublicKey: string;
+        platform: DesktopPlatform;
+      };
+      try {
+        return await licenseService.activate(body);
+      } catch (error) {
+        if (error instanceof LicenseServiceError) {
+          if (error.code === "device_already_active") {
+            return reply.code(409).send({
+              error: error.code,
+              message: "This purchase is already active on another computer.",
+            });
+          }
+          if (error.code === "invalid_license") {
+            return reply.code(401).send({
+              error: error.code,
+              message: "That purchase code was not recognized.",
+            });
+          }
+          return reply.code(503).send({
+            error: "activation_unavailable",
+            message: "App activation is temporarily unavailable.",
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post(
+    "/v1/licenses/renew",
+    {
+      config: { rateLimit: { max: 30, timeWindow: "1 hour" } },
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["activationToken", "devicePublicKey"],
+          properties: {
+            activationToken: { type: "string", pattern: "^dtb_act_[A-Za-z0-9_-]{43}$" },
+            devicePublicKey: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!licenseService) {
+        return reply.code(503).send({ error: "activation_unavailable" });
+      }
+      const body = request.body as { activationToken: string; devicePublicKey: string };
+      try {
+        return await licenseService.renew(body);
+      } catch (error) {
+        if (error instanceof LicenseServiceError) {
+          if (error.code === "invalid_activation") {
+            return reply.code(401).send({ error: error.code });
+          }
+          return reply.code(503).send({ error: "activation_unavailable" });
+        }
+        throw error;
+      }
+    },
+  );
 
   app.post(
     "/v1/checkout/session",

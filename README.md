@@ -50,9 +50,11 @@ Do not run `execute` from automation. The global autonomous-trading kill switch 
 
 ## Robinhood Agentic founder proof
 
-The owner build can verify an existing Robinhood Agentic Trading OAuth session through Robinhood's official MCP endpoint. The native client has a fixed origin and a compile-time read-only surface: it can call only `get_accounts` and `get_portfolio`, verifies a dedicated `agentic_allowed` account, and returns only redacted booleans/counts to the webview. It has no review, place, cancel, transfer, scanner, watchlist, or generic MCP tool method.
+The commercial desktop now owns the complete Robinhood OAuth authorization-code/PKCE connection and refresh-token rotation. The native client uses Robinhood's fixed official Agentic endpoint and exactly one dedicated `agentic_allowed` account. Its typed surface is limited to account/buying-power reads, quotes, positions, recent Agentic orders, order lookup, market-buy review, and placement of the immutable reviewed order. It has no generic tool method and no transfer or withdrawal operation.
 
-Debug builds may import the owner's existing `0600` Hermes OAuth session into the OS vault. Only the access token and finite expiry are retained; the refresh token is not imported. Release builds never read Hermes files. The current owner proof is therefore temporary and must fail closed when that access token expires. Commercial customer connection requires a native Robinhood OAuth authorization-code/PKCE flow and refresh-token rotation before Robinhood can move beyond read-only proof.
+Bluechip Practice uses real account and market reads plus Robinhood's order review, but it has no placement call. Bluechip Real adds the signed-license check, customer dollar limits, current-position and open-order checks, fresh-price and market-hours checks, a durable local reservation, one deterministic order ID, and no retry when Robinhood's response is unclear.
+
+Debug builds may still import the owner's existing `0600` Hermes OAuth session into the OS vault for a one-time founder migration. Only the access token and finite expiry are retained; the refresh token is not imported. Release builds never read Hermes files.
 
 Authenticate the existing owner session and import the reduced bundle without printing credentials or account data:
 
@@ -61,10 +63,10 @@ ROBINHOOD_OAUTH_TOKEN_PATH=~/.hermes/mcp-tokens/robinhood.json \
 cargo run -p daytradingbot-desktop --example import_robinhood_owner
 ```
 
-The owner-only live read proof accepts an access token only through the process environment and prints no account identifiers or dollar values:
+The owner-only Practice proof reads the already-authorized local session, reviews matching sample trades, prints no account identifiers or dollar values, and contains no placement call:
 
 ```sh
-ROBINHOOD_ACCESS_TOKEN=... cargo run -p daytradingbot-venues --example robinhood_owner_probe
+cargo run -p daytradingbot-desktop --example native_robinhood_practice
 ```
 
 ## Coinbase and Polymarket US owner proofs
@@ -72,17 +74,17 @@ ROBINHOOD_ACCESS_TOKEN=... cargo run -p daytradingbot-venues --example robinhood
 Coinbase Advanced Trade and Polymarket US have fixed-origin, read-only native clients. The owner connection probe reads only the closed Keychain entries used by the desktop app, prints redacted status flags, and has no order, transfer, withdrawal, cancel, or generic-request method:
 
 ```sh
-cargo run -p daytradingbot-desktop --bin owner_connection_probe -- --coinbase
-cargo run -p daytradingbot-desktop --bin owner_connection_probe -- --polymarket-us
+cargo run -p daytradingbot-desktop --features owner-tools --bin owner_connection_probe -- --coinbase
+cargo run -p daytradingbot-desktop --features owner-tools --bin owner_connection_probe -- --polymarket-us
 ```
 
 For local owner setup, the vault importer accepts a credential only through standard input, validates its venue-specific shape, and can write only the four Coinbase/Polymarket Keychain accounts compiled into the tool. Never put a credential directly in the command line:
 
 ```sh
-pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'coinbase:key-name'
-pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'coinbase:ecdsa-private-key-pem'
-pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'polymarket-us:key-id'
-pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'polymarket-us:ed25519-secret-key'
+pbpaste | cargo run -p daytradingbot-desktop --features owner-tools --bin owner_vault_import -- 'coinbase:key-name'
+pbpaste | cargo run -p daytradingbot-desktop --features owner-tools --bin owner_vault_import -- 'coinbase:ecdsa-private-key-pem'
+pbpaste | cargo run -p daytradingbot-desktop --features owner-tools --bin owner_vault_import -- 'polymarket-us:key-id'
+pbpaste | cargo run -p daytradingbot-desktop --features owner-tools --bin owner_vault_import -- 'polymarket-us:ed25519-secret-key'
 ```
 
 These probes prove authentication and least-privilege scope only. Live entries remain locked.

@@ -62,6 +62,48 @@ pub struct SubmissionAttemptRecord {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentActivityMode {
+    Practice,
+    Real,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentActivityKind {
+    Started,
+    Paused,
+    MarketCheck,
+    Signal,
+    Skipped,
+    Reviewed,
+    OrderSubmitted,
+    Filled,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewAgentActivity {
+    pub agent_id: String,
+    pub mode: AgentActivityMode,
+    pub kind: AgentActivityKind,
+    pub symbol: Option<String>,
+    pub amount_usd: Option<Decimal>,
+    pub message: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentActivityRecord {
+    pub event_id: Uuid,
+    pub agent_id: String,
+    pub mode: AgentActivityMode,
+    pub kind: AgentActivityKind,
+    pub symbol: Option<String>,
+    pub amount_usd: Option<Decimal>,
+    pub message: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
 /// Single-use authorization emitted only after the durable reservation commits.
 /// It is intentionally not `Clone`; venue submission consumes it by value.
 #[derive(Debug, PartialEq, Eq)]
@@ -112,6 +154,10 @@ pub enum LedgerError {
     InvalidVenueOrderId,
     #[error("stored submission data is invalid")]
     InvalidStoredSubmission,
+    #[error("agent activity is invalid")]
+    InvalidAgentActivity,
+    #[error("stored agent activity is invalid")]
+    InvalidStoredActivity,
     #[error(transparent)]
     Sql(#[from] rusqlite::Error),
 }
@@ -157,6 +203,54 @@ impl Ledger {
         Ok(Self {
             connection: Mutex::new(connection),
         })
+    }
+
+    /// Appends one privacy-safe, customer-readable activity item. Account
+    /// numbers, credential material, raw provider payloads, and order request
+    /// bodies are intentionally not representable by this record type.
+    pub fn record_agent_activity(&self, activity: &NewAgentActivity) -> Result<Uuid, LedgerError> {
+        validate_agent_activity(activity)?;
+        let amount_micros = activity.amount_usd.map(decimal_to_micros).transpose()?;
+        let event_id = Uuid::new_v4();
+        let connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        connection.execute(
+            "INSERT INTO agent_activity
+             (event_id, agent_id, mode, event_kind, symbol, amount_micros, message, occurred_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                event_id.to_string(),
+                activity.agent_id,
+                activity_mode_key(activity.mode),
+                activity_kind_key(activity.kind),
+                activity.symbol,
+                amount_micros,
+                activity.message,
+                activity.occurred_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(event_id)
+    }
+
+    pub fn recent_agent_activity(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<AgentActivityRecord>, LedgerError> {
+        if !(1..=200).contains(&limit) {
+            return Err(LedgerError::InvalidAgentActivity);
+        }
+        let connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT event_id, agent_id, mode, event_kind, symbol, amount_micros,
+                    message, occurred_at
+             FROM agent_activity
+             ORDER BY occurred_at DESC, event_id DESC
+             LIMIT ?1",
+        )?;
+        let rows = statement.query_map([i64::try_from(limit).unwrap_or(200)], |row| {
+            agent_activity_from_row(row)
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(LedgerError::from)
     }
 
     /// Stores the connector's latest reconciled venue-day P&L so the next
@@ -454,6 +548,113 @@ impl Ledger {
         )
     }
 
+    /// Marks an acknowledged venue order as terminal after an authoritative
+    /// order-status read. Fill rows must be recorded separately before a
+    /// `Filled` result is finalized.
+    pub fn reconcile_acknowledged_submission(
+        &self,
+        intent_id: Uuid,
+        resolved_state: OrderState,
+    ) -> Result<(), LedgerError> {
+        let resolved_key = match resolved_state {
+            OrderState::Filled => "filled",
+            OrderState::Canceled => "canceled",
+            OrderState::Rejected => "rejected",
+            _ => return Err(LedgerError::InvalidSubmissionTransition),
+        };
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let intent_id = intent_id.to_string();
+        let now = Utc::now().to_rfc3339();
+        let changed = tx.execute(
+            "UPDATE submission_attempts
+             SET state = 'reconciled', reconciled_state = ?2, updated_at = ?3
+             WHERE intent_id = ?1 AND state = 'acknowledged'",
+            params![intent_id, resolved_key, now],
+        )?;
+        if changed != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        insert_audit(
+            &tx,
+            Some(&intent_id),
+            "acknowledged_submission_reconciled",
+            Some(resolved_key),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Atomically validates the terminal outcome, releases the remaining
+    /// opening reservation, and reconciles an acknowledged broker order. A
+    /// broker `Filled` response without a durable fill leaves both records
+    /// untouched so the order remains visible for reconciliation.
+    pub fn finalize_acknowledged_open_order(
+        &self,
+        intent_id: Uuid,
+        terminal_state: OrderState,
+    ) -> Result<(), LedgerError> {
+        let state = match terminal_state {
+            OrderState::Filled => "filled",
+            OrderState::Canceled => "canceled",
+            OrderState::Rejected => "rejected",
+            _ => return Err(LedgerError::InvalidTerminalState),
+        };
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let intent_id = intent_id.to_string();
+        let (fill_count, active_count): (i64, i64) = tx.query_row(
+            "SELECT COUNT(f.fill_id), COUNT(DISTINCT r.intent_id)
+               FROM intents i
+               JOIN risk_reservations r ON r.intent_id = i.intent_id
+               LEFT JOIN fills f ON f.intent_id = i.intent_id
+              WHERE i.intent_id = ?1 AND i.purpose = 'open' AND r.active = 1",
+            [&intent_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if active_count != 1 {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        }
+        if (terminal_state == OrderState::Filled && fill_count == 0)
+            || (terminal_state == OrderState::Rejected && fill_count > 0)
+        {
+            return Err(LedgerError::InvalidTerminalOutcome);
+        }
+
+        let now = Utc::now().to_rfc3339();
+        let changed = tx.execute(
+            "UPDATE submission_attempts
+                SET state = 'reconciled', reconciled_state = ?2, updated_at = ?3
+              WHERE intent_id = ?1 AND state = 'acknowledged'",
+            params![intent_id, state, now],
+        )?;
+        if changed != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        tx.execute(
+            "UPDATE risk_reservations
+                SET active = 0, released_at = datetime('now')
+              WHERE intent_id = ?1 AND active = 1",
+            [&intent_id],
+        )?;
+        tx.execute(
+            "UPDATE intents SET state = ?2 WHERE intent_id = ?1",
+            params![intent_id, state],
+        )?;
+        tx.execute(
+            "UPDATE orders SET state = ?2, updated_at = ?3 WHERE intent_id = ?1",
+            params![intent_id, state, now],
+        )?;
+        insert_audit(
+            &tx,
+            Some(&intent_id),
+            "acknowledged_open_order_finalized",
+            Some(state),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// A timeout or malformed response after the request begins is always
     /// unknown. The same intent must be reconciled rather than submitted again.
     pub fn mark_submission_unknown(
@@ -586,7 +787,7 @@ impl Ledger {
             "SELECT attempt_id, intent_id, client_order_id, request_fingerprint, state,
                     reconciled_state, venue_order_id, detail_code, started_at, updated_at
              FROM submission_attempts
-             WHERE state IN ('submitting', 'unknown', 'quarantined')
+             WHERE state IN ('submitting', 'acknowledged', 'unknown', 'quarantined')
              ORDER BY started_at",
         )?;
         let rows = statement.query_map([], submission_record_from_row)?;
@@ -1186,6 +1387,115 @@ fn insert_audit(
     Ok(())
 }
 
+fn validate_agent_activity(activity: &NewAgentActivity) -> Result<(), LedgerError> {
+    let agent_id_valid = !activity.agent_id.is_empty()
+        && activity.agent_id.len() <= 64
+        && activity.agent_id.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+        });
+    let symbol_valid = activity.symbol.as_ref().is_none_or(|symbol| {
+        !symbol.is_empty()
+            && symbol.len() <= 16
+            && symbol
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || matches!(byte, b'.' | b'-'))
+    });
+    let message_valid = !activity.message.trim().is_empty()
+        && activity.message.len() <= 280
+        && !activity
+            .message
+            .chars()
+            .any(|character| character.is_control());
+    let amount_valid = activity
+        .amount_usd
+        .is_none_or(|amount| amount >= Decimal::ZERO && amount <= Decimal::new(100_000_000, 2));
+    if agent_id_valid && symbol_valid && message_valid && amount_valid {
+        Ok(())
+    } else {
+        Err(LedgerError::InvalidAgentActivity)
+    }
+}
+
+fn activity_mode_key(mode: AgentActivityMode) -> &'static str {
+    match mode {
+        AgentActivityMode::Practice => "practice",
+        AgentActivityMode::Real => "real",
+    }
+}
+
+fn activity_mode_from_key(value: &str) -> Option<AgentActivityMode> {
+    match value {
+        "practice" => Some(AgentActivityMode::Practice),
+        "real" => Some(AgentActivityMode::Real),
+        _ => None,
+    }
+}
+
+fn activity_kind_key(kind: AgentActivityKind) -> &'static str {
+    match kind {
+        AgentActivityKind::Started => "started",
+        AgentActivityKind::Paused => "paused",
+        AgentActivityKind::MarketCheck => "market_check",
+        AgentActivityKind::Signal => "signal",
+        AgentActivityKind::Skipped => "skipped",
+        AgentActivityKind::Reviewed => "reviewed",
+        AgentActivityKind::OrderSubmitted => "order_submitted",
+        AgentActivityKind::Filled => "filled",
+        AgentActivityKind::Error => "error",
+    }
+}
+
+fn activity_kind_from_key(value: &str) -> Option<AgentActivityKind> {
+    match value {
+        "started" => Some(AgentActivityKind::Started),
+        "paused" => Some(AgentActivityKind::Paused),
+        "market_check" => Some(AgentActivityKind::MarketCheck),
+        "signal" => Some(AgentActivityKind::Signal),
+        "skipped" => Some(AgentActivityKind::Skipped),
+        "reviewed" => Some(AgentActivityKind::Reviewed),
+        "order_submitted" => Some(AgentActivityKind::OrderSubmitted),
+        "filled" => Some(AgentActivityKind::Filled),
+        "error" => Some(AgentActivityKind::Error),
+        _ => None,
+    }
+}
+
+fn agent_activity_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentActivityRecord> {
+    use rusqlite::types::Type;
+
+    let invalid = |column: usize, message: &'static str| {
+        rusqlite::Error::FromSqlConversionFailure(
+            column,
+            Type::Text,
+            Box::new(std::io::Error::other(message)),
+        )
+    };
+    let event_id_text: String = row.get(0)?;
+    let mode_text: String = row.get(2)?;
+    let kind_text: String = row.get(3)?;
+    let occurred_at_text: String = row.get(7)?;
+    let event_id =
+        Uuid::parse_str(&event_id_text).map_err(|_| invalid(0, "invalid activity event id"))?;
+    let mode =
+        activity_mode_from_key(&mode_text).ok_or_else(|| invalid(2, "invalid activity mode"))?;
+    let kind =
+        activity_kind_from_key(&kind_text).ok_or_else(|| invalid(3, "invalid activity kind"))?;
+    let occurred_at = DateTime::parse_from_rfc3339(&occurred_at_text)
+        .map(|value| value.with_timezone(&Utc))
+        .map_err(|_| invalid(7, "invalid activity timestamp"))?;
+    let amount_micros: Option<i64> = row.get(5)?;
+    Ok(AgentActivityRecord {
+        event_id,
+        agent_id: row.get(1)?,
+        mode,
+        kind,
+        symbol: row.get(4)?,
+        amount_usd: amount_micros.map(micros_to_decimal),
+        message: row.get(6)?,
+        occurred_at,
+    })
+}
+
 fn decimal_to_micros(amount: Decimal) -> Result<i64, LedgerError> {
     let scaled = amount * Decimal::from(MICROS_PER_DOLLAR);
     scaled.try_into().map_err(|_| LedgerError::MoneyOutOfRange)
@@ -1368,6 +1678,57 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[test]
+    fn activity_journal_is_customer_safe_and_newest_first() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let first_at = Utc::now() - ChronoDuration::minutes(1);
+        ledger
+            .record_agent_activity(&NewAgentActivity {
+                agent_id: "bluechip".into(),
+                mode: AgentActivityMode::Practice,
+                kind: AgentActivityKind::MarketCheck,
+                symbol: None,
+                amount_usd: None,
+                message: "Checked eight stocks. No trade matched today.".into(),
+                occurred_at: first_at,
+            })
+            .unwrap();
+        ledger
+            .record_agent_activity(&NewAgentActivity {
+                agent_id: "bluechip".into(),
+                mode: AgentActivityMode::Practice,
+                kind: AgentActivityKind::Signal,
+                symbol: Some("AAPL".into()),
+                amount_usd: Some(Decimal::new(500, 2)),
+                message: "AAPL matched the agent's pullback rule.".into(),
+                occurred_at: Utc::now(),
+            })
+            .unwrap();
+
+        let activity = ledger.recent_agent_activity(10).unwrap();
+        assert_eq!(activity.len(), 2);
+        assert_eq!(activity[0].symbol.as_deref(), Some("AAPL"));
+        assert_eq!(activity[0].amount_usd, Some(Decimal::new(500, 2)));
+        assert_eq!(activity[1].occurred_at, first_at);
+    }
+
+    #[test]
+    fn activity_journal_rejects_raw_or_unbounded_text() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let error = ledger
+            .record_agent_activity(&NewAgentActivity {
+                agent_id: "Bluechip With Spaces".into(),
+                mode: AgentActivityMode::Real,
+                kind: AgentActivityKind::Error,
+                symbol: None,
+                amount_usd: None,
+                message: "bad\nraw payload".into(),
+                occurred_at: Utc::now(),
+            })
+            .expect_err("unsafe activity must fail");
+        assert!(matches!(error, LedgerError::InvalidAgentActivity));
+    }
 
     fn trade_intent(account_scope: Uuid, event: &str) -> TradeIntent {
         trade_intent_for_purpose(account_scope, event, IntentPurpose::Open)
@@ -1791,6 +2152,68 @@ mod tests {
             ledger.begin_submission(intent_id, Uuid::new_v4(), &"b".repeat(64)),
             Err(LedgerError::SubmissionAlreadyExists)
         ));
+    }
+
+    #[test]
+    fn acknowledged_submission_stays_visible_until_terminal_reconciliation() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account_scope = Uuid::new_v4();
+        let intent = trade_intent(account_scope, "acknowledged-submit");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+        ledger
+            .begin_submission(intent_id, Uuid::new_v4(), &"d".repeat(64))
+            .unwrap();
+        ledger
+            .acknowledge_submission(intent_id, "venue-order-id")
+            .unwrap();
+        assert_eq!(
+            ledger.unresolved_submissions().unwrap()[0].state,
+            SubmissionAttemptState::Acknowledged
+        );
+
+        ledger
+            .record_open_fill(intent_id, &fill("venue-fill", Decimal::new(500, 2)))
+            .unwrap();
+        ledger
+            .reconcile_acknowledged_submission(intent_id, OrderState::Filled)
+            .unwrap();
+        ledger
+            .finalize_open_order(intent_id, OrderState::Filled)
+            .unwrap();
+        assert!(ledger.unresolved_submissions().unwrap().is_empty());
+    }
+
+    #[test]
+    fn filled_acknowledgement_without_a_fill_remains_unresolved() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account_scope = Uuid::new_v4();
+        let intent = trade_intent(account_scope, "filled-without-execution");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+        ledger
+            .begin_submission(intent_id, Uuid::new_v4(), &"e".repeat(64))
+            .unwrap();
+        ledger
+            .acknowledge_submission(intent_id, "venue-order-id")
+            .unwrap();
+
+        assert!(matches!(
+            ledger.finalize_acknowledged_open_order(intent_id, OrderState::Filled),
+            Err(LedgerError::InvalidTerminalOutcome)
+        ));
+        assert_eq!(
+            ledger.unresolved_submissions().unwrap()[0].state,
+            SubmissionAttemptState::Acknowledged
+        );
+
+        ledger
+            .record_open_fill(intent_id, &fill("venue-fill", Decimal::new(500, 2)))
+            .unwrap();
+        ledger
+            .finalize_acknowledged_open_order(intent_id, OrderState::Filled)
+            .unwrap();
+        assert!(ledger.unresolved_submissions().unwrap().is_empty());
     }
 
     #[test]

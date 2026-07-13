@@ -4,6 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TYPE purchase_status AS ENUM ('pending', 'paid', 'refunded', 'disputed', 'canceled');
 CREATE TYPE license_status AS ENUM ('active', 'revoked', 'refunded');
+CREATE TYPE license_source AS ENUM ('purchase', 'owner_canary');
 CREATE TYPE activation_status AS ENUM ('active', 'deactivated');
 
 CREATE TABLE founder_inventory (
@@ -53,17 +54,27 @@ CREATE TABLE stripe_events (
 
 CREATE TABLE licenses (
     license_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    purchase_id uuid NOT NULL UNIQUE REFERENCES purchases(purchase_id),
+    purchase_id uuid UNIQUE REFERENCES purchases(purchase_id),
+    source license_source NOT NULL DEFAULT 'purchase',
     license_secret_hash bytea NOT NULL UNIQUE,
     status license_status NOT NULL DEFAULT 'active',
     issued_at timestamptz NOT NULL DEFAULT now(),
-    revoked_at timestamptz
+    revoked_at timestamptz,
+    CHECK (
+        (source = 'purchase' AND purchase_id IS NOT NULL)
+        OR (source = 'owner_canary' AND purchase_id IS NULL)
+    )
 );
+
+CREATE UNIQUE INDEX one_owner_canary_license
+    ON licenses (source)
+    WHERE source = 'owner_canary';
 
 CREATE TABLE activations (
     activation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     license_id uuid NOT NULL REFERENCES licenses(license_id),
     device_public_key bytea NOT NULL,
+    activation_secret_hash bytea NOT NULL UNIQUE,
     platform text NOT NULL CHECK (platform IN ('windows-x64', 'macos-universal')),
     status activation_status NOT NULL DEFAULT 'active',
     activated_at timestamptz NOT NULL DEFAULT now(),
@@ -123,4 +134,3 @@ CREATE TABLE telemetry_events (
 );
 
 COMMIT;
-

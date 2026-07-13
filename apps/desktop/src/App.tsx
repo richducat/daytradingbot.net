@@ -1,477 +1,760 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type RiskPolicy = {
-  max_opening_order_usd: string;
-  max_daily_opening_notional_usd: string;
-  max_venue_exposure_usd: string;
-  max_global_exposure_usd: string;
-  max_daily_loss_usd: string;
-  max_resting_entry_orders: number;
+type View = "home" | "agents" | "accounts" | "activity";
+type TradingMode = "practice" | "real";
+type CredentialAccount = "Coinbase" | "Kalshi" | "Polymarket";
+
+type Agent = {
+  id: string;
+  name: string;
+  account: "Robinhood" | "Coinbase" | "Kalshi" | "Polymarket" | string;
+  market: string;
+  summary: string;
+  cadence_minutes: number;
+  risk_level: "steady" | "balanced" | "active";
+  practice_available: boolean;
+  real_trading_available: boolean;
+  customer_ready: boolean;
+  auto_pick_rank: number;
+  engine: { kind: string; legacy_label: string; entrypoint: string };
 };
 
-type EntryLicenseStatus = {
-  entries_allowed: boolean;
-  mode: "entry_enabled" | "close_only";
+type AgentCatalog = { version: number; agents: Agent[] };
+
+type OwnerEngineStatus = {
+  available: boolean;
+  mode: "not_installed" | "unavailable" | "paused" | TradingMode;
+  selected_agent_ids: string[];
+  loaded_agent_ids: string[];
+  message: string;
 };
 
-type RobinhoodOwnerDemoStatus = {
+type RobinhoodStatus = {
   owner_import_available: boolean;
   configured: boolean;
-  connection_state: "not_configured" | "read_only_ready" | "authentication_expired" | "permission_denied" | "no_agentic_account";
-  provider: "robinhood_agentic_mcp";
   authenticated: boolean;
   agentic_account_available: boolean;
-  agentic_account_count: number;
   has_buying_power: boolean;
-  observed_at: string | null;
-  live_entries_available: false;
+  connection_state: string;
 };
 
-type KalshiOwnerDemoStatus = {
+type SimmerStatus = {
   owner_import_available: boolean;
   configured: boolean;
-  connection_state: "not_configured" | "read_only_ready" | "claim_required" | "trading_not_enabled";
-  provider: "simmer_dflow";
   authenticated: boolean;
-  signing_key_available: boolean;
-  direct_api_configured: boolean;
   wallet_configured: boolean;
-  active_position_count: number;
+  direct_api_configured: boolean;
   has_spendable_balance: boolean;
-  has_open_exposure: boolean;
-  warning_count: number;
-  observed_at: string | null;
-  live_entries_available: false;
+  connection_state: string;
 };
 
-type CoinbaseOwnerDemoStatus = {
+type CoinbaseStatus = {
   configured: boolean;
-  connection_state: "not_configured" | "read_only_verified" | "authentication_failed" | "permission_denied" | "unsafe_permissions" | "view_only";
-  provider: "coinbase_advanced_trade";
   authenticated: boolean;
-  can_view: boolean;
-  can_trade: boolean;
-  can_transfer: boolean;
-  can_receive: boolean;
-  account_count: number;
-  has_btc_or_eth_account: boolean;
   least_privilege_live_scope: boolean;
-  observed_at: string | null;
-  live_entries_available: false;
+  has_btc_or_eth_account: boolean;
+  connection_state: string;
 };
 
-type PolymarketUsOwnerDemoStatus = {
+type PolymarketStatus = {
   configured: boolean;
-  connection_state: "public_data_ready" | "read_only_verified" | "authentication_failed" | "account_not_approved";
-  provider: "polymarket_us_retail";
-  market_data_available: boolean;
   authenticated: boolean;
   approved_account_verified: boolean;
-  balance_account_count: number;
   has_buying_power: boolean;
-  international_clob_supported: false;
-  observed_at: string | null;
-  live_entries_available: false;
+  market_data_available: boolean;
+  connection_state: string;
 };
 
-const fallbackPolicy: RiskPolicy = {
-  max_opening_order_usd: "5.00",
-  max_daily_opening_notional_usd: "25.00",
-  max_venue_exposure_usd: "100.00",
-  max_global_exposure_usd: "200.00",
-  max_daily_loss_usd: "10.00",
-  max_resting_entry_orders: 2,
+type SessionResult = {
+  mode: "paused" | TradingMode;
+  selected_agent_ids: string[];
+  message: string;
 };
 
-const venues = [
-  ["Robinhood", "Equities"],
-  ["Coinbase", "BTC + ETH spot"],
-  ["Kalshi", "Event contracts"],
-  ["Polymarket", "Eligible regions"],
-] as const;
+type ActivityItem = {
+  id: string;
+  agent_id: string;
+  mode: TradingMode;
+  kind: "started" | "paused" | "market_check" | "signal" | "skipped" | "reviewed" | "order_submitted" | "filled" | "error";
+  symbol: string | null;
+  amount_usd: string | null;
+  message: string;
+  occurred_at: string;
+};
 
-const disconnectedKalshi: KalshiOwnerDemoStatus = {
+type LicenseStatus = {
+  activated: boolean;
+  real_trading_ready: boolean;
+  renewal_needed: boolean;
+  expires_at: string | null;
+  message: string;
+};
+
+const emptyRobinhood: RobinhoodStatus = {
   owner_import_available: false,
   configured: false,
-  connection_state: "not_configured",
-  provider: "simmer_dflow",
-  authenticated: false,
-  signing_key_available: false,
-  direct_api_configured: false,
-  wallet_configured: false,
-  active_position_count: 0,
-  has_spendable_balance: false,
-  has_open_exposure: false,
-  warning_count: 0,
-  observed_at: null,
-  live_entries_available: false,
-};
-
-const disconnectedRobinhood: RobinhoodOwnerDemoStatus = {
-  owner_import_available: false,
-  configured: false,
-  connection_state: "not_configured",
-  provider: "robinhood_agentic_mcp",
   authenticated: false,
   agentic_account_available: false,
-  agentic_account_count: 0,
   has_buying_power: false,
-  observed_at: null,
-  live_entries_available: false,
-};
-
-const disconnectedCoinbase: CoinbaseOwnerDemoStatus = {
-  configured: false,
   connection_state: "not_configured",
-  provider: "coinbase_advanced_trade",
-  authenticated: false,
-  can_view: false,
-  can_trade: false,
-  can_transfer: false,
-  can_receive: false,
-  account_count: 0,
-  has_btc_or_eth_account: false,
-  least_privilege_live_scope: false,
-  observed_at: null,
-  live_entries_available: false,
 };
 
-const disconnectedPolymarketUs: PolymarketUsOwnerDemoStatus = {
+const emptySimmer: SimmerStatus = {
+  owner_import_available: false,
   configured: false,
-  connection_state: "public_data_ready",
-  provider: "polymarket_us_retail",
-  market_data_available: false,
+  authenticated: false,
+  wallet_configured: false,
+  direct_api_configured: false,
+  has_spendable_balance: false,
+  connection_state: "not_configured",
+};
+
+const emptyCoinbase: CoinbaseStatus = {
+  configured: false,
+  authenticated: false,
+  least_privilege_live_scope: false,
+  has_btc_or_eth_account: false,
+  connection_state: "not_configured",
+};
+
+const emptyPolymarket: PolymarketStatus = {
+  configured: false,
   authenticated: false,
   approved_account_verified: false,
-  balance_account_count: 0,
   has_buying_power: false,
-  international_clob_supported: false,
-  observed_at: null,
-  live_entries_available: false,
+  market_data_available: false,
+  connection_state: "public_data_ready",
 };
 
-function money(value: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
+const emptyEngine: OwnerEngineStatus = {
+  available: false,
+  mode: "not_installed",
+  selected_agent_ids: [],
+  loaded_agent_ids: [],
+  message: "Checking the trading engine…",
+};
+
+const emptyLicense: LicenseStatus = {
+  activated: false,
+  real_trading_ready: false,
+  renewal_needed: false,
+  expires_at: null,
+  message: "Activate the app before using real money.",
+};
+
+const errorCopy: Record<string, string> = {
+  REAL_TRADING_LICENSE_REQUIRED: "Finish activating this copy of DayTradingBot before starting real trading.",
+  REAL_TRADING_ONE_AGENT_AT_A_TIME: "Start real trading with one agent at a time for now.",
+  BLUECHIP_RUNS_BY_ITSELF_FOR_NOW: "Bluechip runs by itself for now. Pause, select only Bluechip, and start again.",
+  ROBINHOOD_ACCOUNT_NOT_CONNECTED: "Connect Robinhood before starting Bluechip.",
+  ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED: "Robinhood needs one dedicated Agentic account for Bluechip.",
+  ROBINHOOD_AUTHENTICATION_EXPIRED: "Reconnect Robinhood so Bluechip can continue.",
+  ADD_FUNDS_TO_ROBINHOOD: "Add at least the per-trade amount to your Robinhood Agentic account.",
+  ORDER_RECONCILIATION_REQUIRED: "One earlier Robinhood order needs to be checked before real trading can continue.",
+  SIMMER_ACCOUNT_NOT_CONNECTED: "Connect your Polymarket or Kalshi trading wallet before starting this agent.",
+  AGENT_INSTALLATION_INCOMPLETE: "One selected trading agent is not installed yet.",
+  TRADING_AGENT_INSTALLATION_INCOMPLETE: "One selected trading agent is not installed in this build yet.",
+  REAL_TRADING_CONFIRMATION_REQUIRED: "Please confirm the real-trading summary before starting.",
+  ENGINE_ACTION_FAILED: "The trading engine could not start that agent. Nothing was turned on.",
+  AGENT_NOT_AVAILABLE_IN_THIS_BUILD: "That agent is coming next and is not available in this app yet.",
+  OWNER_ENGINE_NOT_INSTALLED: "The trading engine is not installed on this computer yet.",
+  PURCHASE_CODE_NOT_RECOGNIZED: "That purchase code was not recognized. Check the code and try again.",
+  PURCHASE_CODE_ACTIVE_ELSEWHERE: "That purchase is already active on another computer.",
+  LICENSE_ACTIVATION_UNAVAILABLE: "App activation is temporarily unavailable. Practice still works.",
+  LICENSE_ACTIVATION_INVALID: "The activation response could not be verified. Real trading stayed off.",
+  LICENSE_STORAGE_UNAVAILABLE: "This computer’s secure storage is unavailable. Real trading stayed off.",
+  KALSHI_AUTHENTICATION_FAILED: "Kalshi did not accept that key. Create a new trading API key and try again.",
+  KALSHI_PERMISSION_DENIED: "That Kalshi key cannot view this account.",
+  KALSHI_RATE_LIMITED: "Kalshi is receiving too many requests. Wait a moment and check again.",
+  KALSHI_CONNECTION_FAILED: "Kalshi could not verify that connection. Nothing was saved.",
+};
+
+function messageFromError(error: unknown) {
+  const key = String(error).replace(/^Error:\s*/, "");
+  return errorCopy[key] ?? "That did not work. Nothing was turned on. Try again or check Accounts.";
+}
+
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function accountInitial(name: string) {
+  return name === "Robinhood" ? "R" : name === "Coinbase" ? "C" : name === "Kalshi" ? "K" : "P";
+}
+
+function activityTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Recent";
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
 export function App() {
-  const [policy, setPolicy] = useState<RiskPolicy>(fallbackPolicy);
-  const [coreOnline, setCoreOnline] = useState(false);
-  const [licenseStatus, setLicenseStatus] = useState<EntryLicenseStatus>({
-    entries_allowed: false,
-    mode: "close_only",
+  const [view, setView] = useState<View>("home");
+  const [catalog, setCatalog] = useState<Agent[]>([]);
+  const [engine, setEngine] = useState<OwnerEngineStatus>(emptyEngine);
+  const [robinhood, setRobinhood] = useState<RobinhoodStatus>(emptyRobinhood);
+  const [simmer, setSimmer] = useState<SimmerStatus>(emptySimmer);
+  const [coinbase, setCoinbase] = useState<CoinbaseStatus>(emptyCoinbase);
+  const [polymarket, setPolymarket] = useState<PolymarketStatus>(emptyPolymarket);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("dtb.selectedAgents") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
   });
-  const [robinhoodDemo, setRobinhoodDemo] = useState<RobinhoodOwnerDemoStatus>(disconnectedRobinhood);
-  const [robinhoodSyncFailed, setRobinhoodSyncFailed] = useState(false);
-  const [robinhoodImporting, setRobinhoodImporting] = useState(false);
-  const [coinbaseDemo, setCoinbaseDemo] = useState<CoinbaseOwnerDemoStatus>(disconnectedCoinbase);
-  const [coinbaseSyncFailed, setCoinbaseSyncFailed] = useState(false);
-  const [kalshiDemo, setKalshiDemo] = useState<KalshiOwnerDemoStatus>(disconnectedKalshi);
-  const [kalshiSyncFailed, setKalshiSyncFailed] = useState(false);
-  const [kalshiImporting, setKalshiImporting] = useState(false);
-  const [polymarketUsDemo, setPolymarketUsDemo] = useState<PolymarketUsOwnerDemoStatus>(disconnectedPolymarketUs);
-  const [polymarketUsSyncFailed, setPolymarketUsSyncFailed] = useState(false);
+  const [dailyBudget, setDailyBudget] = useState(() => Number(localStorage.getItem("dtb.dailyBudget") ?? 15));
+  const [perTrade, setPerTrade] = useState(() => Number(localStorage.getItem("dtb.perTrade") ?? 3));
+  const [mode, setMode] = useState<TradingMode>(() => (localStorage.getItem("dtb.mode") === "real" ? "real" : "practice"));
+  const [setupOpen, setSetupOpen] = useState(() => localStorage.getItem("dtb.setupComplete") !== "yes");
+  const [setupStep, setSetupStep] = useState(1);
+  const [realReviewOpen, setRealReviewOpen] = useState(false);
+  const [credentialAccount, setCredentialAccount] = useState<CredentialAccount | null>(null);
+  const [credentialFields, setCredentialFields] = useState({ first: "", second: "" });
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [license, setLicense] = useState<LicenseStatus>(emptyLicense);
+  const [activationOpen, setActivationOpen] = useState(false);
+  const [purchaseCode, setPurchaseCode] = useState("");
+  const renewalAttempted = useRef(false);
 
-  const refreshKalshiDemo = () => {
-    return invoke<KalshiOwnerDemoStatus>("kalshi_owner_demo_status")
-      .then((result) => {
-        setKalshiDemo(result);
-        setKalshiSyncFailed(false);
-      })
-      .catch(() => {
-        setKalshiSyncFailed(true);
-      });
+  const refresh = async () => {
+    const catalogRequest = invoke<AgentCatalog>("trading_agent_catalog").then((result) => {
+      setCatalog(result.agents);
+      const ready = new Set(result.agents.filter((agent) => agent.customer_ready).map((agent) => agent.id));
+      setSelectedIds((current) => current.filter((id) => ready.has(id)));
+    });
+    const engineRequest = invoke<OwnerEngineStatus>("owner_engine_status").then((result) => {
+      setEngine(result);
+      if (result.selected_agent_ids.length) setSelectedIds(result.selected_agent_ids);
+      if (result.mode === "practice" || result.mode === "real") setMode(result.mode);
+    });
+    void invoke<ActivityItem[]>("recent_trading_activity").then(setActivity).catch(() => undefined);
+    const licenseRequest = invoke<LicenseStatus>("entry_license_status").then(setLicense);
+
+    await Promise.allSettled([catalogRequest, engineRequest, licenseRequest]);
   };
 
-  const refreshRobinhoodDemo = () => {
-    return invoke<RobinhoodOwnerDemoStatus>("robinhood_owner_demo_status")
-      .then((result) => {
-        setRobinhoodDemo(result);
-        setRobinhoodSyncFailed(false);
-      })
-      .catch(() => {
-        setRobinhoodSyncFailed(true);
-      });
+  const refreshAccounts = async () => {
+    await Promise.allSettled([
+      invoke<RobinhoodStatus>("robinhood_owner_demo_status").then(setRobinhood),
+      invoke<SimmerStatus>("kalshi_owner_demo_status").then(setSimmer),
+      invoke<CoinbaseStatus>("coinbase_owner_demo_status").then(setCoinbase),
+      invoke<PolymarketStatus>("polymarket_us_owner_demo_status").then(setPolymarket),
+    ]);
   };
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([
-      invoke<RiskPolicy>("launch_policy"),
-      invoke<EntryLicenseStatus>("entry_license_status"),
-    ])
-      .then(([policyResult, licenseResult]) => {
-        if (active) {
-          setPolicy(policyResult);
-          setLicenseStatus(licenseResult);
-          setCoreOnline(true);
-        }
-      })
-      .catch(() => {
-        if (active) setCoreOnline(false);
-      });
-    return () => {
-      active = false;
-    };
+    void refresh();
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void invoke<CoinbaseOwnerDemoStatus>("coinbase_owner_demo_status")
-      .then((result) => {
-        if (active) {
-          setCoinbaseDemo(result);
-          setCoinbaseSyncFailed(false);
-        }
-      })
-      .catch(() => {
-        if (active) setCoinbaseSyncFailed(true);
-      });
-    return () => {
-      active = false;
-    };
+    const timer = window.setInterval(() => {
+      void invoke<OwnerEngineStatus>("owner_engine_status").then(setEngine).catch(() => undefined);
+      void invoke<ActivityItem[]>("recent_trading_activity").then(setActivity).catch(() => undefined);
+    }, 5_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void invoke<RobinhoodOwnerDemoStatus>("robinhood_owner_demo_status")
-      .then((result) => {
-        if (active) {
-          setRobinhoodDemo(result);
-          setRobinhoodSyncFailed(false);
-        }
-      })
-      .catch(() => {
-        if (active) setRobinhoodSyncFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    localStorage.setItem("dtb.selectedAgents", JSON.stringify(selectedIds));
+    localStorage.setItem("dtb.dailyBudget", String(dailyBudget));
+    localStorage.setItem("dtb.perTrade", String(perTrade));
+    localStorage.setItem("dtb.mode", mode);
+  }, [selectedIds, dailyBudget, perTrade, mode]);
 
   useEffect(() => {
-    let active = true;
-    void invoke<PolymarketUsOwnerDemoStatus>("polymarket_us_owner_demo_status")
-      .then((result) => {
-        if (active) {
-          setPolymarketUsDemo(result);
-          setPolymarketUsSyncFailed(false);
-        }
-      })
-      .catch(() => {
-        if (active) setPolymarketUsSyncFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (!license.renewal_needed || renewalAttempted.current) return;
+    renewalAttempted.current = true;
+    void invoke<LicenseStatus>("renew_license")
+      .then(setLicense)
+      .catch(() => undefined);
+  }, [license.renewal_needed]);
 
-  useEffect(() => {
-    let active = true;
-    void invoke<KalshiOwnerDemoStatus>("kalshi_owner_demo_status")
-      .then((result) => {
-        if (active) {
-          setKalshiDemo(result);
-          setKalshiSyncFailed(false);
-        }
-      })
-      .catch(() => {
-        if (active) setKalshiSyncFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const accounts = useMemo(
+    () => [
+      {
+        name: "Robinhood",
+        detail: "Stocks and ETFs",
+        connected: robinhood.authenticated && robinhood.agentic_account_available,
+        funded: robinhood.has_buying_power,
+        action: "Connect",
+      },
+      {
+        name: "Coinbase",
+        detail: "Bitcoin and Ethereum",
+        connected: coinbase.authenticated && coinbase.least_privilege_live_scope,
+        funded: coinbase.has_btc_or_eth_account,
+        action: "Add account",
+      },
+      {
+        name: "Kalshi",
+        detail: "Event contracts",
+        connected: simmer.authenticated && simmer.direct_api_configured,
+        funded: simmer.has_spendable_balance,
+        action: simmer.owner_import_available && !simmer.configured ? "Use connected account" : "Connect",
+      },
+      {
+        name: "Polymarket",
+        detail: "Prediction markets",
+        connected: polymarket.authenticated || (simmer.authenticated && simmer.wallet_configured),
+        funded: polymarket.has_buying_power || simmer.has_spendable_balance,
+        action: "Connect wallet",
+      },
+    ],
+    [coinbase, polymarket, robinhood, simmer],
+  );
 
-  const importOwnerDemo = () => {
-    setKalshiImporting(true);
-    void invoke<boolean>("import_owner_demo_credentials")
-      .then(() => refreshKalshiDemo())
-      .finally(() => setKalshiImporting(false));
+  const connectedNames = useMemo(() => new Set(accounts.filter((account) => account.connected).map((account) => account.name)), [accounts]);
+  const selectedAgents = catalog.filter((agent) => selectedIds.includes(agent.id));
+  const running = engine.mode === "practice" || engine.mode === "real";
+
+  const toggleAgent = (id: string) => {
+    setNotice(null);
+    const agent = catalog.find((item) => item.id === id);
+    if (!agent?.customer_ready) {
+      setNotice("That agent is coming next. Bluechip is available in this customer build.");
+      return;
+    }
+    setSelectedIds((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id);
+      if (current.length >= 3) {
+        setNotice("Choose up to three trading agents.");
+        return current;
+      }
+      return [...current, id];
+    });
   };
 
-  const importRobinhoodOwnerConnection = () => {
-    setRobinhoodImporting(true);
-    void invoke<boolean>("import_robinhood_owner_connection")
-      .then(() => refreshRobinhoodDemo())
-      .finally(() => setRobinhoodImporting(false));
+  const pickForMe = () => {
+    const eligible = catalog
+      .filter((agent) => agent.customer_ready && connectedNames.has(agent.account))
+      .sort((a, b) => a.auto_pick_rank - b.auto_pick_rank);
+    const pick = eligible[0];
+    if (!pick) {
+      setNotice("Connect an account—or check your saved connections—before using Pick for me.");
+      setView("accounts");
+      return;
+    }
+    setSelectedIds([pick.id]);
+    setNotice(`${pick.name} is the best match for your connected ${pick.account} account and current settings.`);
+  };
+
+  const connectAccount = async (account: string) => {
+    if (account === "Coinbase" || account === "Polymarket" || (account === "Kalshi" && !simmer.owner_import_available)) {
+      setCredentialAccount(account);
+      setCredentialFields({ first: "", second: "" });
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      if (account === "Robinhood") await invoke("connect_robinhood");
+      if (account === "Kalshi") await invoke("import_owner_demo_credentials");
+      await Promise.all([refresh(), refreshAccounts()]);
+      setNotice(`${account} is connected.`);
+    } catch (error) {
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCredentials = async () => {
+    if (!credentialAccount || !credentialFields.first.trim() || !credentialFields.second.trim()) {
+      setNotice("Complete both fields to connect this account.");
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      if (credentialAccount === "Coinbase") {
+        await invoke("connect_coinbase_account", {
+          request: { key_name: credentialFields.first.trim(), private_key_pem: credentialFields.second.trim() },
+        });
+      } else if (credentialAccount === "Kalshi") {
+        await invoke("connect_kalshi_account", {
+          request: { api_key_id: credentialFields.first.trim(), private_key_pem: credentialFields.second.trim() },
+        });
+      } else {
+        await invoke("connect_polymarket_us_account", {
+          request: { key_id: credentialFields.first.trim(), secret_key: credentialFields.second.trim() },
+        });
+      }
+      const connected = credentialAccount;
+      setCredentialFields({ first: "", second: "" });
+      setCredentialAccount(null);
+      setNotice(`${connected} is connected.`);
+      await Promise.all([refresh(), refreshAccounts()]);
+    } catch (error) {
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = async (confirmed = false) => {
+    if (!selectedIds.length) {
+      setNotice("Choose a trading agent first, or use Pick for me.");
+      setView("agents");
+      return;
+    }
+    if (mode === "real" && !license.real_trading_ready) {
+      setRealReviewOpen(false);
+      setActivationOpen(true);
+      return;
+    }
+    if (mode === "real" && !confirmed) {
+      setRealReviewOpen(true);
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await invoke<SessionResult>("start_owner_engine_session", {
+        request: {
+          agent_ids: selectedIds,
+          mode,
+          daily_budget_usd: dailyBudget,
+          max_per_trade_usd: perTrade,
+          real_confirmation: mode === "real" ? "START REAL TRADING" : null,
+        },
+      });
+      setRealReviewOpen(false);
+      setSetupOpen(false);
+      localStorage.setItem("dtb.setupComplete", "yes");
+      setNotice(result.message);
+      await refresh();
+      setView("home");
+    } catch (error) {
+      setRealReviewOpen(false);
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const activate = async () => {
+    if (!purchaseCode.trim()) {
+      setNotice("Enter the purchase code from your DayTradingBot receipt.");
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await invoke<LicenseStatus>("activate_license", {
+        request: { license_code: purchaseCode.trim() },
+      });
+      setLicense(result);
+      setPurchaseCode("");
+      setActivationOpen(false);
+      setNotice("DayTradingBot is activated. You can now review and start real trading.");
+    } catch (error) {
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pause = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await invoke<SessionResult>("pause_owner_engine_session");
+      setNotice(result.message);
+      await refresh();
+    } catch (error) {
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finishSetupStep = () => {
+    if (setupStep === 2 && !selectedIds.length) {
+      setNotice("Choose a trading agent or use Pick for me.");
+      return;
+    }
+    if (setupStep < 4) setSetupStep((step) => step + 1);
   };
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="desktop-wordmark">DTB</div>
-        <nav aria-label="Application">
-          <button className="nav-item active" type="button">Overview</button>
-          <button className="nav-item" type="button">Venues</button>
-          <button className="nav-item" type="button">Strategies</button>
-          <button className="nav-item" type="button">Orders</button>
-          <button className="nav-item" type="button">Diagnostics</button>
+        <button className="brand" type="button" onClick={() => setView("home")} aria-label="DayTradingBot home">
+          <span>DTB</span>
+          <strong>DayTradingBot</strong>
+        </button>
+        <nav aria-label="Main navigation">
+          {(["home", "agents", "accounts", "activity"] as View[]).map((item) => (
+            <button className={view === item ? "nav-item active" : "nav-item"} type="button" key={item} onClick={() => setView(item)}>
+              {item === "home" ? "Home" : item === "agents" ? "Trading agents" : item === "accounts" ? "Accounts" : "Activity"}
+            </button>
+          ))}
         </nav>
-        <div className="sidebar-foot">
-          <span className="state-dot" />
-          <span>{coreOnline ? "Risk core online" : "Preview mode"}</span>
-        </div>
+        <button className="setup-link" type="button" onClick={() => setSetupOpen(true)}>Setup</button>
+        <button className={license.real_trading_ready ? "activation-link ready" : "activation-link"} type="button" onClick={() => setActivationOpen(true)}>{license.real_trading_ready ? "App activated" : "Activate app"}</button>
+        <div className="engine-note"><span className={engine.available ? "online" : ""} />{engine.available ? "Trading engine ready" : "Installer needed"}</div>
       </aside>
 
-      <main className="workspace">
-        <header className="workspace-header">
+      <main className="main-area">
+        <header className="topbar">
           <div>
-            <p className="kicker">Local execution workspace</p>
-            <h1>Overview</h1>
+            <p>{view === "home" ? "Your trading team" : view === "agents" ? "Choose who trades" : view === "accounts" ? "Your money stays in your accounts" : "Every move, in one place"}</p>
+            <h1>{view === "home" ? "Home" : view === "agents" ? "Trading agents" : view === "accounts" ? "Accounts" : "Activity"}</h1>
           </div>
-          <div className={`lock-state ${licenseStatus.entries_allowed ? "enabled" : ""}`}>
-            <span /> {licenseStatus.entries_allowed ? "LIVE ENTRY ENABLED" : "LIVE LOCKED"}
-          </div>
+          {running ? (
+            <button className="pause-button" type="button" onClick={pause} disabled={busy}>Pause trading</button>
+          ) : (
+            <button className="start-button compact" type="button" onClick={() => void start()} disabled={busy}>Start trading</button>
+          )}
         </header>
 
-        <section className="status-strip" aria-label="Account status">
-          <div><span>License</span><strong>{licenseStatus.entries_allowed ? "Entry lease active" : "Not activated"}</strong></div>
-          <div><span>Open exposure</span><strong>$0.00</strong></div>
-          <div><span>Daily opening</span><strong>$0.00 / {money(policy.max_daily_opening_notional_usd)}</strong></div>
-          <div><span>Resting entries</span><strong>0 / {policy.max_resting_entry_orders}</strong></div>
-        </section>
+        {notice ? <div className="notice" role="status"><span />{notice}<button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">×</button></div> : null}
 
-        <section className="workspace-section">
-          <div className="section-title">
-            <div><p className="kicker">Connection state</p><h2>Venues</h2></div>
-            <p>Credentials remain in your operating-system vault.</p>
-          </div>
-          <div className="venue-table">
-            {venues.map(([name, scope]) => {
-              const isRobinhood = name === "Robinhood";
-              const isCoinbase = name === "Coinbase";
-              const isKalshi = name === "Kalshi";
-              const isPolymarket = name === "Polymarket";
-              const robinhoodVerified = isRobinhood && robinhoodDemo.connection_state === "read_only_ready";
-              const coinbaseVerified = isCoinbase && coinbaseDemo.authenticated && coinbaseDemo.connection_state !== "unsafe_permissions";
-              const kalshiVerified = isKalshi && kalshiDemo.connection_state === "read_only_ready";
-              const polymarketVerified = isPolymarket && polymarketUsDemo.authenticated;
-              const publicDataConnected = isPolymarket && polymarketUsDemo.market_data_available;
-              const verified = robinhoodVerified || coinbaseVerified || kalshiVerified || polymarketVerified || publicDataConnected;
-              const stateLabel = isRobinhood
-                ? robinhoodSyncFailed
-                  ? "Sync unavailable"
-                  : robinhoodVerified
-                    ? "Read-only verified"
-                    : robinhoodDemo.connection_state === "authentication_expired"
-                      ? "Reconnect required"
-                      : robinhoodDemo.connection_state === "permission_denied"
-                        ? "Agentic access denied"
-                      : "Not connected"
-                : isCoinbase
-                  ? coinbaseSyncFailed
-                    ? "Sync unavailable"
-                    : coinbaseDemo.connection_state === "unsafe_permissions"
-                      ? "Unsafe key permissions"
-                      : coinbaseDemo.authenticated
-                        ? "Read-only verified"
-                        : "API key required"
-                : isKalshi
-                  ? kalshiSyncFailed
-                    ? "Sync unavailable"
-                    : kalshiVerified
-                      ? "Read-only verified"
-                      : "Not connected"
-                  : polymarketUsSyncFailed
-                    ? "Sync unavailable"
-                    : polymarketVerified
-                      ? "US account verified"
-                      : publicDataConnected
-                        ? "US market data connected"
-                        : "US setup required";
-              const venueDetail = isRobinhood
-                ? `${scope} · official Agentic MCP`
-                : isCoinbase
-                  ? `${scope} · official Advanced Trade`
-                  : isKalshi
-                    ? `${scope} · owner demo via Simmer/DFlow`
-                    : `${scope} · official Polymarket US only`;
-              return <div className={`venue-item ${verified ? "verified" : ""}`} key={name}>
-                <span className="venue-mark">{name.slice(0, 1)}</span>
-                <div><strong>{name}</strong><small>{venueDetail}</small></div>
-                <span className={verified ? "verified-state" : "not-connected"}>{stateLabel}</span>
-                <button type="button" disabled>{verified ? publicDataConnected && !polymarketVerified ? "Market data" : "Synced" : "Connect"}</button>
-              </div>;
-            })}
-          </div>
-        </section>
+        {view === "home" ? (
+          <div className="home-view">
+            <section className="session-hero">
+              <div>
+                <p className="eyebrow">{running ? `${engine.mode === "real" ? "Real trading" : "Practice"} is running` : "Ready when you are"}</p>
+                <h2>{running ? "Your agents are watching the markets." : "Set your limits. Then put your agents to work."}</h2>
+              </div>
+              <div className="session-action">
+                <span>{selectedAgents.length ? selectedAgents.map((agent) => agent.name).join(" + ") : "No agent selected"}</span>
+                <strong>{money(dailyBudget)} <small>at risk today</small></strong>
+                {running ? (
+                  <button className="pause-button wide" type="button" onClick={pause} disabled={busy}>Pause trading</button>
+                ) : (
+                  <button className="start-button wide" type="button" onClick={() => void start()} disabled={busy}>{busy ? "Starting…" : "Start trading"}</button>
+                )}
+              </div>
+            </section>
 
-        <section className="workspace-section demo-proof" aria-labelledby="coinbase-proof-heading">
-          <div className="section-title">
-            <div><p className="kicker">Official owner connection</p><h2 id="coinbase-proof-heading">Coinbase Advanced Trade, safely redacted</h2></div>
-            <p>This proof checks only key permissions and portfolio account availability. It never displays balances, asset quantities, account IDs, orders, fills, or credentials.</p>
-          </div>
-          <div className="proof-grid">
-            <div><span>Authentication</span><strong>{coinbaseDemo.authenticated ? "Verified" : "API key required"}</strong></div>
-            <div><span>Required permissions</span><strong>{coinbaseDemo.least_privilege_live_scope ? "View + trade only" : coinbaseDemo.can_transfer || coinbaseDemo.can_receive ? "Unsafe — replace key" : "Not verified"}</strong></div>
-            <div><span>BTC or ETH spot account</span><strong>{coinbaseDemo.authenticated ? coinbaseDemo.has_btc_or_eth_account ? "Available" : "Not found" : "—"}</strong></div>
-            <div><span>Transfer permission</span><strong className={coinbaseDemo.can_transfer ? "locked-copy" : ""}>{coinbaseDemo.authenticated ? coinbaseDemo.can_transfer ? "Must be removed" : "Disabled" : "—"}</strong></div>
-            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
-          </div>
-          <p className="proof-note">Use a portfolio-scoped Coinbase CDP ECDSA key with View and Trade only. Transfer and Receive must remain disabled. Order preview, submission, cancellation, and reconciliation are not exposed in this build.</p>
-        </section>
+            <section className="quick-settings" aria-label="Trading settings">
+              <button type="button" onClick={() => setSetupOpen(true)}><span>Trading with</span><strong>{selectedAgents.length ? selectedAgents.map((agent) => agent.name).join(", ") : "Choose an agent"}</strong></button>
+              <button type="button" onClick={() => setSetupOpen(true)}><span>Mode</span><strong>{mode === "practice" ? "Practice" : "Real trading"}</strong></button>
+              <button type="button" onClick={() => setSetupOpen(true)}><span>Daily limit</span><strong>{money(dailyBudget)}</strong></button>
+              <button type="button" onClick={() => setSetupOpen(true)}><span>Each trade</span><strong>Up to {money(perTrade)}</strong></button>
+            </section>
 
-        <section className="workspace-section demo-proof" aria-labelledby="polymarket-us-proof-heading">
-          <div className="section-title">
-            <div><p className="kicker">Compliant US route</p><h2 id="polymarket-us-proof-heading">Polymarket US — not the international crypto CLOB</h2></div>
-            <p>US residents need the separate Polymarket US app, identity approval, and retail developer key. International wallet credentials are never accepted here.</p>
-          </div>
-          <div className="proof-grid">
-            <div><span>US market data</span><strong>{polymarketUsDemo.market_data_available ? "Connected" : "Unavailable"}</strong></div>
-            <div><span>Approved US account</span><strong>{polymarketUsDemo.approved_account_verified ? "Verified" : "KYC + API key required"}</strong></div>
-            <div><span>Buying power</span><strong>{polymarketUsDemo.authenticated ? polymarketUsDemo.has_buying_power ? "Available" : "None" : "—"}</strong></div>
-            <div><span>International Polymarket</span><strong className="locked-copy">Not supported</strong></div>
-            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
-          </div>
-          <p className="proof-note">The official US public gateway is connected. Live account access requires approval in the Polymarket US app and a Key ID + one-time secret from polymarket.us/developer. This build has no submit or retry path, preventing duplicate real-money orders after a timeout.</p>
-        </section>
+            <section className="home-grid">
+              <div className="plain-section account-summary">
+                <div className="section-heading"><div><p className="eyebrow">Connected money</p><h3>Your accounts</h3></div><button type="button" onClick={() => setView("accounts")}>Manage</button></div>
+                <div className="account-lines">
+                  {accounts.filter((account) => account.connected).length ? accounts.filter((account) => account.connected).map((account) => (
+                    <div className="account-line" key={account.name}>
+                      <span className="account-logo">{accountInitial(account.name)}</span>
+                      <div><strong>{account.name}</strong><small>{account.detail}</small></div>
+                      <span className="connected-copy">Connected</span>
+                    </div>
+                  )) : <button className="empty-action" type="button" onClick={() => setSetupOpen(true)}>Connect your first account</button>}
+                </div>
+              </div>
 
-        <section className="workspace-section demo-proof" aria-labelledby="robinhood-proof-heading">
-          <div className="section-title">
-            <div><p className="kicker">Private founder proof</p><h2 id="robinhood-proof-heading">Your Robinhood Agentic account, safely redacted</h2></div>
-            <p>This view verifies the official MCP connection without showing account numbers, balances, positions, orders, or OAuth credentials.</p>
+              <div className="plain-section recent-summary">
+                <div className="section-heading"><div><p className="eyebrow">Latest update</p><h3>What your agents are doing</h3></div><button type="button" onClick={() => setView("activity")}>See all</button></div>
+                <div className="activity-line">
+                  <span className={running ? "pulse-dot active" : "pulse-dot"} />
+                  <div><strong>{activity[0]?.message ?? engine.message}</strong><small>{activity[0] ? `${activity[0].mode === "practice" ? "Practice" : "Real trading"} · ${activityTime(activity[0].occurred_at)}` : running ? "The next market check runs on each agent’s schedule." : "Start Practice to see what the agents would do before using real money."}</small></div>
+                </div>
+              </div>
+            </section>
           </div>
-          <div className="proof-grid">
-            <div><span>Authentication</span><strong>{robinhoodDemo.authenticated ? "Verified" : "Not verified"}</strong></div>
-            <div><span>Dedicated Agentic account</span><strong>{robinhoodDemo.agentic_account_available ? "Verified" : "Not found"}</strong></div>
-            <div><span>Buying power</span><strong>{robinhoodDemo.authenticated ? robinhoodDemo.has_buying_power ? "Available" : "None" : "—"}</strong></div>
-            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
-          </div>
-          {robinhoodDemo.owner_import_available && !robinhoodDemo.configured ? <button className="owner-import" type="button" onClick={importRobinhoodOwnerConnection} disabled={robinhoodImporting}>{robinhoodImporting ? "Connecting…" : "Use this Mac's existing Robinhood Agentic connection"}</button> : null}
-          <p className="proof-note">Official Robinhood MCP only. The desktop can call only the read-only account proof; review, place, cancel, transfer, and generic MCP tool access are not exposed.</p>
-        </section>
+        ) : null}
 
-        <section className="workspace-section demo-proof" aria-labelledby="demo-proof-heading">
-          <div className="section-title">
-            <div><p className="kicker">Private founder proof</p><h2 id="demo-proof-heading">Your Kalshi account, safely redacted</h2></div>
-            <p>This view verifies the existing connection without showing balances, wallet addresses, positions, market names, or credentials.</p>
-          </div>
-          <div className="proof-grid">
-            <div><span>Authentication</span><strong>{kalshiDemo.authenticated ? "Verified" : "Not verified"}</strong></div>
-            <div><span>Local signing key</span><strong>{kalshiDemo.signing_key_available ? "In OS vault" : "Not imported"}</strong></div>
-            <div><span>Direct Kalshi API</span><strong>{kalshiDemo.direct_api_configured ? "Configured" : "Required for live"}</strong></div>
-            <div><span>Active positions synced</span><strong>{kalshiDemo.authenticated ? kalshiDemo.active_position_count : "—"}</strong></div>
-            <div><span>Live entries</span><strong className="locked-copy">Locked</strong></div>
-          </div>
-          {kalshiDemo.owner_import_available && !kalshiDemo.configured ? <button className="owner-import" type="button" onClick={importOwnerDemo} disabled={kalshiImporting}>{kalshiImporting ? "Importing…" : "Use this Mac's existing owner connection"}</button> : null}
-          <p className="proof-note">Simmer/DFlow remains read-only. A one-contract live canary can use only the direct Kalshi API after its separate credentials, market choice, fee check, and confirmation gates pass.</p>
-        </section>
+        {view === "agents" ? (
+          <section className="agents-view">
+            <div className="view-intro"><div><h2>Choose up to three.</h2><p>Each agent follows a different trading approach. You can change them whenever trading is paused.</p></div><button className="pick-button" type="button" onClick={pickForMe}>Pick for me</button></div>
+            <div className="agent-list">
+              {catalog.map((agent) => {
+                const selected = selectedIds.includes(agent.id);
+                const connected = connectedNames.has(agent.account);
+                return (
+                  <button className={selected ? "agent-row selected" : "agent-row"} type="button" key={agent.id} onClick={() => toggleAgent(agent.id)} disabled={running || !agent.customer_ready}>
+                    <span className="agent-avatar">{agent.name.slice(0, 1)}</span>
+                    <div className="agent-main"><span><strong>{agent.name}</strong><small>{agent.account} · every {agent.cadence_minutes} minutes</small></span><p>{agent.summary}</p></div>
+                    <span className={`risk-tag ${agent.risk_level}`}>{agent.risk_level === "steady" ? "Steady" : agent.risk_level === "balanced" ? "Balanced" : "Active"}</span>
+                    <span className={connected ? "account-ready" : "account-needed"}>{!agent.customer_ready ? "Coming next" : connected ? "Account ready" : `Connect ${agent.account}`}</span>
+                    <span className="selection-mark">{!agent.customer_ready ? "Not yet" : selected ? "Selected" : "Select"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
-        <section className="workspace-section risk-panel">
-          <div className="section-title">
-            <div><p className="kicker">Non-overridable maximums</p><h2>Risk policy</h2></div>
-            <p>Customers may lower these values after activation.</p>
-          </div>
-          <div className="policy-grid">
-            <div><span>Opening order</span><strong>{money(policy.max_opening_order_usd)}</strong></div>
-            <div><span>Venue exposure</span><strong>{money(policy.max_venue_exposure_usd)}</strong></div>
-            <div><span>Global exposure</span><strong>{money(policy.max_global_exposure_usd)}</strong></div>
-            <div><span>Venue daily loss stop</span><strong>{money(policy.max_daily_loss_usd)}</strong></div>
-          </div>
-        </section>
+        {view === "accounts" ? (
+          <section className="accounts-view">
+            <div className="view-intro"><div><h2>Connect the accounts you want to trade with.</h2><p>Money stays with the broker, exchange, or wallet you already use.</p></div><button className="pick-button" type="button" disabled={busy} onClick={() => void refreshAccounts()}>Check connections</button></div>
+            <div className="account-list">
+              {accounts.map((account) => (
+                <div className="account-row" key={account.name}>
+                  <span className="account-logo large">{accountInitial(account.name)}</span>
+                  <div><strong>{account.name}</strong><small>{account.detail}</small></div>
+                  <div className="account-state"><span className={account.connected ? "state-indicator connected" : "state-indicator"} />{account.connected ? (account.funded ? "Connected and ready" : "Connected · add funds to trade") : "Not connected"}</div>
+                  {account.connected ? <button className="secondary-button" type="button">View</button> : (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void connectAccount(account.name)}
+                    >{account.action}</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="account-footnote">DayTradingBot never needs permission to withdraw or transfer money.</p>
+          </section>
+        ) : null}
+
+        {view === "activity" ? (
+          <section className="activity-view">
+            <div className="view-intro"><div><h2>Clear records, without the noise.</h2><p>Market checks, decisions, orders, and results will appear here in time order.</p></div></div>
+            <div className="timeline">
+              <div className="timeline-row"><span className={running ? "pulse-dot active" : "pulse-dot"} /><time>Now</time><div><strong>{engine.message}</strong><p>{selectedAgents.length ? `${selectedAgents.map((agent) => agent.name).join(", ")} · ${mode === "practice" ? "Practice" : "Real trading"}` : "Choose an agent to begin."}</p></div></div>
+              {activity.map((item) => (
+                <div className={item.kind === "error" ? "timeline-row warning" : "timeline-row"} key={item.id}>
+                  <span className={item.kind === "order_submitted" || item.kind === "filled" ? "pulse-dot active" : "pulse-dot"} />
+                  <time>{activityTime(item.occurred_at)}</time>
+                  <div><strong>{item.message}</strong><p>{item.agent_id === "bluechip" ? "Bluechip" : item.agent_id} · {item.mode === "practice" ? "Practice" : "Real trading"}{item.amount_usd ? ` · $${Number(item.amount_usd).toFixed(2)}` : ""}</p></div>
+                </div>
+              ))}
+              {!activity.length && !running ? <div className="timeline-row muted"><span className="pulse-dot" /><time>Next</time><div><strong>Your first market check</strong><p>Start Practice to watch the agents work without using real money.</p></div></div> : null}
+            </div>
+          </section>
+        ) : null}
       </main>
+
+      {setupOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+            <header>
+              <div><p>Step {setupStep} of 4</p><h2 id="setup-title">{setupStep === 1 ? "Connect your accounts" : setupStep === 2 ? "Choose your trading agent" : setupStep === 3 ? "Set your limits" : "Choose how to start"}</h2></div>
+              <button type="button" onClick={() => setSetupOpen(false)} aria-label="Close setup">×</button>
+            </header>
+            <div className="setup-progress" aria-hidden="true">{[1, 2, 3, 4].map((step) => <span className={step <= setupStep ? "complete" : ""} key={step} />)}</div>
+
+            {setupStep === 1 ? (
+              <div className="setup-body">
+                <p className="setup-lead">Start with one account. You can add more later.</p>
+                <div className="setup-account-list">
+                  {accounts.map((account) => (
+                    <div className="setup-account" key={account.name}>
+                      <span className="account-logo">{accountInitial(account.name)}</span>
+                      <div><strong>{account.name}</strong><small>{account.connected ? (account.funded ? "Connected and ready" : "Connected · add funds to trade") : account.detail}</small></div>
+                      {account.connected ? <span className="check active">✓</span> : (
+                        <button
+                          className="setup-connect"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void connectAccount(account.name)}
+                        >{account.action}</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {setupStep === 2 ? (
+              <div className="setup-body">
+                <div className="setup-agent-head"><p className="setup-lead">Choose one yourself, or let DayTradingBot match an agent to your connected accounts.</p><button className="pick-button" type="button" onClick={pickForMe}>Pick for me</button></div>
+                <div className="setup-agent-list">
+                  {catalog.filter((agent) => agent.customer_ready).slice(0, 6).map((agent) => <button className={selectedIds.includes(agent.id) ? "setup-agent selected" : "setup-agent"} type="button" key={agent.id} onClick={() => toggleAgent(agent.id)}><span className="agent-avatar">{agent.name.slice(0, 1)}</span><div><strong>{agent.name}</strong><small>{agent.account} · {agent.summary}</small></div><span>{selectedIds.includes(agent.id) ? "✓" : "+"}</span></button>)}
+                </div>
+              </div>
+            ) : null}
+
+            {setupStep === 3 ? (
+              <div className="setup-body limits-body">
+                <div className="limit-control"><div><span>Amount at risk today</span><strong>{money(dailyBudget)}</strong></div><input type="range" min="1" max="25" step="1" value={dailyBudget} onChange={(event) => { const value = Number(event.target.value); setDailyBudget(value); if (perTrade > value) setPerTrade(value); }} /><small>When the agents reach this amount, they cannot open another trade that day.</small></div>
+                <div className="limit-control"><div><span>Most in one trade</span><strong>{money(perTrade)}</strong></div><input type="range" min="1" max={Math.min(5, dailyBudget)} step="1" value={perTrade} onChange={(event) => setPerTrade(Number(event.target.value))} /><small>No agent can put more than this amount into one new trade.</small></div>
+                <p className="risk-line">The full amount you put at risk can be lost. Start smaller until you are comfortable with how the agents trade.</p>
+              </div>
+            ) : null}
+
+            {setupStep === 4 ? (
+              <div className="setup-body mode-body">
+                <button className={mode === "practice" ? "mode-choice selected" : "mode-choice"} type="button" onClick={() => setMode("practice")}><span>Practice</span><strong>See the agents work without using real money.</strong><small>Recommended for your first run</small></button>
+                <button className={mode === "real" ? "mode-choice selected" : "mode-choice"} type="button" onClick={() => setMode("real")}><span>Real trading</span><strong>Use money in your connected accounts.</strong><small>{license.real_trading_ready ? "App activated · every trade can lose money" : "Enter your purchase code once before starting"}</small></button>
+                <div className="start-summary"><span>{selectedAgents.map((agent) => agent.name).join(" + ") || "Choose an agent"}</span><strong>{money(dailyBudget)} today · {money(perTrade)} per trade</strong></div>
+              </div>
+            ) : null}
+
+            <footer>
+              <button className="back-button" type="button" onClick={() => setupStep === 1 ? setSetupOpen(false) : setSetupStep((step) => step - 1)}>{setupStep === 1 ? "Close" : "Back"}</button>
+              {setupStep < 4 ? <button className="continue-button" type="button" onClick={finishSetupStep}>Continue</button> : <button className="continue-button" type="button" onClick={() => void start()} disabled={busy}>{busy ? "Starting…" : mode === "practice" ? "Start Practice" : "Review real trading"}</button>}
+            </footer>
+          </section>
+        </div>
+      ) : null}
+
+      {realReviewOpen ? (
+        <div className="modal-backdrop highest" role="presentation">
+          <section className="real-review" role="alertdialog" aria-modal="true" aria-labelledby="real-review-title">
+            <p className="eyebrow">Real money</p>
+            <h2 id="real-review-title">Ready to start real trading?</h2>
+            <p>The selected agents can place trades in your connected accounts. The full amount at risk today can be lost.</p>
+            <dl><div><dt>Trading agents</dt><dd>{selectedAgents.map((agent) => agent.name).join(", ")}</dd></div><div><dt>Amount at risk today</dt><dd>{money(dailyBudget)}</dd></div><div><dt>Most in one trade</dt><dd>{money(perTrade)}</dd></div></dl>
+            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{busy ? "Starting…" : "Start real trading"}</button></div>
+          </section>
+        </div>
+      ) : null}
+
+      {credentialAccount ? (
+        <div className="modal-backdrop highest" role="presentation">
+          <section className="credential-modal" role="dialog" aria-modal="true" aria-labelledby="credential-title">
+            <header>
+              <div><p className="eyebrow">Connect account</p><h2 id="credential-title">{credentialAccount}</h2></div>
+              <button type="button" onClick={() => { setCredentialFields({ first: "", second: "" }); setCredentialAccount(null); }} aria-label="Close">×</button>
+            </header>
+            <p>{credentialAccount === "Coinbase" ? "Use an Advanced Trade key with View and Trade only. Leave transfer and withdrawal permissions off." : credentialAccount === "Kalshi" ? "Create a trading API key in Kalshi, then paste the key ID and private key below." : "Use a Polymarket US developer key from your approved retail account."}</p>
+            <label>
+              <span>{credentialAccount === "Coinbase" ? "API key name" : "Key ID"}</span>
+              <input type="text" autoComplete="off" spellCheck={false} value={credentialFields.first} onChange={(event) => setCredentialFields((fields) => ({ ...fields, first: event.target.value }))} />
+            </label>
+            <label>
+              <span>{credentialAccount === "Polymarket" ? "Secret key" : "Private key"}</span>
+              <textarea autoComplete="off" spellCheck={false} rows={6} value={credentialFields.second} onChange={(event) => setCredentialFields((fields) => ({ ...fields, second: event.target.value }))} />
+            </label>
+            <small>Your key is checked directly with {credentialAccount} and saved only in this computer’s secure storage.</small>
+            <footer><button className="back-button" type="button" onClick={() => { setCredentialFields({ first: "", second: "" }); setCredentialAccount(null); }}>Cancel</button><button className="continue-button" type="button" disabled={busy} onClick={() => void submitCredentials()}>{busy ? "Connecting…" : `Connect ${credentialAccount}`}</button></footer>
+          </section>
+        </div>
+      ) : null}
+
+      {activationOpen ? (
+        <div className="modal-backdrop highest" role="presentation">
+          <section className="credential-modal activation-modal" role="dialog" aria-modal="true" aria-labelledby="activation-title">
+            <header>
+              <div><p className="eyebrow">One-time setup</p><h2 id="activation-title">Activate DayTradingBot</h2></div>
+              <button type="button" onClick={() => setActivationOpen(false)} aria-label="Close">×</button>
+            </header>
+            {license.real_trading_ready ? (
+              <p>This app is activated for real trading on this computer. Practice and real trading are both available.</p>
+            ) : (
+              <>
+                <p>Enter the purchase code from your receipt. One purchase can be active on one computer at a time.</p>
+                <label>
+                  <span>Purchase code</span>
+                  <input type="text" autoComplete="off" spellCheck={false} placeholder="DTB-…" value={purchaseCode} onChange={(event) => setPurchaseCode(event.target.value.toUpperCase())} />
+                </label>
+                <small>The code only activates the app. Your brokerage and wallet connections remain on this computer.</small>
+              </>
+            )}
+            <footer>
+              <button className="back-button" type="button" onClick={() => setActivationOpen(false)}>Close</button>
+              {!license.real_trading_ready ? <button className="continue-button" type="button" disabled={busy} onClick={() => void activate()}>{busy ? "Activating…" : "Activate app"}</button> : null}
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

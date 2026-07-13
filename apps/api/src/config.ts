@@ -10,6 +10,8 @@ const ConfigSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_PRICE_ID: z.string().min(1).optional(),
+  LICENSE_SIGNING_PRIVATE_KEY_PEM: z.string().min(1).optional(),
+  LICENSE_SECRET_PEPPER: z.string().min(32).optional(),
 });
 
 export type ApiConfig = z.infer<typeof ConfigSchema>;
@@ -36,6 +38,11 @@ export function loadConfig(env: Environment = process.env): ApiConfig {
     STRIPE_SECRET_KEY: secretValue(env, "STRIPE_SECRET_KEY"),
     STRIPE_WEBHOOK_SECRET: secretValue(env, "STRIPE_WEBHOOK_SECRET"),
     STRIPE_PRICE_ID: env.STRIPE_PRICE_ID,
+    LICENSE_SIGNING_PRIVATE_KEY_PEM:
+      secretValue(env, "LICENSE_SIGNING_PRIVATE_KEY_PEM")
+      ?? (env.LICENSE_SIGNING_KEY_FILE
+        ? readFileSync(env.LICENSE_SIGNING_KEY_FILE, { encoding: "utf8" }).trim()
+        : undefined),
+    LICENSE_SECRET_PEPPER: secretValue(env, "LICENSE_SECRET_PEPPER"),
   });
 }
-

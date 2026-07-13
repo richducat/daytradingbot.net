@@ -1,3 +1,9 @@
+mod agent_catalog;
+mod bluechip_runtime;
+mod customer_connections;
+mod license_activation;
+mod owner_engine;
+mod robinhood_connection;
 pub mod vault;
 pub use daytradingbot_release as release_verification;
 
@@ -5,6 +11,7 @@ use daytradingbot_contracts::RiskPolicy;
 use daytradingbot_ledger::Ledger;
 use daytradingbot_licensing::LicenseGate;
 use daytradingbot_venues::coinbase::{CoinbaseAdvancedTradeClient, CoinbaseError};
+use daytradingbot_venues::kalshi::{DirectKalshiClient, DirectKalshiError, KalshiEnvironment};
 use daytradingbot_venues::polymarket_us::{
     PolymarketUsError, PolymarketUsPublicClient, PolymarketUsRetailClient,
 };
@@ -19,12 +26,6 @@ use zeroize::{Zeroize, Zeroizing};
 #[tauri::command]
 fn launch_policy() -> RiskPolicy {
     RiskPolicy::default()
-}
-
-#[derive(Serialize)]
-struct EntryLicenseStatus {
-    entries_allowed: bool,
-    mode: &'static str,
 }
 
 #[derive(Serialize)]
@@ -311,6 +312,7 @@ fn parse_robinhood_oauth_token(raw: &str) -> Result<StoredRobinhoodOAuthToken, &
     Ok(token)
 }
 
+#[cfg(any(debug_assertions, test))]
 fn reduce_robinhood_oauth_bundle(
     raw: &str,
 ) -> Result<(Zeroizing<Vec<u8>>, Option<f64>), &'static str> {
@@ -340,6 +342,19 @@ fn robinhood_token_is_current(expires_at: Option<f64>) -> bool {
     expires_at.is_some_and(|expiry| expiry.is_finite() && expiry > unix_now() + 120.0)
 }
 
+fn load_robinhood_oauth_token(
+    vault: &CredentialVault,
+) -> Result<Option<StoredRobinhoodOAuthToken>, &'static str> {
+    let Some(raw_bytes) = vault
+        .load_optional(VaultKey::RobinhoodOAuthToken)
+        .map_err(|_| "ROBINHOOD_OWNER_VAULT_UNAVAILABLE")?
+    else {
+        return Ok(None);
+    };
+    let raw = std::str::from_utf8(&raw_bytes).map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+    parse_robinhood_oauth_token(raw).map(Some)
+}
+
 /// Reads only the official MCP `get_accounts` tool and returns a privacy-safe
 /// proof that a dedicated Agentic account is reachable. No generic MCP tool
 /// name, market, quote, review, order, cancel, or transfer operation is exposed.
@@ -347,16 +362,20 @@ fn robinhood_token_is_current(expires_at: Option<f64>) -> bool {
 async fn robinhood_owner_demo_status(
     vault: tauri::State<'_, CredentialVault>,
 ) -> Result<RobinhoodOwnerDemoStatus, &'static str> {
-    let Some(raw_bytes) = vault
-        .load_optional(VaultKey::RobinhoodOAuthToken)
-        .map_err(|_| "ROBINHOOD_OWNER_VAULT_UNAVAILABLE")?
-    else {
+    let Some(mut token) = load_robinhood_oauth_token(&vault)? else {
         return Ok(RobinhoodOwnerDemoStatus::not_configured());
     };
-    let raw = std::str::from_utf8(&raw_bytes).map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
-    let token = parse_robinhood_oauth_token(raw)?;
     if !robinhood_token_is_current(token.expires_at) {
-        return Ok(RobinhoodOwnerDemoStatus::authentication_expired());
+        let refreshed = robinhood_connection::refresh_robinhood_access(&vault)
+            .await
+            .unwrap_or(false);
+        if !refreshed {
+            return Ok(RobinhoodOwnerDemoStatus::authentication_expired());
+        }
+        token = load_robinhood_oauth_token(&vault)?.ok_or("ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
+        if !robinhood_token_is_current(token.expires_at) {
+            return Ok(RobinhoodOwnerDemoStatus::authentication_expired());
+        }
     }
     let client = RobinhoodAgenticClient::new(Zeroizing::new(token.access_token.clone()))
         .map_err(|_| "ROBINHOOD_OWNER_CREDENTIAL_INVALID")?;
@@ -389,52 +408,6 @@ async fn robinhood_owner_demo_status(
         observed_at: Some(snapshot.observed_at.to_rfc3339()),
         live_entries_available: false,
     })
-}
-
-#[tauri::command]
-fn entry_license_status(
-    gate: tauri::State<'_, LicenseGate>,
-    vault: tauri::State<'_, CredentialVault>,
-) -> EntryLicenseStatus {
-    #[cfg(debug_assertions)]
-    {
-        let _ = (gate, vault);
-        EntryLicenseStatus {
-            entries_allowed: false,
-            mode: "close_only",
-        }
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        let now_unix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(i64::MAX, |duration| {
-                i64::try_from(duration.as_secs()).unwrap_or(i64::MAX)
-            });
-        let trusted_time_floor = vault
-            .load_optional(VaultKey::LicenseLastTrustedTime)
-            .ok()
-            .flatten()
-            .and_then(|value| std::str::from_utf8(&value).ok()?.parse::<i64>().ok());
-        let trusted_time_floor = trusted_time_floor.unwrap_or(now_unix);
-        let floor_to_store = now_unix.max(trusted_time_floor);
-        let vault_available = vault
-            .store(
-                VaultKey::LicenseLastTrustedTime,
-                floor_to_store.to_string().as_bytes(),
-            )
-            .is_ok();
-        let entries_allowed = vault_available && gate.entries_allowed(now_unix, trusted_time_floor);
-        EntryLicenseStatus {
-            entries_allowed,
-            mode: if entries_allowed {
-                "entry_enabled"
-            } else {
-                "close_only"
-            },
-        }
-    }
 }
 
 #[derive(Serialize)]
@@ -474,6 +447,29 @@ impl KalshiOwnerDemoStatus {
             live_entries_available: false,
         }
     }
+
+    fn direct_only(authenticated: bool, has_spendable_balance: bool) -> Self {
+        Self {
+            owner_import_available: cfg!(debug_assertions),
+            configured: true,
+            connection_state: if authenticated {
+                "read_only_ready"
+            } else {
+                "authentication_failed"
+            },
+            provider: "kalshi_direct",
+            authenticated,
+            signing_key_available: true,
+            direct_api_configured: true,
+            wallet_configured: false,
+            active_position_count: 0,
+            has_spendable_balance,
+            has_open_exposure: false,
+            warning_count: usize::from(!authenticated),
+            observed_at: Some(chrono::Utc::now().to_rfc3339()),
+            live_entries_available: false,
+        }
+    }
 }
 
 /// Reads a deliberately redacted summary of the owner's existing Kalshi
@@ -483,18 +479,42 @@ impl KalshiOwnerDemoStatus {
 async fn kalshi_owner_demo_status(
     vault: tauri::State<'_, CredentialVault>,
 ) -> Result<KalshiOwnerDemoStatus, &'static str> {
-    let direct_api_configured = vault
+    let direct_key_id = vault
         .load_optional(VaultKey::KalshiApiKeyId)
-        .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
-        .is_some()
-        && vault
-            .load_optional(VaultKey::KalshiPrivateKeyPem)
-            .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
-            .is_some();
+        .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?;
+    let direct_private_key = vault
+        .load_optional(VaultKey::KalshiPrivateKeyPem)
+        .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?;
+    let direct_api_configured = direct_key_id.is_some() && direct_private_key.is_some();
+    let direct_balance = if let (Some(key_id), Some(private_key)) =
+        (direct_key_id, direct_private_key)
+    {
+        let key_id = Zeroizing::new(
+            String::from_utf8(key_id.to_vec()).map_err(|_| "KALSHI_CREDENTIAL_INVALID")?,
+        );
+        let private_key = Zeroizing::new(
+            String::from_utf8(private_key.to_vec()).map_err(|_| "KALSHI_CREDENTIAL_INVALID")?,
+        );
+        let client = DirectKalshiClient::new(KalshiEnvironment::Production, key_id, private_key)
+            .map_err(|_| "KALSHI_CREDENTIAL_INVALID")?;
+        match client.read_balance().await {
+            Ok(balance) => Some(balance.balance),
+            Err(DirectKalshiError::AuthenticationFailed | DirectKalshiError::PermissionDenied) => {
+                return Ok(KalshiOwnerDemoStatus::direct_only(false, false));
+            }
+            Err(DirectKalshiError::RateLimited) => return Err("KALSHI_RATE_LIMITED"),
+            Err(_) => return Err("KALSHI_CONNECTION_FAILED"),
+        }
+    } else {
+        None
+    };
     let Some(api_key_bytes) = vault
         .load_optional(VaultKey::SimmerApiKey)
         .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
     else {
+        if let Some(balance) = direct_balance {
+            return Ok(KalshiOwnerDemoStatus::direct_only(true, balance > 0));
+        }
         return Ok(KalshiOwnerDemoStatus::not_configured(direct_api_configured));
     };
     let signing_key_available = vault
@@ -520,12 +540,13 @@ async fn kalshi_owner_demo_status(
         configured: true,
         connection_state,
         provider: "simmer_dflow",
-        authenticated: snapshot.authenticated,
-        signing_key_available,
+        authenticated: snapshot.authenticated || direct_balance.is_some(),
+        signing_key_available: signing_key_available || direct_api_configured,
         direct_api_configured,
         wallet_configured: snapshot.wallet_configured,
         active_position_count: snapshot.active_position_count,
-        has_spendable_balance: snapshot.has_spendable_balance,
+        has_spendable_balance: snapshot.has_spendable_balance
+            || direct_balance.is_some_and(|balance| balance > 0),
         has_open_exposure: snapshot.has_open_exposure,
         warning_count: snapshot.warning_count,
         observed_at: Some(snapshot.observed_at.to_rfc3339()),
@@ -533,6 +554,7 @@ async fn kalshi_owner_demo_status(
     })
 }
 
+#[cfg(debug_assertions)]
 #[derive(serde::Deserialize)]
 struct OwnerSimmerCredentials {
     api_key: String,
@@ -652,13 +674,9 @@ pub fn run() {
     tauri::Builder::default()
         .manage(CredentialVault::new())
         .manage(LicenseGate::new())
+        .manage(bluechip_runtime::BluechipRuntime::default())
         .setup(|app| {
-            #[cfg(debug_assertions)]
-            {
-                let vault = app.state::<CredentialVault>();
-                let _ = import_owner_demo_credentials_into(&vault);
-                let _ = import_robinhood_owner_connection_into(&vault);
-            }
+            let _ = license_activation::restore_license(app.handle());
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             let ledger = Ledger::open(app_data_dir.join("ledger.sqlite3"))
@@ -667,8 +685,21 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            agent_catalog::trading_agent_catalog,
+            customer_connections::connect_coinbase_account,
+            customer_connections::connect_simmer_account,
+            customer_connections::connect_polymarket_us_account,
+            customer_connections::connect_kalshi_account,
+            bluechip_runtime::recent_trading_activity,
+            owner_engine::owner_engine_status,
+            owner_engine::start_owner_engine_session,
+            owner_engine::pause_owner_engine_session,
+            robinhood_connection::connect_robinhood,
+            robinhood_connection::disconnect_robinhood,
             launch_policy,
-            entry_license_status,
+            license_activation::entry_license_status,
+            license_activation::activate_license,
+            license_activation::renew_license,
             coinbase_owner_demo_status,
             polymarket_us_owner_demo_status,
             robinhood_owner_demo_status,

@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "id": "bluechip",
+      "name": "Bluechip",
+      "account": "Robinhood",
+      "market": "Stocks and ETFs",
+      "summary": "Looks for pullbacks in a short list of widely held stocks and funds.",
+      "cadence_minutes": 15,
+      "risk_level": "steady",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": true,
+      "auto_pick_rank": 10,
+      "engine": {
+        "kind": "robinhood_agentic",
+        "legacy_label": "ai.openclaw.simmer.robinhood",
+        "entrypoint": "skills/robinhood-equities/robinhood_desk.py"
+      }
+    },
+    {
+      "id": "oracle-gap-polymarket",
+      "name": "Oracle Gap",
+      "account": "Polymarket",
+      "market": "Prediction markets",
+      "summary": "Looks for a meaningful gap between market prices and a group of AI forecasts.",
+      "cadence_minutes": 30,
+      "risk_level": "balanced",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 20,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.divergence",
+        "entrypoint": "skills/polymarket-ai-divergence/ai_divergence.py"
+      }
+    },
+    {
+      "id": "oracle-gap-kalshi",
+      "name": "Oracle Gap",
+      "account": "Kalshi",
+      "market": "Event contracts",
+      "summary": "Looks for a meaningful gap between Kalshi prices and a group of AI forecasts.",
+      "cadence_minutes": 30,
+      "risk_level": "balanced",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 21,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.kalshi-divergence",
+        "entrypoint": "skills/polymarket-ai-divergence/ai_divergence.py"
+      }
+    },
+    {
+      "id": "stormfront",
+      "name": "Stormfront",
+      "account": "Polymarket",
+      "market": "Weather markets",
+      "summary": "Compares weather-market prices with current public forecasts.",
+      "cadence_minutes": 30,
+      "risk_level": "steady",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 12,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.weather",
+        "entrypoint": "skills/polymarket-weather-trader/weather_trader.py"
+      }
+    },
+    {
+      "id": "barometer",
+      "name": "Barometer",
+      "account": "Kalshi",
+      "market": "Weather contracts",
+      "summary": "Compares Kalshi weather contracts with current public forecasts.",
+      "cadence_minutes": 30,
+      "risk_level": "steady",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 13,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.kalshi-weather",
+        "entrypoint": "skills/kalshi-weather-trader/weather_trader.py"
+      }
+    },
+    {
+      "id": "smart-money",
+      "name": "Smart Money",
+      "account": "Polymarket",
+      "market": "Prediction markets",
+      "summary": "Follows a carefully selected group of experienced prediction-market traders.",
+      "cadence_minutes": 30,
+      "risk_level": "balanced",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 30,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.copytrading",
+        "entrypoint": "skills/polymarket-copytrading/copytrading_trader.py"
+      }
+    },
+    {
+      "id": "news-watch",
+      "name": "News Watch",
+      "account": "Polymarket",
+      "market": "News-driven markets",
+      "summary": "Watches trusted news sources for events that can move prediction markets.",
+      "cadence_minutes": 30,
+      "risk_level": "active",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 50,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.signal-sniper",
+        "entrypoint": "skills/polymarket-signal-sniper/signal_sniper.py"
+      }
+    },
+    {
+      "id": "sprinter",
+      "name": "Sprinter",
+      "account": "Polymarket",
+      "market": "Short-term crypto markets",
+      "summary": "Looks for short bursts of momentum in fast Bitcoin and crypto markets.",
+      "cadence_minutes": 15,
+      "risk_level": "active",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 60,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.fastloop",
+        "entrypoint": "skills/polymarket-fast-loop/fastloop_trader.py"
+      }
+    },
+    {
+      "id": "last-call",
+      "name": "Last Call",
+      "account": "Polymarket",
+      "market": "Markets near settlement",
+      "summary": "Looks for carefully priced opportunities shortly before a market settles.",
+      "cadence_minutes": 5,
+      "risk_level": "active",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 70,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.mert",
+        "entrypoint": "skills/polymarket-mert-sniper/mert_sniper.py"
+      }
+    },
+    {
+      "id": "x-pulse",
+      "name": "X Pulse",
+      "account": "Polymarket",
+      "market": "Social-media markets",
+      "summary": "Tracks posting activity for markets tied to social-media volume.",
+      "cadence_minutes": 30,
+      "risk_level": "active",
+      "practice_available": true,
+      "real_trading_available": true,
+      "customer_ready": false,
+      "auto_pick_rank": 80,
+      "engine": {
+        "kind": "simmer",
+        "legacy_label": "ai.openclaw.simmer.elon",
+        "entrypoint": "skills/polymarket-elon-tweets/elon_tweets.py"
+      }
+    }
+  ]
+}
