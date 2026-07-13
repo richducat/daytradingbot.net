@@ -26,8 +26,8 @@ type Question = {
 
 type Confirmations = {
   losses: boolean;
-  essentials: boolean;
-  ownership: boolean;
+  disclosure: boolean;
+  choice: boolean;
 };
 
 type StoredIntake = {
@@ -38,30 +38,30 @@ type StoredIntake = {
 
 const emptyConfirmations: Confirmations = {
   losses: false,
-  essentials: false,
-  ownership: false,
+  disclosure: false,
+  choice: false,
 };
 
 const questions: Question[] = [
   {
     key: "goal",
     eyebrow: "Your goal",
-    title: "What do you actually want help with?",
-    help: "Choose the closest answer. This is the first place we may decide the product is not right for you.",
-    why: "Why we ask: an agent can automate a process. It cannot make returns predictable.",
+    title: "What do you want the bot to help with?",
+    help: "There is no wrong answer. This just helps us make a useful first suggestion.",
+    why: "Why we ask: different goals call for different bots and starting settings.",
     options: [
-      { value: "learn", label: "Learn before I risk money", detail: "I want to watch what an agent would do in Practice." },
+      { value: "learn", label: "Learn before I risk money", detail: "I want to watch what a bot would do in Practice." },
       { value: "save_time", label: "Spend less time watching markets", detail: "I want software to check a defined market for me." },
       { value: "use_rules", label: "Put firm rules around my trading", detail: "I want fixed limits and a repeatable approach." },
-      { value: "fast_returns", label: "Make fast or guaranteed money", detail: "I expect the AI to reliably produce a profit." },
+      { value: "fast_returns", label: "Look for short-term opportunities", detail: "I want the bot focused on faster-moving setups, and I understand they can lose money." },
     ],
   },
   {
     key: "market",
     eyebrow: "The market",
-    title: "Where do you want an agent to look?",
-    help: "Different agents use different accounts, information, and trading approaches.",
-    why: "Why we ask: this determines which agents and account connections can work for you.",
+    title: "Which market are you interested in?",
+    help: "Different bots use different accounts, information, and trading strategies.",
+    why: "Why we ask: this determines which bots and account connections can work for you.",
     options: [
       { value: "stocks", label: "Stocks and ETFs", detail: "Companies and funds traded through Robinhood." },
       { value: "crypto", label: "Bitcoin and crypto", detail: "Short-term crypto opportunities through a supported exchange." },
@@ -72,9 +72,9 @@ const questions: Question[] = [
   {
     key: "approach",
     eyebrow: "The approach",
-    title: "Which kind of signal makes the most sense to you?",
+    title: "What kind of strategy sounds right to you?",
     help: "You do not need to know trading terminology. Pick the explanation you are most comfortable following.",
-    why: "Why we ask: you should understand the basic reason an agent acts, even when the software does the work.",
+    why: "Why we ask: you should understand the basic reason a bot acts, even when the software does the work.",
     options: [
       { value: "pullbacks", label: "Price pullbacks", detail: "Look for established stocks or funds that have dropped by a defined amount." },
       { value: "public_data", label: "Public data and forecasts", detail: "Compare market prices with weather forecasts or other public data." },
@@ -87,11 +87,11 @@ const questions: Question[] = [
   {
     key: "account",
     eyebrow: "Your account",
-    title: "Which account could the app connect to?",
+    title: "Which account do you use?",
     help: "Your money stays with that company. DayTradingBot does not accept deposits or hold customer funds.",
-    why: "Why we ask: we will not recommend an agent that cannot connect to an account you can actually use.",
+    why: "Why we ask: each bot works with specific account connections. You can still choose a different released bot.",
     options: [
-      { value: "robinhood_agentic", label: "Robinhood Agentic account", detail: "I already have Robinhood's dedicated account for an agent." },
+      { value: "robinhood_agentic", label: "Robinhood Agentic account", detail: "I already have Robinhood's dedicated account for automated trading." },
       { value: "robinhood", label: "Regular Robinhood account", detail: "I use Robinhood but have not set up an Agentic account." },
       { value: "coinbase", label: "Coinbase", detail: "I have a Coinbase account I control." },
       { value: "kalshi", label: "Kalshi", detail: "I have an eligible Kalshi account I control." },
@@ -102,9 +102,9 @@ const questions: Question[] = [
   {
     key: "experience",
     eyebrow: "Your experience",
-    title: "How much trading experience do you have?",
-    help: "This changes the starting amount and whether we insist on Practice first.",
-    why: "Why we ask: a new customer should not receive the same starting plan as an experienced active trader.",
+    title: "How familiar are you with trading?",
+    help: "This helps us suggest a starting amount and whether to try Practice first.",
+    why: "Why we ask: someone new may want a smaller starting suggestion than an active trader.",
     options: [
       { value: "new", label: "New", detail: "I am still learning how orders, positions, and losses work." },
       { value: "some", label: "Some experience", detail: "I have placed trades and understand that losses happen." },
@@ -114,9 +114,9 @@ const questions: Question[] = [
   {
     key: "reviewFrequency",
     eyebrow: "Your involvement",
-    title: "How often will you review the app's activity?",
-    help: "Automation still needs an owner. Pause, rejected orders, and account notices should not be ignored.",
-    why: "Why we ask: people who will not review activity should not start with real money.",
+    title: "How often do you want to check in?",
+    help: "The app shows every action, skipped trade, and account message so you can review what happened.",
+    why: "Why we ask: if you check in less often, we will suggest starting in Practice.",
     options: [
       { value: "daily", label: "At least once each trading day", detail: "I can check activity and account notices daily." },
       { value: "few_times_week", label: "A few times each week", detail: "I can review the app regularly, but not constantly." },
@@ -126,9 +126,9 @@ const questions: Question[] = [
   {
     key: "dailyBudget",
     eyebrow: "Your dollar limit",
-    title: "What is the most the app may put into new trades in one day?",
-    help: "This is a ceiling, not a target. The agent may use less or place no trade at all.",
-    why: "Why we ask: your match should arrive with a specific starting limit—not an empty box asking you to guess.",
+    title: "What is the most it can put into new trades each day?",
+    help: "This is a ceiling, not a target. The bot may use less or place no trade at all.",
+    why: "Why we ask: we can give you a clear starting suggestion instead of an empty box.",
     options: [
       { value: "5", label: "$5 per day", detail: "The smallest starting plan." },
       { value: "10", label: "$10 per day", detail: "A modest plan for someone with prior experience." },
@@ -138,18 +138,18 @@ const questions: Question[] = [
   {
     key: "startPreference",
     eyebrow: "Practice or Real",
-    title: "How do you expect to begin?",
-    help: "Practice uses current market information and records what the agent would do without placing an order.",
-    why: "Why we ask: choosing Real immediately may cause us to recommend Practice anyway.",
+    title: "How do you want to start?",
+    help: "Practice uses current market information and records what the bot would do without placing an order.",
+    why: "Why we ask: we may suggest Practice first, but you make the final choice.",
     options: [
-      { value: "practice", label: "Practice first", detail: "I want to understand the agent before any real order." },
+      { value: "practice", label: "Practice first", detail: "I want to understand the bot before any real order." },
       { value: "real_later", label: "Practice, then consider Real", detail: "I may use real money after I review the activity." },
       { value: "real_now", label: "Real money immediately", detail: "I would prefer to skip Practice." },
     ],
   },
 ];
 
-const storageKey = "daytradingbot-intake-v1";
+const storageKey = "daytradingbot-intake-v2";
 
 function readStoredIntake(): StoredIntake {
   try {
@@ -173,37 +173,6 @@ function track(event: string, details: Record<string, string | number> = {}) {
   target.dataLayer?.push({ event, ...details });
 }
 
-function stoppedResult(reason: "fast_returns" | "essentials"): MatchResult {
-  if (reason === "fast_returns") {
-    return {
-      status: "not_fit",
-      agent: null,
-      title: "DayTradingBot is not a fit for that goal.",
-      summary: "No trading agent can promise fast or guaranteed money, and we will not take payment from someone expecting that.",
-      reason: "The product automates a defined process. It does not remove market risk or make returns predictable.",
-      accountNeeded: "None",
-      recommendedMode: "Practice",
-      dailyLimit: 0,
-      perTradeLimit: 0,
-      needsAccountSetup: false,
-      realTradingCaution: null,
-    };
-  }
-  return {
-    status: "not_fit",
-    agent: null,
-    title: "DayTradingBot is not a fit right now.",
-    summary: "You should not use automated trading with money needed for bills or essential expenses.",
-    reason: "A dollar limit reduces exposure, but it cannot make a trade safe or prevent the full amount from being lost.",
-    accountNeeded: "None",
-    recommendedMode: "Practice",
-    dailyLimit: 0,
-    perTradeLimit: 0,
-    needsAccountSetup: false,
-    realTradingCaution: null,
-  };
-}
-
 function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: () => void; onReset: () => void }) {
   const available = result.status === "available";
 
@@ -211,75 +180,61 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
     <main className="match-result">
       <header className="intake-header">
         <a className="wordmark" href="/">DAYTRADINGBOT</a>
-        <span>Fit review complete</span>
+        <span>Your suggestion</span>
       </header>
       <section className="match-hero">
-        <p className="eyebrow">{result.status === "not_fit" ? "Honest answer" : "Your agent match"}</p>
+        <p className="eyebrow">Our suggestion—not a rule</p>
         <h1>{result.title}</h1>
         <p className="match-lead">{result.summary}</p>
+        <p className="match-choice">This is a starting point. You can choose any released bot in the app.</p>
       </section>
 
-      {result.status === "not_fit" ? (
-        <section className="not-fit-panel">
-          <h2>Why we stopped here</h2>
-          <p>{result.reason}</p>
-          <p>Practice tools and general trading education may be more appropriate, but this software should not be purchased with an expectation of reliable profit.</p>
-          <div className="result-actions">
-            <button className="button button-secondary" type="button" onClick={onEdit}>Change my answer</button>
-            <a className="text-link" href="/">Return home</a>
-          </div>
+      <section className="match-plan" aria-labelledby="plan-heading">
+        <div className="match-plan-intro">
+          <p className="eyebrow">A simple place to start</p>
+          <h2 id="plan-heading">Here is the setup we would try first.</h2>
+          <p>{result.reason} Change any of it before you start.</p>
+        </div>
+        <dl className="plan-rows">
+          <div><dt>Suggested bot</dt><dd>{result.agent}</dd></div>
+          <div><dt>Account it uses</dt><dd>{result.accountNeeded}</dd></div>
+          <div><dt>Suggested way to start</dt><dd>{result.recommendedMode}</dd></div>
+          <div><dt>Suggested amount per trade</dt><dd>${result.perTradeLimit}</dd></div>
+          <div><dt>Suggested amount per day</dt><dd>${result.dailyLimit}</dd></div>
+        </dl>
+      </section>
+
+      {(result.needsAccountSetup || result.realTradingCaution) && (
+        <section className="match-notices" aria-label="Helpful notes">
+          {result.needsAccountSetup && <p><strong>You may need a different account connection.</strong> {result.agent} uses {result.accountNeeded}. You can set that up later or choose another released bot.</p>}
+          {result.realTradingCaution && <p><strong>Our starting suggestion.</strong> {result.realTradingCaution}</p>}
         </section>
-      ) : (
-        <>
-          <section className="match-plan" aria-labelledby="plan-heading">
-            <div className="match-plan-intro">
-              <p className="eyebrow">Your suggested starting plan</p>
-              <h2 id="plan-heading">A setup you can understand before paying.</h2>
-              <p>{result.reason}</p>
-            </div>
-            <dl className="plan-rows">
-              <div><dt>Agent</dt><dd>{result.agent}</dd></div>
-              <div><dt>Required account</dt><dd>{result.accountNeeded}</dd></div>
-              <div><dt>Starting mode</dt><dd>{result.recommendedMode}</dd></div>
-              <div><dt>Most in one trade</dt><dd>${result.perTradeLimit}</dd></div>
-              <div><dt>Most in new trades per day</dt><dd>${result.dailyLimit}</dd></div>
-            </dl>
-          </section>
-
-          {(result.needsAccountSetup || result.realTradingCaution) && (
-            <section className="match-notices" aria-label="Before you start">
-              {result.needsAccountSetup && <p><strong>Account setup needed.</strong> Your selected account is not the connection this agent requires. The app would guide you through the correct account before Start becomes available.</p>}
-              {result.realTradingCaution && <p><strong>Practice required.</strong> {result.realTradingCaution}</p>}
-            </section>
-          )}
-
-          <section className="after-match">
-            <div>
-              <p className="eyebrow">What would happen next</p>
-              <h2>Payment comes after the fit decision.</h2>
-            </div>
-            <ol>
-              <li><span>01</span><div><strong>Review this match</strong><p>See the agent, required account, starting mode, and exact dollar limits.</p></div></li>
-              <li><span>02</span><div><strong>Purchase the desktop license</strong><p>Only available matches may continue. Trading money is never paid to DayTradingBot.</p></div></li>
-              <li><span>03</span><div><strong>Install and connect</strong><p>Connect the supported account in the desktop app and confirm available funds there.</p></div></li>
-              <li><span>04</span><div><strong>Start in Practice</strong><p>Review what the agent finds before deciding whether to enable Real trading.</p></div></li>
-            </ol>
-          </section>
-
-          <section className="match-checkout">
-            <div>
-              <p className="eyebrow">{available ? "Potential founding fit" : "No payment will be shown"}</p>
-              <h2>{available ? "$98 once, after final testing." : `${result.agent} is still being packaged for customers.`}</h2>
-              <p>{available
-                ? "Checkout remains closed today. When it opens, this completed match will be required before purchase."
-                : "We will not sell you Bluechip merely because it is available when another agent better matches your answers."}</p>
-            </div>
-            <button className="button button-disabled" type="button" disabled>
-              {available ? "Checkout opens after final testing" : "No purchase available for this match"}
-            </button>
-          </section>
-        </>
       )}
+
+      <section className="after-match">
+        <div>
+          <p className="eyebrow">You stay in charge</p>
+          <h2>You decide what happens next.</h2>
+        </div>
+        <ol>
+          <li><span>01</span><div><strong>Keep or change the bot</strong><p>Use this suggestion, edit your answers, or choose any released bot.</p></div></li>
+          <li><span>02</span><div><strong>Read the fine print</strong><p>Real trades can lose money. The bot does not promise a profit.</p></div></li>
+          <li><span>03</span><div><strong>Buy and connect</strong><p>Buy the desktop app, then connect an account you own. Trading money stays in that account.</p></div></li>
+          <li><span>04</span><div><strong>Set your limits and press Start</strong><p>Choose Practice or Real, set the dollar limits, and pause new trades whenever you want.</p></div></li>
+        </ol>
+      </section>
+
+      <section className="match-checkout">
+        <div>
+          <p className="eyebrow">{available ? "Founding price" : "Your choice is still open"}</p>
+          <h2>{available ? "$98 once, when checkout opens." : `${result.agent} is not released yet.`}</h2>
+          <p>{available
+            ? "Checkout is closed while final live testing and the installers are finished. Your quiz answers will not block you."
+            : `You can wait for ${result.agent} or choose any bot that has been released. This suggestion never locks you in.`}</p>
+          <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
+        </div>
+        <button className="button button-disabled" type="button" disabled>Checkout opens after final testing</button>
+      </section>
 
       <footer className="result-footer">
         <button type="button" onClick={onEdit}>Edit my answers</button>
@@ -297,18 +252,17 @@ export function Onboarding() {
   const [confirmations, setConfirmations] = useState<Confirmations>(initial.confirmations);
   const [step, setStep] = useState(initial.step);
   const [showResult, setShowResult] = useState(false);
-  const [stopReason, setStopReason] = useState<"fast_returns" | "essentials" | null>(null);
 
   const isConfirmationStep = step === questions.length;
   const question = questions[step];
   const selected = question ? answers[question.key] : undefined;
-  const allConfirmed = confirmations.losses && confirmations.essentials && confirmations.ownership;
+  const allConfirmed = confirmations.losses && confirmations.disclosure && confirmations.choice;
   const canContinue = isConfirmationStep ? allConfirmed : Boolean(selected);
 
   useEffect(() => {
     document.title = showResult
-      ? "Your agent match — DayTradingBot"
-      : "Find my trading agent — DayTradingBot";
+      ? "Your bot suggestion — DayTradingBot"
+      : "Help me choose a bot — DayTradingBot";
   }, [showResult]);
 
   useEffect(() => {
@@ -316,9 +270,8 @@ export function Onboarding() {
   }, [answers, confirmations, step]);
 
   const result = useMemo(() => {
-    if (stopReason) return stoppedResult(stopReason);
     return isCompleteAnswers(answers) ? recommendAgent(answers) : null;
-  }, [answers, stopReason]);
+  }, [answers]);
 
   if (showResult && result) {
     return (
@@ -326,8 +279,7 @@ export function Onboarding() {
         result={result}
         onEdit={() => {
           setShowResult(false);
-          setStep(stopReason === "essentials" ? questions.length : result.status === "not_fit" ? 0 : questions.length);
-          setStopReason(null);
+          setStep(questions.length);
         }}
         onReset={() => {
           window.localStorage.removeItem(storageKey);
@@ -335,7 +287,6 @@ export function Onboarding() {
           setConfirmations(emptyConfirmations);
           setStep(0);
           setShowResult(false);
-          setStopReason(null);
           track("agent_match_restarted");
         }}
       />
@@ -344,17 +295,10 @@ export function Onboarding() {
 
   function continueIntake() {
     if (!canContinue) return;
-    if (step === 0 && answers.goal === "fast_returns") {
-      setStopReason("fast_returns");
-      setShowResult(true);
-      track("agent_match_stopped", { reason: "fast_returns" });
-      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
-      return;
-    }
     if (isConfirmationStep) {
       if (!isCompleteAnswers(answers)) return;
       const match = recommendAgent(answers);
-      track("agent_match_completed", { status: match.status, agent: match.agent ?? "none" });
+      track("agent_match_completed", { status: match.status, agent: match.agent });
       setShowResult(true);
       window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
       return;
@@ -382,16 +326,16 @@ export function Onboarding() {
 
       <div className="intake-layout">
         <aside className="intake-assurance">
-          <p className="eyebrow">Find my agent</p>
-          <h2>We would rather say no than sell the wrong setup.</h2>
+          <p className="eyebrow">Help me choose</p>
+          <h2>A few quick questions. Then you choose.</h2>
           <ul>
             <li>About two minutes</li>
             <li>One question at a time</li>
+            <li>Nothing you answer locks you out</li>
             <li>No Social Security number</li>
             <li>No account password or deposit</li>
-            <li>No payment before the result</li>
           </ul>
-          <p>Your answers stay in this browser during pre-launch testing.</p>
+          <p>We will suggest a bot and starting setup. Your answers stay in this browser during pre-launch testing.</p>
         </aside>
 
         <section className="intake-question" aria-live="polite">
@@ -408,33 +352,22 @@ export function Onboarding() {
               {isConfirmationStep ? (
                 <>
                   <p className="eyebrow">Before your result</p>
-                  <h1>Confirm the three things we will not assume.</h1>
-                  <p className="question-help">All three are required for a match. If one is not true, we should stop before payment.</p>
+                  <h1>Read this before you see your suggestion.</h1>
+                  <p className="question-help">These boxes confirm that you saw the fine print. They do not decide which tools you can use.</p>
                   <div className="confirmation-list">
                     <label>
                       <input type="checkbox" checked={confirmations.losses} onChange={(event) => setConfirmations((current) => ({ ...current, losses: event.target.checked }))} />
-                      <span><strong>I understand every agent can lose money.</strong><small>No strategy, AI model, or Practice result guarantees a future profit.</small></span>
+                      <span><strong>I understand real trading can lose money.</strong><small>AI and Practice results do not guarantee a profit.</small></span>
                     </label>
                     <label>
-                      <input type="checkbox" checked={confirmations.essentials} onChange={(event) => setConfirmations((current) => ({ ...current, essentials: event.target.checked }))} />
-                      <span><strong>The amount I chose is not needed for essentials.</strong><small>Losing it would not prevent me from paying bills, food, housing, or other necessities.</small></span>
+                      <input type="checkbox" checked={confirmations.disclosure} onChange={(event) => setConfirmations((current) => ({ ...current, disclosure: event.target.checked }))} />
+                      <span><strong>I read the <a href="/risk-disclosure/" target="_blank" rel="noreferrer">risk disclosure</a>.</strong><small>It explains trading losses, account responsibility, and what can go wrong with automation.</small></span>
                     </label>
                     <label>
-                      <input type="checkbox" checked={confirmations.ownership} onChange={(event) => setConfirmations((current) => ({ ...current, ownership: event.target.checked }))} />
-                      <span><strong>I will connect only an account I own.</strong><small>I will review activity and remain responsible for my account and trades.</small></span>
+                      <input type="checkbox" checked={confirmations.choice} onChange={(event) => setConfirmations((current) => ({ ...current, choice: event.target.checked }))} />
+                      <span><strong>I understand this quiz only makes a suggestion.</strong><small>I can choose any released bot, and I remain responsible for my account and trades.</small></span>
                     </label>
                   </div>
-                  <button
-                    className="not-fit-link"
-                    type="button"
-                    onClick={() => {
-                      setStopReason("essentials");
-                      setShowResult(true);
-                      track("agent_match_declined_suitability");
-                    }}
-                  >
-                    I cannot confirm all three
-                  </button>
                 </>
               ) : question ? (
                 <>
@@ -478,7 +411,7 @@ export function Onboarding() {
               Back
             </button>
             <button className="button button-primary" type="button" disabled={!canContinue} onClick={continueIntake}>
-              {isConfirmationStep ? "See my agent match" : "Continue"}
+              {isConfirmationStep ? "See my suggestion" : "Continue"}
             </button>
           </div>
         </section>

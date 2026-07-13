@@ -10,28 +10,29 @@ function SectionHeading({ eyebrow, children }: { eyebrow: string; children: Reac
 }
 
 const productFlow = [
-  ["Connect your own account", "The desktop app connects to a supported broker, exchange, or approved market account. Your trading money stays there."],
-  ["One agent watches one kind of market", "Each agent follows a defined approach. It checks market information and either finds a matching opportunity or does nothing."],
-  ["You choose Practice or Real", "Practice records what the agent would do and sends no order. Real may place an order only inside the dollar limits you chose."],
-  ["You see every decision", "The app keeps an activity record showing what it checked, why it acted or skipped, the amount, and the account response."],
+  ["Connect an account you already use", "Connect a supported broker, exchange, or market account. Your trading money stays in that account—not with us."],
+  ["Pick a bot", "Each bot watches one kind of market and follows one clear strategy. You can use our suggestion or choose a different released bot."],
+  ["Set your limits", "Choose Practice or Real, then decide how much the bot may put into one trade and into new trades for the day."],
+  ["Press Start", "See what the bot checks, what it does, and what it skips. Press Pause whenever you want to stop new trades."],
 ] as const;
 
 const screeningReasons = [
-  "what you want the software to help with",
-  "which market and trading approach you understand",
-  "which account you own or are willing to set up",
-  "your experience and how often you will review activity",
-  "the most the app may put into new trades each day",
-  "whether you understand that the full amount may be lost",
+  "what you want help with",
+  "which market interests you",
+  "what kind of strategy sounds right",
+  "which account you already use",
+  "how familiar you are with trading",
+  "how much you want the bot to use",
 ] as const;
 
 const faqs = [
-  ["What exactly is DayTradingBot?", "It is a desktop software app. You connect a supported account, choose one specialized trading agent, set dollar limits, and choose Practice or Real. The agent checks its market automatically and records what happens."],
-  ["Why do I have to answer so many questions?", "Because the account, market, strategy, experience, review habits, and dollar amount all affect which setup makes sense. If the answers point to an unreleased agent or an unsafe expectation, payment should not be offered."],
-  ["Is the agent match investment advice?", "No. It is a software-compatibility and starting-setup recommendation based on the preferences you provide. It does not predict returns or tell you that a trade is suitable for your financial situation."],
+  ["What exactly is DayTradingBot?", "It is a desktop app. You connect an account you own, pick a trading bot, choose Practice or Real, set dollar limits, and press Start. The app shows you what the bot does."],
+  ["Why ask me questions?", "The answers help us suggest a bot and sensible starting settings. They do not approve you, reject you, or take away access to released bots."],
+  ["Can I ignore the suggestion?", "Yes. The result is a starting suggestion, not a rule and not investment advice. You can choose any bot that has been released."],
   ["Where do I deposit trading money?", "Not with DayTradingBot. You add funds directly through the broker, exchange, or market account you own. The software is not a bank, broker, exchange, or custodian."],
-  ["Can it place real trades?", "The Bluechip customer app has a protected Real-trading path for a dedicated Robinhood Agentic account. Sales remain closed until the production activation server, signed installers, and final approved small-dollar live test are complete."],
-  ["What if my best-matched agent is not released?", "You will see the match and the reason, but no purchase option. We will not sell you a different agent merely because it is available."],
+  ["Can it place real trades?", "Bluechip includes a Real option for a dedicated Robinhood Agentic account. Checkout stays closed until the live connection, signed installers, and final small-dollar test are finished."],
+  ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
+  ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
   ["What would the $98 license include?", "One active Mac or Windows computer, the version 1 desktop app, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
 ] as const;
 
@@ -45,8 +46,8 @@ export function App() {
     <main>
       <header className="site-header">
         <a className="wordmark" href="#top" aria-label="DayTradingBot home">DAYTRADINGBOT</a>
-        <nav aria-label="Primary navigation"><a href="#product">What it is</a><a href="#example">Example</a><a href="#match">Your match</a><a href="#price">Price</a></nav>
-        <a className="header-cta" href="/get-started/">Find my agent</a>
+        <nav aria-label="Primary navigation"><a href="#product">How it works</a><a href="#example">Bluechip</a><a href="#bots">Bots</a><a href="#price">Price</a></nav>
+        <a className="header-cta" href="/get-started/">Help me choose</a>
       </header>
 
       <section className="hero" id="top">
@@ -58,14 +59,14 @@ export function App() {
           variants={reveal}
           transition={{ duration: 0.55, ease: "easeOut" }}
         >
-          <p className="eyebrow"><span className="status-dot" /> AI trading software for self-directed investors</p>
-          <h1>Get matched before you buy.</h1>
-          <p className="hero-deck">DayTradingBot is a desktop app that connects to your own trading account, gives one specialized AI agent a market to watch, and lets it practice or place trades inside dollar limits you set.</p>
+          <p className="eyebrow"><span className="status-dot" /> AI trading bots you control</p>
+          <h1>Pick a bot. Set your limits. Press Start.</h1>
+          <p className="hero-deck">DayTradingBot is a desktop app that connects to accounts you already use. Choose a bot, choose Practice or Real, tell it how much it can use, and press Start.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/get-started/">Find my agent <span>About 2 minutes</span></a>
-            <a className="text-link" href="#product">See exactly what I am getting <span aria-hidden="true">↓</span></a>
+            <a className="button button-primary" href="/get-started/">Help me choose a bot <span>About 2 minutes</span></a>
+            <a className="text-link" href="#bots">See all bots <span aria-hidden="true">↓</span></a>
           </div>
-          <p className="hero-note">No payment before your result. No account password. No deposit to us. No promise of profit.</p>
+          <p className="hero-note">The questions make a suggestion. They do not decide what you can use. Read the risk disclosure, then choose for yourself.</p>
         </motion.div>
 
         <motion.figure
@@ -75,15 +76,15 @@ export function App() {
           transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
         >
           <img src="/images/daytradingbot-desktop-setup.png" alt="The DayTradingBot desktop app showing the account connection step" />
-          <figcaption><span>Actual desktop setup screen</span> Account connections happen after purchase and remain on your computer.</figcaption>
+          <figcaption><span>Actual desktop setup screen</span> Connect your account inside the app after purchase.</figcaption>
         </motion.figure>
       </section>
 
       <section className="product-explainer section-shell" id="product">
         <div className="product-statement">
           <p className="eyebrow">What am I buying?</p>
-          <h2>A desktop app that watches a market and follows one agent's rules.</h2>
-          <p>It is not an investing account and it is not a chat window giving random tips. It is software that runs a defined trading process through an account you control.</p>
+          <h2>You are buying the app—not sending us trading money.</h2>
+          <p>Install it on your Mac or Windows computer, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -100,9 +101,9 @@ export function App() {
         <div className="section-shell example-layout">
           <div className="example-copy">
             <p className="eyebrow">A real example: Bluechip</p>
-            <h2>Here is what the first customer agent actually does.</h2>
-            <p>Bluechip is the first agent packaged in the customer app. Its job is narrow on purpose: look for pullbacks in a short list of widely held stocks and funds.</p>
-            <a className="text-link dark-link" href="/get-started/">See if Bluechip fits me <span aria-hidden="true">→</span></a>
+            <h2>Here is what the first customer bot does.</h2>
+            <p>Bluechip watches a short list of widely held stocks and funds. It looks for a specific kind of price drop, checks the limits you set, and either acts or does nothing.</p>
+            <a className="text-link dark-link" href="/get-started/">Get a bot suggestion <span aria-hidden="true">→</span></a>
           </div>
           <dl className="example-rules">
             <div><dt>Market watched</dt><dd>AAPL, NVDA, TSLA, SPY, QQQ, AMD, MSFT, GOOGL</dd></div>
@@ -118,43 +119,43 @@ export function App() {
       <section className="screening-section" id="match">
         <div className="section-shell screening-layout">
           <div className="screening-title">
-            <p className="eyebrow">Before payment</p>
-            <span className="question-count">9</span>
-            <h2>First, we interview you.</h2>
-            <p>Every answer is used. We do not ask for a phone number, Social Security number, brokerage password, or deposit.</p>
+            <p className="eyebrow">Want help choosing?</p>
+            <span className="question-count">8</span>
+            <h2>A few questions. One suggestion. Your call.</h2>
+            <p>We do not ask for a phone number, Social Security number, account password, or deposit.</p>
           </div>
           <div className="screening-list">
             <p>We ask about:</p>
             <ol>{screeningReasons.map((reason, index) => <li key={reason}><span>0{index + 1}</span>{reason}</li>)}</ol>
-            <div className="screening-stop"><strong>We may stop the sale.</strong><p>If you expect guaranteed returns, cannot afford the selected amount, will not review activity, or match an agent that is not released, you will not see checkout.</p></div>
-            <a className="button button-primary" href="/get-started/">Start my fit review</a>
+            <div className="screening-choice"><strong>Nothing you answer locks you out.</strong><p>We suggest a bot and starting settings. You can change the answers or choose any released bot after reading the risk disclosure.</p></div>
+            <a className="button button-primary" href="/get-started/">Help me choose a bot</a>
           </div>
         </div>
       </section>
 
-      <section className="routing-section">
+      <section className="routing-section" id="bots">
         <div className="section-shell">
-          <SectionHeading eyebrow="Your answers change the result">There is no universal “best bot.”</SectionHeading>
+          <SectionHeading eyebrow="Choose for yourself">Here is what each bot is built for.</SectionHeading>
           <div className="routing-table">
-            <div className="routing-head"><span>If you want to trade</span><span>Your likely match</span><span>Purchase status</span></div>
+            <div className="routing-head"><span>If you want to trade</span><span>Likely suggestion</span><span>Release status</span></div>
             <div><span>Large stocks and ETFs</span><strong>Bluechip</strong><small className="available">Available first</small></div>
             <div><span>Short-term crypto moves</span><strong>Sprinter</strong><small>Still being packaged</small></div>
             <div><span>Weather and public data</span><strong>Stormfront or Barometer</strong><small>Still being packaged</small></div>
             <div><span>News and prediction markets</span><strong>News Watch or Oracle Gap</strong><small>Still being packaged</small></div>
           </div>
-          <p className="routing-note">The match page explains why, which account is required, whether Practice is mandatory, and the exact starting limits. An unreleased match cannot continue to payment.</p>
+          <p className="routing-note">The quiz makes an optional suggestion and explains the account and starting limits. You can choose any released bot. Bots still being packaged are labeled clearly.</p>
         </div>
       </section>
 
       <section className="customer-journey">
         <div className="section-shell journey-layout">
-          <SectionHeading eyebrow="After you are matched">Know every step before entering a card number.</SectionHeading>
+          <SectionHeading eyebrow="When checkout opens">Here is the whole process.</SectionHeading>
           <ol>
-            <li><span>01</span><div><h3>Review your plan</h3><p>Agent, required account, Practice or Real, daily amount, and per-trade amount.</p></div></li>
-            <li><span>02</span><div><h3>Purchase the software</h3><p>One desktop license. Your trading funds and venue fees are separate.</p></div></li>
-            <li><span>03</span><div><h3>Install and connect</h3><p>Connect the supported account in the app. Credentials stay in your computer's secure storage.</p></div></li>
-            <li><span>04</span><div><h3>Press Start Practice</h3><p>Watch the agent check its market and review its activity without sending an order.</p></div></li>
-            <li><span>05</span><div><h3>Choose Real only when ready</h3><p>Confirm the account and dollar limits again, then press Start. Pause stops new trades.</p></div></li>
+            <li><span>01</span><div><h3>Choose a bot</h3><p>Use our suggestion or pick any released bot yourself.</p></div></li>
+            <li><span>02</span><div><h3>Read the risk disclosure</h3><p>Know what can go wrong before you enter a card number or turn on Real trading.</p></div></li>
+            <li><span>03</span><div><h3>Buy and install the app</h3><p>One desktop license. Your trading money and account fees are separate.</p></div></li>
+            <li><span>04</span><div><h3>Connect your account</h3><p>Connect it inside the app. Your credentials stay in your computer's secure storage.</p></div></li>
+            <li><span>05</span><div><h3>Set limits and press Start</h3><p>Choose Practice or Real. Set the dollars per trade and per day. Press Pause to stop new trades.</p></div></li>
           </ol>
         </div>
       </section>
@@ -162,33 +163,33 @@ export function App() {
       <section className="founder" id="price">
         <div className="section-shell founder-inner">
           <div>
-            <p className="eyebrow">Price after a qualifying match</p>
+            <p className="eyebrow">Founding price</p>
             <h2>${siteConfig.founderPrice} once.</h2>
             <p className="price-qualifier">One active Mac or Windows computer. Version 1 and version 1 updates.</p>
           </div>
           <div className="offer-copy">
             <ul>
               <li>Desktop app and guided account setup</li>
-              <li>Practice and protected Real modes for released agents</li>
-              <li>Agent activity history and fixed customer maximums</li>
+              <li>Practice mode and Real trading for released bots</li>
+              <li>A clear activity history and dollar limits you control</li>
               <li>Trading capital, account fees, and taxes not included</li>
             </ul>
-            <a className="button offer-button" href="/get-started/">Find my agent before I buy</a>
-            <small>Checkout is closed during final testing. Completing the fit review does not create an account or charge you.</small>
+            <a className="button offer-button" href="/get-started/">Help me choose a bot</a>
+            <small>Checkout is closed during final testing. The quiz is optional guidance; its answers do not approve or deny access.</small>
           </div>
         </div>
       </section>
 
       <section className="faq section-shell" aria-labelledby="faq-heading">
-        <SectionHeading eyebrow="Straight answers"><span id="faq-heading">What you should know before the fit review.</span></SectionHeading>
+        <SectionHeading eyebrow="Straight answers"><span id="faq-heading">What you should know before you start.</span></SectionHeading>
         <div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div>
       </section>
 
       <section className="final-cta">
-        <p className="eyebrow">No blind checkout</p>
-        <h2>Find out what fits—and what does not.</h2>
-        <a className="button button-primary" href="/get-started/">Start my 2-minute fit review</a>
-        <p>Answers stay in this browser during pre-launch testing.</p>
+        <p className="eyebrow">Want a suggestion?</p>
+        <h2>Tell us what you want. Then make your own choice.</h2>
+        <a className="button button-primary" href="/get-started/">Help me choose a bot</a>
+        <p>About two minutes. Your answers stay in this browser during pre-launch testing.</p>
       </section>
 
       <footer className="site-footer">

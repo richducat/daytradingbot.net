@@ -13,10 +13,11 @@ const base: MatchAnswers = {
 };
 
 describe("recommendAgent", () => {
-  it("refuses customers expecting fast or guaranteed returns", () => {
+  it("still makes a recommendation when someone wants short-term opportunities", () => {
     const result = recommendAgent({ ...base, goal: "fast_returns" });
-    expect(result.status).toBe("not_fit");
-    expect(result.agent).toBeNull();
+    expect(result.status).toBe("available");
+    expect(result.agent).toBe("Bluechip");
+    expect(result.realTradingCaution).toContain("faster losses");
   });
 
   it("matches a new stock trader to Bluechip with a smaller starting plan", () => {
@@ -59,9 +60,10 @@ describe("recommendAgent", () => {
     expect(result.agent).toBe("Barometer");
   });
 
-  it("holds infrequent reviewers in Practice", () => {
+  it("suggests Practice to infrequent reviewers without blocking their choice", () => {
     const result = recommendAgent({ ...base, experience: "active", reviewFrequency: "rarely", startPreference: "real_now" });
     expect(result.recommendedMode).toBe("Practice");
-    expect(result.realTradingCaution).toContain("rarely review");
+    expect(result.realTradingCaution).toContain("suggest staying in Practice");
+    expect(result.realTradingCaution).toContain("final choice is yours");
   });
 });

@@ -42,8 +42,8 @@ export type AgentName =
   | "X Pulse";
 
 export type MatchResult = {
-  status: "available" | "coming_soon" | "not_fit";
-  agent: AgentName | null;
+  status: "available" | "coming_soon";
+  agent: AgentName;
   title: string;
   summary: string;
   reason: string;
@@ -133,23 +133,6 @@ function hasRequiredAccount(agent: AgentName, account: AccountChoice): boolean {
 
 export function recommendAgent(answers: MatchAnswers): MatchResult {
   const { dailyLimit, perTradeLimit } = riskPlan(answers);
-
-  if (answers.goal === "fast_returns") {
-    return {
-      status: "not_fit",
-      agent: null,
-      title: "DayTradingBot is not a fit for that goal.",
-      summary: "No trading agent can promise fast or guaranteed money, and we will not take payment from someone expecting that.",
-      reason: "The product automates a defined process. It does not remove market risk or make returns predictable.",
-      accountNeeded: "None",
-      recommendedMode: "Practice",
-      dailyLimit,
-      perTradeLimit,
-      needsAccountSetup: false,
-      realTradingCaution: null,
-    };
-  }
-
   const agent = selectAgent(answers);
   const available = agent === "Bluechip";
   const needsAccountSetup = !hasRequiredAccount(agent, answers.account);
@@ -158,20 +141,25 @@ export function recommendAgent(answers: MatchAnswers): MatchResult {
     || answers.reviewFrequency === "rarely"
     || answers.startPreference === "real_now";
   const recommendedMode = mustStartInPractice ? "Practice" : "Real after Practice";
-  const realTradingCaution = answers.reviewFrequency === "rarely"
-    ? "You said you would rarely review activity. We would limit this match to Practice until you can check it regularly."
-    : answers.startPreference === "real_now"
-      ? "You asked to use real money immediately. We would still require a Practice run first."
-      : null;
+  const cautions: string[] = [];
+  if (answers.goal === "fast_returns") {
+    cautions.push("Short-term opportunities can also mean faster losses. We suggest starting small and trying Practice first.");
+  }
+  if (answers.reviewFrequency === "rarely") {
+    cautions.push("Because you plan to check in rarely, we suggest staying in Practice until regular reviews fit your schedule.");
+  } else if (answers.startPreference === "real_now") {
+    cautions.push("You want to use real money right away. We suggest a Practice run first so you can see what the bot does.");
+  }
+  const realTradingCaution = cautions.length > 0 ? `${cautions.join(" ")} The final choice is yours.` : null;
 
   return {
     status: available ? "available" : "coming_soon",
     agent,
-    title: available ? `${agent} is your strongest current match.` : `${agent} is your closest match—but it is not for sale yet.`,
+    title: available ? `${agent} fits your answers best.` : `${agent} fits your answers best—but it is not released yet.`,
     summary: summaries[agent],
     reason: answers.market === "unsure"
-      ? `We matched your goal and preferred approach with ${accountLabels[answers.account]}.`
-      : `We matched your market, preferred approach, experience, and current account.` ,
+      ? `We used your goal, preferred strategy, and ${accountLabels[answers.account]} to make this suggestion.`
+      : `We used your market, preferred strategy, experience, and current account to make this suggestion.` ,
     accountNeeded: requiredAccount(agent),
     recommendedMode,
     dailyLimit,
