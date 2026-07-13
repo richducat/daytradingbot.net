@@ -99,6 +99,20 @@ impl LicenseGate {
         Ok(())
     }
 
+    /// Installs a non-expiring entry lease only in explicitly feature-gated
+    /// private owner-demo builds. Customer builds do not compile this method.
+    #[cfg(feature = "owner-demo-license")]
+    pub fn install_owner_demo(&self) -> Result<(), LeaseError> {
+        let mut current = self.lease.write().map_err(|_| LeaseError::Poisoned)?;
+        *current = Some(VerifiedLease {
+            lease_id: Uuid::from_u128(0x6f776e65722d64656d6f2d6c65617365),
+            license_id: Uuid::from_u128(0x6f776e65722d64656d6f2d6c6963656e),
+            expires_at_unix: i64::MAX,
+            allows_entries: true,
+        });
+        Ok(())
+    }
+
     /// Fails closed on no lease, expiry, revoked entry permission, or lock failure.
     /// This decision is intentionally scoped to opening trades only.
     #[must_use]
@@ -292,5 +306,13 @@ mod tests {
         assert!(gate.entries_allowed(1_700_000_001, 1_700_000_001));
         assert!(!gate.entries_allowed(lease.claims.expires_at_unix, lease.claims.expires_at_unix,));
         assert!(!gate.entries_allowed(1_700_000_001, lease.claims.expires_at_unix));
+    }
+
+    #[cfg(feature = "owner-demo-license")]
+    #[test]
+    fn private_owner_demo_feature_can_install_an_entry_lease() {
+        let gate = LicenseGate::new();
+        gate.install_owner_demo().unwrap();
+        assert!(gate.entries_allowed(1_700_000_001, 1_700_000_001));
     }
 }

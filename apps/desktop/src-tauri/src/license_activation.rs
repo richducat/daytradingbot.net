@@ -4,13 +4,21 @@ use daytradingbot_licensing::{LicenseGate, SignedLease};
 use ed25519_dalek::SigningKey;
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "owner-demo-license")]
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+#[cfg(feature = "owner-demo-license")]
+use subtle::ConstantTimeEq;
 use tauri::{AppHandle, Manager};
 use zeroize::{Zeroize, Zeroizing};
 
 const RENEWAL_WINDOW_SECONDS: i64 = 24 * 60 * 60;
+#[cfg(feature = "owner-demo-license")]
+const OWNER_DEMO_CODE_SHA256: &str = env!("DAYTRADINGBOT_OWNER_DEMO_CODE_SHA256");
+#[cfg(feature = "owner-demo-license")]
+const OWNER_DEMO_MARKER_VERSION: u16 = 1;
 
 #[derive(Debug, Serialize)]
 pub struct EntryLicenseStatus {
@@ -29,6 +37,17 @@ impl EntryLicenseStatus {
             renewal_needed: false,
             expires_at: None,
             message,
+        }
+    }
+
+    #[cfg(feature = "owner-demo-license")]
+    fn owner_demo() -> Self {
+        Self {
+            activated: true,
+            real_trading_ready: true,
+            renewal_needed: false,
+            expires_at: None,
+            message: "This private owner demo is activated for real trading.",
         }
     }
 }
@@ -86,6 +105,13 @@ struct StoredActivation {
     signed_lease: SignedLease,
 }
 
+#[cfg(feature = "owner-demo-license")]
+#[derive(Debug, Serialize, Deserialize)]
+struct StoredOwnerDemoActivation {
+    version: u16,
+    device_public_key: [u8; 32],
+}
+
 fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -102,6 +128,14 @@ fn activation_path(app: &AppHandle) -> Result<PathBuf, &'static str> {
     app.path()
         .app_data_dir()
         .map(|directory| directory.join("license-activation.json"))
+        .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn owner_demo_activation_path(app: &AppHandle) -> Result<PathBuf, &'static str> {
+    app.path()
+        .app_data_dir()
+        .map(|directory| directory.join("owner-demo-activation.json"))
         .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")
 }
 
@@ -130,6 +164,96 @@ fn write_activation(app: &AppHandle, activation: &StoredActivation) -> Result<()
             .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
     }
     Ok(())
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn read_owner_demo_activation(
+    app: &AppHandle,
+) -> Result<Option<StoredOwnerDemoActivation>, &'static str> {
+    let bytes = match fs::read(owner_demo_activation_path(app)?) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err("LICENSE_STORAGE_UNAVAILABLE"),
+    };
+    let activation: StoredOwnerDemoActivation =
+        serde_json::from_slice(&bytes).map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
+    if activation.version != OWNER_DEMO_MARKER_VERSION {
+        return Err("LICENSE_ACTIVATION_INVALID");
+    }
+    Ok(Some(activation))
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn write_owner_demo_activation(
+    app: &AppHandle,
+    device_public_key: [u8; 32],
+) -> Result<(), &'static str> {
+    let path = owner_demo_activation_path(app)?;
+    let parent = path.parent().ok_or("LICENSE_STORAGE_UNAVAILABLE")?;
+    fs::create_dir_all(parent).map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
+    let bytes = serde_json::to_vec(&StoredOwnerDemoActivation {
+        version: OWNER_DEMO_MARKER_VERSION,
+        device_public_key,
+    })
+    .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
+    fs::write(&path, bytes).map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn decode_sha256_hex(value: &str) -> Option<[u8; 32]> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut decoded = [0_u8; 32];
+    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        let text = std::str::from_utf8(pair).ok()?;
+        decoded[index] = u8::from_str_radix(text, 16).ok()?;
+    }
+    Some(decoded)
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn owner_demo_code_matches_with_hash(code: &str, expected_hash: &str) -> bool {
+    let Some(expected) = decode_sha256_hex(expected_hash) else {
+        return false;
+    };
+    let actual: [u8; 32] = Sha256::digest(code.as_bytes()).into();
+    bool::from(actual.ct_eq(&expected))
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn owner_demo_code_matches(code: &str) -> bool {
+    owner_demo_code_matches_with_hash(code, OWNER_DEMO_CODE_SHA256)
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn restore_owner_demo(app: &AppHandle) -> Result<bool, &'static str> {
+    let Some(activation) = read_owner_demo_activation(app)? else {
+        return Ok(false);
+    };
+    let signing_key = load_or_create_device_key(app.state::<CredentialVault>().inner())?;
+    if signing_key.verifying_key().to_bytes() != activation.device_public_key {
+        return Err("LICENSE_ACTIVATION_INVALID");
+    }
+    app.state::<LicenseGate>()
+        .install_owner_demo()
+        .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
+    Ok(true)
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn owner_demo_ready(app: &AppHandle) -> bool {
+    read_owner_demo_activation(app).ok().flatten().is_some()
+        && app
+            .state::<LicenseGate>()
+            .entries_allowed(unix_now(), unix_now())
 }
 
 fn load_or_create_device_key(vault: &CredentialVault) -> Result<SigningKey, &'static str> {
@@ -210,6 +334,10 @@ async fn parse_api_response(
 }
 
 pub fn restore_license(app: &AppHandle) -> Result<bool, &'static str> {
+    #[cfg(feature = "owner-demo-license")]
+    if restore_owner_demo(app)? {
+        return Ok(true);
+    }
     let Some(activation) = read_activation(app)? else {
         return Ok(false);
     };
@@ -225,6 +353,10 @@ pub fn restore_license(app: &AppHandle) -> Result<bool, &'static str> {
 
 #[tauri::command]
 pub fn entry_license_status(app: AppHandle) -> EntryLicenseStatus {
+    #[cfg(feature = "owner-demo-license")]
+    if owner_demo_ready(&app) {
+        return EntryLicenseStatus::owner_demo();
+    }
     let Ok(Some(activation)) = read_activation(&app) else {
         return EntryLicenseStatus::not_activated("Activate the app before using real money.");
     };
@@ -259,6 +391,16 @@ pub async fn activate_license(
     {
         return Err("PURCHASE_CODE_NOT_RECOGNIZED");
     }
+    #[cfg(feature = "owner-demo-license")]
+    if owner_demo_code_matches(&request.license_code) {
+        let signing_key = load_or_create_device_key(app.state::<CredentialVault>().inner())?;
+        let device_public_key = signing_key.verifying_key().to_bytes();
+        write_owner_demo_activation(&app, device_public_key)?;
+        app.state::<LicenseGate>()
+            .install_owner_demo()
+            .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
+        return Ok(EntryLicenseStatus::owner_demo());
+    }
     let signing_key = load_or_create_device_key(app.state::<CredentialVault>().inner())?;
     let device_public_key = signing_key.verifying_key().to_bytes();
     let encoded_public_key = URL_SAFE_NO_PAD.encode(device_public_key);
@@ -290,6 +432,10 @@ pub async fn activate_license(
 
 #[tauri::command]
 pub async fn renew_license(app: AppHandle) -> Result<EntryLicenseStatus, &'static str> {
+    #[cfg(feature = "owner-demo-license")]
+    if owner_demo_ready(&app) {
+        return Ok(EntryLicenseStatus::owner_demo());
+    }
     let activation = read_activation(&app)?.ok_or("PURCHASE_CODE_NOT_RECOGNIZED")?;
     let token = app
         .state::<CredentialVault>()
@@ -331,5 +477,18 @@ mod tests {
             URL_SAFE_NO_PAD.encode(key.verifying_key().to_bytes()).len(),
             43
         );
+    }
+
+    #[cfg(feature = "owner-demo-license")]
+    #[test]
+    fn owner_demo_code_check_accepts_only_the_matching_code() {
+        let code = "DTB-OWNER-0123456789ABCDEF0123456789ABCDEF0123";
+        let hash = format!("{:x}", Sha256::digest(code.as_bytes()));
+        assert!(owner_demo_code_matches_with_hash(code, &hash));
+        assert!(!owner_demo_code_matches_with_hash(
+            "DTB-OWNER-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+            &hash,
+        ));
+        assert!(!owner_demo_code_matches_with_hash(code, "not-a-hash"));
     }
 }

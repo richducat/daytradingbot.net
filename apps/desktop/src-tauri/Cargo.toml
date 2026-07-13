@@ -11,6 +11,7 @@ description = "DayTradingBot local trading and risk-control desktop application"
 [features]
 default = []
 owner-tools = []
+owner-demo-license = ["daytradingbot-licensing/owner-demo-license", "dep:subtle"]
 
 [[bin]]
 name = "daytradingbot-desktop"
@@ -52,6 +53,7 @@ rust_decimal.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+subtle = { workspace = true, optional = true }
 tauri = { version = "2.11.5", features = [] }
 thiserror.workspace = true
 tokio.workspace = true
