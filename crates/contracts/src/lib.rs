@@ -37,6 +37,41 @@ pub enum IntentPurpose {
     Reduce,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PredictionOutcome {
+    Yes,
+    No,
+}
+
+/// Exact event-contract order semantics. Prices and fees are integer cents so
+/// a connector never has to infer contract quantity from a floating-point
+/// dollar amount.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PredictionOrderSpec {
+    pub outcome: PredictionOutcome,
+    pub contract_count: u32,
+    pub limit_price_cents: u8,
+    /// Total fee allowance for the complete order, not per contract.
+    pub max_fee_cents: u32,
+}
+
+impl PredictionOrderSpec {
+    #[must_use]
+    pub fn worst_case_loss_cents(&self) -> Option<u64> {
+        u64::from(self.contract_count)
+            .checked_mul(u64::from(self.limit_price_cents))?
+            .checked_add(u64::from(self.max_fee_cents))
+    }
+
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        self.contract_count > 0
+            && (1..=99).contains(&self.limit_price_cents)
+            && self.worst_case_loss_cents().is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TradeIntent {
     pub intent_id: Uuid,
@@ -55,6 +90,8 @@ pub struct TradeIntent {
     pub notional_usd: Decimal,
     #[serde(with = "rust_decimal::serde::str_option")]
     pub limit_price: Option<Decimal>,
+    /// Required for event-contract venues and absent for spot/equity venues.
+    pub prediction: Option<PredictionOrderSpec>,
     pub signal_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub rationale: String,
@@ -203,6 +240,45 @@ pub enum RiskRejection {
     MissingOwnedLot,
     ReduceExceedsOwnedLot,
     ReduceWrongSide,
+    InvalidPredictionOrder,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prediction_order_uses_exact_integer_worst_case_loss() {
+        let spec = PredictionOrderSpec {
+            outcome: PredictionOutcome::Yes,
+            contract_count: 1,
+            limit_price_cents: 99,
+            max_fee_cents: 1,
+        };
+
+        assert!(spec.is_valid());
+        assert_eq!(spec.worst_case_loss_cents(), Some(100));
+    }
+
+    #[test]
+    fn prediction_order_rejects_zero_contracts_and_invalid_prices() {
+        for spec in [
+            PredictionOrderSpec {
+                outcome: PredictionOutcome::No,
+                contract_count: 0,
+                limit_price_cents: 50,
+                max_fee_cents: 1,
+            },
+            PredictionOrderSpec {
+                outcome: PredictionOutcome::No,
+                contract_count: 1,
+                limit_price_cents: 100,
+                max_fee_cents: 0,
+            },
+        ] {
+            assert!(!spec.is_valid());
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

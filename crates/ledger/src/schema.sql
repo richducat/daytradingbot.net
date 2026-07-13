@@ -28,6 +28,14 @@ CREATE TABLE IF NOT EXISTS risk_reservations (
     released_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS prediction_intents (
+    intent_id TEXT PRIMARY KEY REFERENCES intents(intent_id),
+    outcome TEXT NOT NULL CHECK (outcome IN ('yes', 'no')),
+    contract_count INTEGER NOT NULL CHECK (contract_count > 0),
+    limit_price_cents INTEGER NOT NULL CHECK (limit_price_cents BETWEEN 1 AND 99),
+    max_fee_cents INTEGER NOT NULL CHECK (max_fee_cents >= 0)
+);
+
 CREATE INDEX IF NOT EXISTS active_reservations_by_venue
     ON risk_reservations(account_scope, venue, venue_day, active);
 
@@ -47,6 +55,28 @@ CREATE TABLE IF NOT EXISTS orders (
     state TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS submission_attempts (
+    attempt_id TEXT PRIMARY KEY,
+    intent_id TEXT NOT NULL UNIQUE REFERENCES intents(intent_id),
+    client_order_id TEXT NOT NULL UNIQUE,
+    request_fingerprint TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (
+        state IN ('submitting', 'acknowledged', 'unknown', 'reconciled', 'quarantined')
+    ),
+    reconciled_state TEXT CHECK (
+        reconciled_state IS NULL OR reconciled_state IN (
+            'acknowledged', 'partially_filled', 'filled', 'canceled', 'rejected'
+        )
+    ),
+    venue_order_id TEXT,
+    detail_code TEXT,
+    started_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS unresolved_submission_attempts
+    ON submission_attempts(state, updated_at);
 
 CREATE TABLE IF NOT EXISTS fills (
     fill_id TEXT PRIMARY KEY,

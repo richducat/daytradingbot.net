@@ -1,6 +1,6 @@
 use chrono::Utc;
 use daytradingbot_contracts::{
-    IntentPurpose, RiskDecision, RiskPolicy, RiskRejection, RiskSnapshot, TradeIntent,
+    IntentPurpose, RiskDecision, RiskPolicy, RiskRejection, RiskSnapshot, TradeIntent, Venue,
 };
 use rust_decimal::Decimal;
 use thiserror::Error;
@@ -67,6 +67,23 @@ impl RiskEngine {
         }
         if intent.notional_usd <= Decimal::ZERO {
             return reject(RiskRejection::InvalidNotional);
+        }
+        let prediction_valid = match (intent.venue, intent.prediction.as_ref()) {
+            (Venue::Kalshi, Some(spec)) if spec.is_valid() => {
+                if intent.purpose == IntentPurpose::Open {
+                    spec.worst_case_loss_cents()
+                        .and_then(|cents| i64::try_from(cents).ok())
+                        .is_some_and(|cents| Decimal::new(cents, 2) == intent.notional_usd)
+                } else {
+                    true
+                }
+            }
+            (Venue::Kalshi, _) => false,
+            (_, None) => true,
+            (_, Some(_)) => false,
+        };
+        if !prediction_valid {
+            return reject(RiskRejection::InvalidPredictionOrder);
         }
         if intent.expires_at <= Utc::now() {
             return reject(RiskRejection::IntentExpired);
@@ -151,7 +168,10 @@ fn reject(reason: RiskRejection) -> RiskDecision {
 #[cfg(test)]
 mod tests {
     use chrono::Duration;
-    use daytradingbot_contracts::{IntentPurpose, OrderSide, OrderType, RiskRejection, Venue};
+    use daytradingbot_contracts::{
+        IntentPurpose, OrderSide, OrderType, PredictionOrderSpec, PredictionOutcome, RiskRejection,
+        Venue,
+    };
     use uuid::Uuid;
 
     use super::*;
@@ -175,6 +195,7 @@ mod tests {
             purpose,
             notional_usd: notional,
             limit_price: None,
+            prediction: None,
             signal_at: now,
             expires_at: now + Duration::minutes(1),
             rationale: "test fixture".into(),
@@ -186,6 +207,31 @@ mod tests {
             safety: daytradingbot_contracts::SafetyState::ready_for_entries(),
             ..RiskSnapshot::default()
         }
+    }
+
+    #[test]
+    fn kalshi_entry_requires_exact_contract_semantics_and_worst_case_notional() {
+        let engine = RiskEngine::new();
+        let mut kalshi = intent(IntentPurpose::Open, Decimal::new(52, 2));
+        kalshi.venue = Venue::Kalshi;
+        kalshi.prediction = Some(PredictionOrderSpec {
+            outcome: PredictionOutcome::Yes,
+            contract_count: 1,
+            limit_price_cents: 50,
+            max_fee_cents: 2,
+        });
+        assert_eq!(
+            engine.evaluate(&kalshi, &ready_snapshot(), &RiskPolicy::default()),
+            RiskDecision::Allowed
+        );
+
+        kalshi.notional_usd = Decimal::new(50, 2);
+        assert_eq!(
+            engine.evaluate(&kalshi, &ready_snapshot(), &RiskPolicy::default()),
+            RiskDecision::Rejected {
+                reason: RiskRejection::InvalidPredictionOrder
+            }
+        );
     }
 
     #[test]

@@ -7,13 +7,16 @@ rust-version.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+base64.workspace = true
 chrono.workspace = true
 daytradingbot-contracts = { path = "../contracts" }
 daytradingbot-ledger = { path = "../ledger" }
 rust_decimal.workspace = true
 reqwest.workspace = true
+ring.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 zeroize.workspace = true

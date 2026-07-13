@@ -77,6 +77,7 @@ struct KalshiOwnerDemoStatus {
     provider: &'static str,
     authenticated: bool,
     signing_key_available: bool,
+    direct_api_configured: bool,
     wallet_configured: bool,
     active_position_count: usize,
     has_spendable_balance: bool,
@@ -87,7 +88,7 @@ struct KalshiOwnerDemoStatus {
 }
 
 impl KalshiOwnerDemoStatus {
-    fn not_configured() -> Self {
+    fn not_configured(direct_api_configured: bool) -> Self {
         Self {
             owner_import_available: cfg!(debug_assertions),
             configured: false,
@@ -95,6 +96,7 @@ impl KalshiOwnerDemoStatus {
             provider: "simmer_dflow",
             authenticated: false,
             signing_key_available: false,
+            direct_api_configured,
             wallet_configured: false,
             active_position_count: 0,
             has_spendable_balance: false,
@@ -113,11 +115,19 @@ impl KalshiOwnerDemoStatus {
 async fn kalshi_owner_demo_status(
     vault: tauri::State<'_, CredentialVault>,
 ) -> Result<KalshiOwnerDemoStatus, &'static str> {
+    let direct_api_configured = vault
+        .load_optional(VaultKey::KalshiApiKeyId)
+        .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
+        .is_some()
+        && vault
+            .load_optional(VaultKey::KalshiPrivateKeyPem)
+            .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
+            .is_some();
     let Some(api_key_bytes) = vault
         .load_optional(VaultKey::SimmerApiKey)
         .map_err(|_| "OWNER_DEMO_VAULT_UNAVAILABLE")?
     else {
-        return Ok(KalshiOwnerDemoStatus::not_configured());
+        return Ok(KalshiOwnerDemoStatus::not_configured(direct_api_configured));
     };
     let signing_key_available = vault
         .load_optional(VaultKey::KalshiSolanaPrivateKey)
@@ -144,6 +154,7 @@ async fn kalshi_owner_demo_status(
         provider: "simmer_dflow",
         authenticated: snapshot.authenticated,
         signing_key_available,
+        direct_api_configured,
         wallet_configured: snapshot.wallet_configured,
         active_position_count: snapshot.active_position_count,
         has_spendable_balance: snapshot.has_spendable_balance,

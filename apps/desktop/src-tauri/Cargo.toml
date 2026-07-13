@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.6", features = [] }
 
 [dependencies]
+chrono.workspace = true
 daytradingbot-contracts = { path = "../../../crates/contracts" }
 daytradingbot-core = { path = "../../../crates/core" }
 daytradingbot-ledger = { path = "../../../crates/ledger" }
@@ -21,9 +22,12 @@ daytradingbot-licensing = { path = "../../../crates/licensing" }
 daytradingbot-release = { path = "../../../crates/release" }
 daytradingbot-venues = { path = "../../../crates/venues" }
 keyring = "4.1.4"
+rust_decimal.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tauri = { version = "2.11.5", features = [] }
 thiserror.workspace = true
 tokio.workspace = true
+uuid.workspace = true
 zeroize.workspace = true

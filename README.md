@@ -26,3 +26,24 @@ pnpm build
 ```
 
 The production topology is documented in `docs/hosting-namecheap.md` and is intentionally not deployed until the Namecheap account inventory and launch gates are complete.
+
+## Direct Kalshi founder canary
+
+Simmer/DFlow is read-only. The only live canary path uses direct Kalshi V2 credentials, exactly one FOK contract, a general-fee preflight, a maximum $1 all-in loss, a durable client-order ID, and no automatic retry.
+
+After a production Kalshi API key is created, authenticate and import it into the OS vault without printing either credential:
+
+```sh
+KALSHI_API_KEY_ID=... \
+KALSHI_PRIVATE_KEY_PATH=/absolute/path/to/kalshi.key \
+cargo run -p daytradingbot-desktop --example import_direct_kalshi
+```
+
+The trade runner is deliberately two phase. `preview` is read-only and returns an intent ID plus a confirmation token bound to the exact market rules and order. `execute` requires both values and re-runs preflight before its single submission:
+
+```sh
+cargo run -p daytradingbot-desktop --example direct_kalshi_canary -- preview TICKER yes 50
+cargo run -p daytradingbot-desktop --example direct_kalshi_canary -- execute TICKER yes 50 INTENT_ID CONFIRMATION_TOKEN
+```
+
+Do not run `execute` from automation. The global autonomous-trading kill switch remains separate and off.

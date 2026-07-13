@@ -867,6 +867,7 @@ dependencies = [
 name = "daytradingbot-desktop"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "daytradingbot-contracts",
  "daytradingbot-core",
  "daytradingbot-ledger",
@@ -874,12 +875,15 @@ dependencies = [
  "daytradingbot-release",
  "daytradingbot-venues",
  "keyring",
+ "rust_decimal",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "thiserror 2.0.18",
  "tokio",
+ "uuid",
  "zeroize",
 ]
 
@@ -924,13 +928,16 @@ name = "daytradingbot-venues"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "daytradingbot-contracts",
  "daytradingbot-ledger",
  "reqwest 0.12.28",
+ "ring",
  "rust_decimal",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.18",
  "uuid",
  "zeroize",
