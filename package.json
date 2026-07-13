@@ -12,6 +12,7 @@
     "build:web": "pnpm --filter @daytradingbot/web build",
     "build:api": "pnpm --filter @daytradingbot/api build",
     "build:desktop-ui": "pnpm --filter @daytradingbot/desktop build",
+    "build:owner-demo": "zsh scripts/build-owner-demo-macos.sh",
     "build:rust": "cargo build --workspace --locked",
     "check": "pnpm typecheck && pnpm test && pnpm lint:rust",
     "dev:web": "pnpm --filter @daytradingbot/web dev",

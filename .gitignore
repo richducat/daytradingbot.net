@@ -15,5 +15,6 @@ target/
 .env.*
 !.env.example
 coverage/
+outputs/
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/target/

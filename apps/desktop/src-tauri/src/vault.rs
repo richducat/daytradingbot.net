@@ -9,6 +9,7 @@ const VAULT_SERVICE: &str = "net.daytradingbot.desktop";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VaultKey {
     DeviceSigningKey,
+    OwnerDemoDeviceSigningKey,
     LicenseActivationToken,
     LicenseLastTrustedTime,
     RobinhoodOAuthToken,
@@ -29,6 +30,7 @@ impl VaultKey {
     fn account(self) -> &'static str {
         match self {
             Self::DeviceSigningKey => "device:signing-key",
+            Self::OwnerDemoDeviceSigningKey => "owner-demo:device-signing-key",
             Self::LicenseActivationToken => "license:activation-token",
             Self::LicenseLastTrustedTime => "license:last-trusted-time",
             Self::RobinhoodOAuthToken => "robinhood:oauth-token",
@@ -102,6 +104,7 @@ mod tests {
     fn every_allowed_secret_has_a_unique_fixed_vault_account() {
         let keys = [
             VaultKey::DeviceSigningKey,
+            VaultKey::OwnerDemoDeviceSigningKey,
             VaultKey::LicenseActivationToken,
             VaultKey::LicenseLastTrustedTime,
             VaultKey::RobinhoodOAuthToken,

@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type View = "home" | "agents" | "accounts" | "activity";
 type TradingMode = "practice" | "real";
-type CredentialAccount = "Coinbase" | "Kalshi" | "Polymarket";
+type AccountName = "Robinhood" | "Coinbase" | "Kalshi" | "Polymarket";
+type CredentialAccount = Exclude<AccountName, "Robinhood">;
 
 type Agent = {
   id: string;
@@ -164,6 +165,11 @@ const errorCopy: Record<string, string> = {
   LICENSE_ACTIVATION_UNAVAILABLE: "App activation is temporarily unavailable. Practice still works.",
   LICENSE_ACTIVATION_INVALID: "The activation response could not be verified. Real trading stayed off.",
   LICENSE_STORAGE_UNAVAILABLE: "This computer’s secure storage is unavailable. Real trading stayed off.",
+  ACCOUNT_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to that saved account. Nothing was changed.",
+  ROBINHOOD_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Robinhood connection. Nothing was changed.",
+  COINBASE_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Coinbase connection. Nothing was changed.",
+  OWNER_DEMO_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Kalshi connection. Nothing was changed.",
+  POLYMARKET_US_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Polymarket connection. Nothing was changed.",
   KALSHI_AUTHENTICATION_FAILED: "Kalshi did not accept that key. Create a new trading API key and try again.",
   KALSHI_PERMISSION_DENIED: "That Kalshi key cannot view this account.",
   KALSHI_RATE_LIMITED: "Kalshi is receiving too many requests. Wait a moment and check again.",
@@ -241,13 +247,31 @@ export function App() {
     await Promise.allSettled([catalogRequest, engineRequest, licenseRequest]);
   };
 
-  const refreshAccounts = async () => {
-    await Promise.allSettled([
-      invoke<RobinhoodStatus>("robinhood_owner_demo_status").then(setRobinhood),
-      invoke<SimmerStatus>("kalshi_owner_demo_status").then(setSimmer),
-      invoke<CoinbaseStatus>("coinbase_owner_demo_status").then(setCoinbase),
-      invoke<PolymarketStatus>("polymarket_us_owner_demo_status").then(setPolymarket),
-    ]);
+  const refreshAccount = async (account: AccountName) => {
+    if (account === "Robinhood") {
+      setRobinhood(await invoke<RobinhoodStatus>("robinhood_owner_demo_status"));
+    } else if (account === "Coinbase") {
+      setCoinbase(await invoke<CoinbaseStatus>("coinbase_owner_demo_status"));
+    } else if (account === "Kalshi") {
+      setSimmer(await invoke<SimmerStatus>("kalshi_owner_demo_status"));
+    } else {
+      setPolymarket(await invoke<PolymarketStatus>("polymarket_us_owner_demo_status"));
+    }
+  };
+
+  const checkAllConnections = async () => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      for (const account of ["Robinhood", "Coinbase", "Kalshi", "Polymarket"] satisfies AccountName[]) {
+        await refreshAccount(account);
+      }
+      setNotice("Saved account connections checked.");
+    } catch (error) {
+      setNotice(messageFromError(error));
+    } finally {
+      setBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -277,7 +301,7 @@ export function App() {
       .catch(() => undefined);
   }, [license.renewal_needed]);
 
-  const accounts = useMemo(
+  const accounts = useMemo<Array<{ name: AccountName; detail: string; connected: boolean; funded: boolean; action: string }>>(
     () => [
       {
         name: "Robinhood",
@@ -311,7 +335,7 @@ export function App() {
     [coinbase, polymarket, robinhood, simmer],
   );
 
-  const connectedNames = useMemo(() => new Set(accounts.filter((account) => account.connected).map((account) => account.name)), [accounts]);
+  const connectedNames = useMemo(() => new Set<string>(accounts.filter((account) => account.connected).map((account) => account.name)), [accounts]);
   const selectedAgents = catalog.filter((agent) => selectedIds.includes(agent.id));
   const running = engine.mode === "practice" || engine.mode === "real";
 
@@ -346,7 +370,7 @@ export function App() {
     setNotice(`${pick.name} is the best match for your connected ${pick.account} account and current settings.`);
   };
 
-  const connectAccount = async (account: string) => {
+  const connectAccount = async (account: AccountName) => {
     if (account === "Coinbase" || account === "Polymarket" || (account === "Kalshi" && !simmer.owner_import_available)) {
       setCredentialAccount(account);
       setCredentialFields({ first: "", second: "" });
@@ -357,7 +381,7 @@ export function App() {
     try {
       if (account === "Robinhood") await invoke("connect_robinhood");
       if (account === "Kalshi") await invoke("import_owner_demo_credentials");
-      await Promise.all([refresh(), refreshAccounts()]);
+      await Promise.all([refresh(), refreshAccount(account)]);
       setNotice(`${account} is connected.`);
     } catch (error) {
       setNotice(messageFromError(error));
@@ -391,7 +415,7 @@ export function App() {
       setCredentialFields({ first: "", second: "" });
       setCredentialAccount(null);
       setNotice(`${connected} is connected.`);
-      await Promise.all([refresh(), refreshAccounts()]);
+      await Promise.all([refresh(), refreshAccount(connected)]);
     } catch (error) {
       setNotice(messageFromError(error));
     } finally {
@@ -591,7 +615,7 @@ export function App() {
 
         {view === "accounts" ? (
           <section className="accounts-view">
-            <div className="view-intro"><div><h2>Connect the accounts you want to trade with.</h2><p>Money stays with the broker, exchange, or wallet you already use.</p></div><button className="pick-button" type="button" disabled={busy} onClick={() => void refreshAccounts()}>Check connections</button></div>
+            <div className="view-intro"><div><h2>Connect the accounts you want to trade with.</h2><p>Money stays with the broker, exchange, or wallet you already use.</p></div><button className="pick-button" type="button" disabled={busy} onClick={() => void checkAllConnections()}>{busy ? "Checking…" : "Check connections"}</button></div>
             <div className="account-list">
               {accounts.map((account) => (
                 <div className="account-row" key={account.name}>

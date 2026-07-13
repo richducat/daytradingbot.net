@@ -238,7 +238,7 @@ fn restore_owner_demo(app: &AppHandle) -> Result<bool, &'static str> {
     let Some(activation) = read_owner_demo_activation(app)? else {
         return Ok(false);
     };
-    let signing_key = load_or_create_device_key(app.state::<CredentialVault>().inner())?;
+    let signing_key = load_or_create_owner_demo_device_key(app.state::<CredentialVault>().inner())?;
     if signing_key.verifying_key().to_bytes() != activation.device_public_key {
         return Err("LICENSE_ACTIVATION_INVALID");
     }
@@ -257,8 +257,22 @@ fn owner_demo_ready(app: &AppHandle) -> bool {
 }
 
 fn load_or_create_device_key(vault: &CredentialVault) -> Result<SigningKey, &'static str> {
+    load_or_create_signing_key(vault, VaultKey::DeviceSigningKey)
+}
+
+#[cfg(feature = "owner-demo-license")]
+fn load_or_create_owner_demo_device_key(
+    vault: &CredentialVault,
+) -> Result<SigningKey, &'static str> {
+    load_or_create_signing_key(vault, VaultKey::OwnerDemoDeviceSigningKey)
+}
+
+fn load_or_create_signing_key(
+    vault: &CredentialVault,
+    vault_key: VaultKey,
+) -> Result<SigningKey, &'static str> {
     if let Some(seed) = vault
-        .load_optional(VaultKey::DeviceSigningKey)
+        .load_optional(vault_key)
         .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?
     {
         let seed: [u8; 32] = seed
@@ -273,7 +287,7 @@ fn load_or_create_device_key(vault: &CredentialVault) -> Result<SigningKey, &'st
         .fill(seed.as_mut())
         .map_err(|_| "LICENSE_ACTIVATION_UNAVAILABLE")?;
     vault
-        .store(VaultKey::DeviceSigningKey, seed.as_ref())
+        .store(vault_key, seed.as_ref())
         .map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
     Ok(SigningKey::from_bytes(&seed))
 }
@@ -393,7 +407,8 @@ pub async fn activate_license(
     }
     #[cfg(feature = "owner-demo-license")]
     if owner_demo_code_matches(&request.license_code) {
-        let signing_key = load_or_create_device_key(app.state::<CredentialVault>().inner())?;
+        let signing_key =
+            load_or_create_owner_demo_device_key(app.state::<CredentialVault>().inner())?;
         let device_public_key = signing_key.verifying_key().to_bytes();
         write_owner_demo_activation(&app, device_public_key)?;
         app.state::<LicenseGate>()

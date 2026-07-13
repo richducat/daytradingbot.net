@@ -14,5 +14,10 @@
         "resizable": true
       }
     ]
+  },
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "F9C5A2C0C0536C90002057AA77C5750A3D3AE0D4"
+    }
   }
 }
