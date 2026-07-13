@@ -11,6 +11,7 @@ base64.workspace = true
 chrono.workspace = true
 daytradingbot-contracts = { path = "../contracts" }
 daytradingbot-ledger = { path = "../ledger" }
+p256.workspace = true
 rust_decimal.workspace = true
 reqwest.workspace = true
 ring.workspace = true

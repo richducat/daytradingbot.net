@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod coinbase;
 pub mod kalshi;
+pub mod polymarket_us;
 pub mod robinhood;
 pub mod simmer;
 
@@ -43,7 +45,14 @@ impl VenueCapabilities {
                 supports_close_only: true,
                 supports_cancel: true,
             },
-            Venue::Coinbase | Venue::Kalshi => Self {
+            Venue::Coinbase => Self {
+                has_native_client_order_id: true,
+                supports_order_preview: true,
+                supports_partial_fills: true,
+                supports_close_only: true,
+                supports_cancel: true,
+            },
+            Venue::Kalshi => Self {
                 has_native_client_order_id: true,
                 supports_order_preview: false,
                 supports_partial_fills: true,
@@ -52,7 +61,7 @@ impl VenueCapabilities {
             },
             Venue::Polymarket => Self {
                 has_native_client_order_id: false,
-                supports_order_preview: false,
+                supports_order_preview: true,
                 supports_partial_fills: true,
                 supports_close_only: true,
                 supports_cancel: true,

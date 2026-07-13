@@ -12,16 +12,14 @@ pub enum VaultKey {
     LicenseActivationToken,
     LicenseLastTrustedTime,
     RobinhoodOAuthToken,
-    CoinbaseApiKey,
-    CoinbaseApiSecret,
+    CoinbaseKeyName,
+    CoinbasePrivateKeyPem,
     SimmerApiKey,
     KalshiSolanaPrivateKey,
     KalshiApiKeyId,
     KalshiPrivateKeyPem,
-    PolymarketApiKey,
-    PolymarketApiSecret,
-    PolymarketPassphrase,
-    PolymarketPrivateKey,
+    PolymarketUsKeyId,
+    PolymarketUsSecretKey,
 }
 
 impl VaultKey {
@@ -32,16 +30,14 @@ impl VaultKey {
             Self::LicenseActivationToken => "license:activation-token",
             Self::LicenseLastTrustedTime => "license:last-trusted-time",
             Self::RobinhoodOAuthToken => "robinhood:oauth-token",
-            Self::CoinbaseApiKey => "coinbase:api-key",
-            Self::CoinbaseApiSecret => "coinbase:api-secret",
+            Self::CoinbaseKeyName => "coinbase:key-name",
+            Self::CoinbasePrivateKeyPem => "coinbase:ecdsa-private-key-pem",
             Self::SimmerApiKey => "owner-demo:simmer-api-key",
             Self::KalshiSolanaPrivateKey => "owner-demo:kalshi-solana-private-key",
             Self::KalshiApiKeyId => "kalshi:api-key-id",
             Self::KalshiPrivateKeyPem => "kalshi:rsa-private-key-pem",
-            Self::PolymarketApiKey => "polymarket:api-key",
-            Self::PolymarketApiSecret => "polymarket:api-secret",
-            Self::PolymarketPassphrase => "polymarket:passphrase",
-            Self::PolymarketPrivateKey => "polymarket:private-key",
+            Self::PolymarketUsKeyId => "polymarket-us:key-id",
+            Self::PolymarketUsSecretKey => "polymarket-us:ed25519-secret-key",
         }
     }
 }
@@ -105,16 +101,14 @@ mod tests {
             VaultKey::LicenseActivationToken,
             VaultKey::LicenseLastTrustedTime,
             VaultKey::RobinhoodOAuthToken,
-            VaultKey::CoinbaseApiKey,
-            VaultKey::CoinbaseApiSecret,
+            VaultKey::CoinbaseKeyName,
+            VaultKey::CoinbasePrivateKeyPem,
             VaultKey::SimmerApiKey,
             VaultKey::KalshiSolanaPrivateKey,
             VaultKey::KalshiApiKeyId,
             VaultKey::KalshiPrivateKeyPem,
-            VaultKey::PolymarketApiKey,
-            VaultKey::PolymarketApiSecret,
-            VaultKey::PolymarketPassphrase,
-            VaultKey::PolymarketPrivateKey,
+            VaultKey::PolymarketUsKeyId,
+            VaultKey::PolymarketUsSecretKey,
         ];
         let accounts: HashSet<_> = keys.into_iter().map(VaultKey::account).collect();
         assert_eq!(accounts.len(), keys.len());

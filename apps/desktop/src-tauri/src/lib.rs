@@ -4,6 +4,10 @@ pub use daytradingbot_release as release_verification;
 use daytradingbot_contracts::RiskPolicy;
 use daytradingbot_ledger::Ledger;
 use daytradingbot_licensing::LicenseGate;
+use daytradingbot_venues::coinbase::{CoinbaseAdvancedTradeClient, CoinbaseError};
+use daytradingbot_venues::polymarket_us::{
+    PolymarketUsError, PolymarketUsPublicClient, PolymarketUsRetailClient,
+};
 use daytradingbot_venues::robinhood::{RobinhoodAgenticClient, RobinhoodMcpError};
 use daytradingbot_venues::simmer::{SimmerConnectionState, SimmerKalshiClient};
 use serde::{Deserialize, Serialize};
@@ -68,6 +72,222 @@ impl RobinhoodOwnerDemoStatus {
             ..Self::not_configured()
         }
     }
+}
+
+#[derive(Serialize)]
+struct CoinbaseOwnerDemoStatus {
+    configured: bool,
+    connection_state: &'static str,
+    provider: &'static str,
+    authenticated: bool,
+    can_view: bool,
+    can_trade: bool,
+    can_transfer: bool,
+    can_receive: bool,
+    account_count: usize,
+    has_btc_or_eth_account: bool,
+    least_privilege_live_scope: bool,
+    observed_at: Option<String>,
+    live_entries_available: bool,
+}
+
+impl CoinbaseOwnerDemoStatus {
+    fn not_configured() -> Self {
+        Self {
+            configured: false,
+            connection_state: "not_configured",
+            provider: "coinbase_advanced_trade",
+            authenticated: false,
+            can_view: false,
+            can_trade: false,
+            can_transfer: false,
+            can_receive: false,
+            account_count: 0,
+            has_btc_or_eth_account: false,
+            least_privilege_live_scope: false,
+            observed_at: None,
+            live_entries_available: false,
+        }
+    }
+
+    fn failed(connection_state: &'static str) -> Self {
+        Self {
+            configured: true,
+            connection_state,
+            ..Self::not_configured()
+        }
+    }
+}
+
+/// Reads only Coinbase's key-permissions and first account-page endpoints. It
+/// cannot quote, preview, order, cancel, convert, transfer, or withdraw.
+#[tauri::command]
+async fn coinbase_owner_demo_status(
+    vault: tauri::State<'_, CredentialVault>,
+) -> Result<CoinbaseOwnerDemoStatus, &'static str> {
+    let key_name = vault
+        .load_optional(VaultKey::CoinbaseKeyName)
+        .map_err(|_| "COINBASE_OWNER_VAULT_UNAVAILABLE")?;
+    let private_key = vault
+        .load_optional(VaultKey::CoinbasePrivateKeyPem)
+        .map_err(|_| "COINBASE_OWNER_VAULT_UNAVAILABLE")?;
+    let (Some(key_name), Some(private_key)) = (key_name, private_key) else {
+        return Ok(CoinbaseOwnerDemoStatus::not_configured());
+    };
+    let key_name = Zeroizing::new(
+        String::from_utf8(key_name.to_vec()).map_err(|_| "COINBASE_OWNER_CREDENTIAL_INVALID")?,
+    );
+    let private_key = Zeroizing::new(
+        String::from_utf8(private_key.to_vec()).map_err(|_| "COINBASE_OWNER_CREDENTIAL_INVALID")?,
+    );
+    let client = CoinbaseAdvancedTradeClient::new(key_name, private_key)
+        .map_err(|_| "COINBASE_OWNER_CREDENTIAL_INVALID")?;
+    let snapshot = match client.read_owner_snapshot().await {
+        Ok(snapshot) => snapshot,
+        Err(CoinbaseError::AuthenticationFailed) => {
+            return Ok(CoinbaseOwnerDemoStatus::failed("authentication_failed"));
+        }
+        Err(CoinbaseError::PermissionDenied) => {
+            return Ok(CoinbaseOwnerDemoStatus::failed("permission_denied"));
+        }
+        Err(CoinbaseError::RateLimited) => return Err("COINBASE_OWNER_RATE_LIMITED"),
+        Err(_) => return Err("COINBASE_OWNER_PROVIDER_UNAVAILABLE"),
+    };
+    Ok(CoinbaseOwnerDemoStatus {
+        configured: true,
+        connection_state: if snapshot.least_privilege_live_scope {
+            "read_only_verified"
+        } else if snapshot.can_transfer || snapshot.can_receive {
+            "unsafe_permissions"
+        } else if !snapshot.can_trade {
+            "view_only"
+        } else {
+            "read_only_verified"
+        },
+        provider: "coinbase_advanced_trade",
+        authenticated: snapshot.authenticated,
+        can_view: snapshot.can_view,
+        can_trade: snapshot.can_trade,
+        can_transfer: snapshot.can_transfer,
+        can_receive: snapshot.can_receive,
+        account_count: snapshot.account_count,
+        has_btc_or_eth_account: snapshot.has_btc_or_eth_account,
+        least_privilege_live_scope: snapshot.least_privilege_live_scope,
+        observed_at: Some(snapshot.observed_at.to_rfc3339()),
+        live_entries_available: false,
+    })
+}
+
+#[derive(Serialize)]
+struct PolymarketUsOwnerDemoStatus {
+    configured: bool,
+    connection_state: &'static str,
+    provider: &'static str,
+    market_data_available: bool,
+    authenticated: bool,
+    approved_account_verified: bool,
+    balance_account_count: usize,
+    has_buying_power: bool,
+    international_clob_supported: bool,
+    observed_at: Option<String>,
+    live_entries_available: bool,
+}
+
+impl PolymarketUsOwnerDemoStatus {
+    fn public_only(market_data_available: bool, observed_at: Option<String>) -> Self {
+        Self {
+            configured: false,
+            connection_state: "public_data_ready",
+            provider: "polymarket_us_retail",
+            market_data_available,
+            authenticated: false,
+            approved_account_verified: false,
+            balance_account_count: 0,
+            has_buying_power: false,
+            international_clob_supported: false,
+            observed_at,
+            live_entries_available: false,
+        }
+    }
+
+    fn failed(
+        connection_state: &'static str,
+        market_data_available: bool,
+        observed_at: Option<String>,
+    ) -> Self {
+        Self {
+            configured: true,
+            connection_state,
+            ..Self::public_only(market_data_available, observed_at)
+        }
+    }
+}
+
+/// Connects the official Polymarket US public gateway and, when the separate
+/// US retail credentials exist, verifies the approved account via a read-only
+/// balance request. The international CLOB is deliberately unsupported.
+#[tauri::command]
+async fn polymarket_us_owner_demo_status(
+    vault: tauri::State<'_, CredentialVault>,
+) -> Result<PolymarketUsOwnerDemoStatus, &'static str> {
+    let public = PolymarketUsPublicClient::new()
+        .map_err(|_| "POLYMARKET_US_PUBLIC_PROVIDER_UNAVAILABLE")?
+        .read_market_data_snapshot()
+        .await
+        .map_err(|_| "POLYMARKET_US_PUBLIC_PROVIDER_UNAVAILABLE")?;
+    let observed_at = Some(public.observed_at.to_rfc3339());
+    let key_id = vault
+        .load_optional(VaultKey::PolymarketUsKeyId)
+        .map_err(|_| "POLYMARKET_US_OWNER_VAULT_UNAVAILABLE")?;
+    let secret_key = vault
+        .load_optional(VaultKey::PolymarketUsSecretKey)
+        .map_err(|_| "POLYMARKET_US_OWNER_VAULT_UNAVAILABLE")?;
+    let (Some(key_id), Some(secret_key)) = (key_id, secret_key) else {
+        return Ok(PolymarketUsOwnerDemoStatus::public_only(
+            public.market_data_available,
+            observed_at,
+        ));
+    };
+    let key_id = Zeroizing::new(
+        String::from_utf8(key_id.to_vec()).map_err(|_| "POLYMARKET_US_CREDENTIAL_INVALID")?,
+    );
+    let secret_key = Zeroizing::new(
+        String::from_utf8(secret_key.to_vec()).map_err(|_| "POLYMARKET_US_CREDENTIAL_INVALID")?,
+    );
+    let client = PolymarketUsRetailClient::new(key_id, secret_key)
+        .map_err(|_| "POLYMARKET_US_CREDENTIAL_INVALID")?;
+    let snapshot = match client.read_owner_snapshot().await {
+        Ok(snapshot) => snapshot,
+        Err(PolymarketUsError::AuthenticationFailed) => {
+            return Ok(PolymarketUsOwnerDemoStatus::failed(
+                "authentication_failed",
+                public.market_data_available,
+                observed_at,
+            ));
+        }
+        Err(PolymarketUsError::PermissionDenied) => {
+            return Ok(PolymarketUsOwnerDemoStatus::failed(
+                "account_not_approved",
+                public.market_data_available,
+                observed_at,
+            ));
+        }
+        Err(PolymarketUsError::RateLimited) => return Err("POLYMARKET_US_OWNER_RATE_LIMITED"),
+        Err(_) => return Err("POLYMARKET_US_OWNER_PROVIDER_UNAVAILABLE"),
+    };
+    Ok(PolymarketUsOwnerDemoStatus {
+        configured: true,
+        connection_state: "read_only_verified",
+        provider: "polymarket_us_retail",
+        market_data_available: public.market_data_available,
+        authenticated: snapshot.authenticated,
+        approved_account_verified: snapshot.authenticated,
+        balance_account_count: snapshot.balance_account_count,
+        has_buying_power: snapshot.has_buying_power,
+        international_clob_supported: false,
+        observed_at: Some(snapshot.observed_at.to_rfc3339()),
+        live_entries_available: false,
+    })
 }
 
 #[derive(Deserialize)]
@@ -449,6 +669,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             launch_policy,
             entry_license_status,
+            coinbase_owner_demo_status,
+            polymarket_us_owner_demo_status,
             robinhood_owner_demo_status,
             kalshi_owner_demo_status,
             import_owner_demo_credentials,

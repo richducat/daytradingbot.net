@@ -45,6 +45,36 @@ type KalshiOwnerDemoStatus = {
   live_entries_available: false;
 };
 
+type CoinbaseOwnerDemoStatus = {
+  configured: boolean;
+  connection_state: "not_configured" | "read_only_verified" | "authentication_failed" | "permission_denied" | "unsafe_permissions" | "view_only";
+  provider: "coinbase_advanced_trade";
+  authenticated: boolean;
+  can_view: boolean;
+  can_trade: boolean;
+  can_transfer: boolean;
+  can_receive: boolean;
+  account_count: number;
+  has_btc_or_eth_account: boolean;
+  least_privilege_live_scope: boolean;
+  observed_at: string | null;
+  live_entries_available: false;
+};
+
+type PolymarketUsOwnerDemoStatus = {
+  configured: boolean;
+  connection_state: "public_data_ready" | "read_only_verified" | "authentication_failed" | "account_not_approved";
+  provider: "polymarket_us_retail";
+  market_data_available: boolean;
+  authenticated: boolean;
+  approved_account_verified: boolean;
+  balance_account_count: number;
+  has_buying_power: boolean;
+  international_clob_supported: false;
+  observed_at: string | null;
+  live_entries_available: false;
+};
+
 const fallbackPolicy: RiskPolicy = {
   max_opening_order_usd: "5.00",
   max_daily_opening_notional_usd: "25.00",
@@ -91,6 +121,36 @@ const disconnectedRobinhood: RobinhoodOwnerDemoStatus = {
   live_entries_available: false,
 };
 
+const disconnectedCoinbase: CoinbaseOwnerDemoStatus = {
+  configured: false,
+  connection_state: "not_configured",
+  provider: "coinbase_advanced_trade",
+  authenticated: false,
+  can_view: false,
+  can_trade: false,
+  can_transfer: false,
+  can_receive: false,
+  account_count: 0,
+  has_btc_or_eth_account: false,
+  least_privilege_live_scope: false,
+  observed_at: null,
+  live_entries_available: false,
+};
+
+const disconnectedPolymarketUs: PolymarketUsOwnerDemoStatus = {
+  configured: false,
+  connection_state: "public_data_ready",
+  provider: "polymarket_us_retail",
+  market_data_available: false,
+  authenticated: false,
+  approved_account_verified: false,
+  balance_account_count: 0,
+  has_buying_power: false,
+  international_clob_supported: false,
+  observed_at: null,
+  live_entries_available: false,
+};
+
 function money(value: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value));
 }
@@ -105,9 +165,13 @@ export function App() {
   const [robinhoodDemo, setRobinhoodDemo] = useState<RobinhoodOwnerDemoStatus>(disconnectedRobinhood);
   const [robinhoodSyncFailed, setRobinhoodSyncFailed] = useState(false);
   const [robinhoodImporting, setRobinhoodImporting] = useState(false);
+  const [coinbaseDemo, setCoinbaseDemo] = useState<CoinbaseOwnerDemoStatus>(disconnectedCoinbase);
+  const [coinbaseSyncFailed, setCoinbaseSyncFailed] = useState(false);
   const [kalshiDemo, setKalshiDemo] = useState<KalshiOwnerDemoStatus>(disconnectedKalshi);
   const [kalshiSyncFailed, setKalshiSyncFailed] = useState(false);
   const [kalshiImporting, setKalshiImporting] = useState(false);
+  const [polymarketUsDemo, setPolymarketUsDemo] = useState<PolymarketUsOwnerDemoStatus>(disconnectedPolymarketUs);
+  const [polymarketUsSyncFailed, setPolymarketUsSyncFailed] = useState(false);
 
   const refreshKalshiDemo = () => {
     return invoke<KalshiOwnerDemoStatus>("kalshi_owner_demo_status")
@@ -154,6 +218,23 @@ export function App() {
 
   useEffect(() => {
     let active = true;
+    void invoke<CoinbaseOwnerDemoStatus>("coinbase_owner_demo_status")
+      .then((result) => {
+        if (active) {
+          setCoinbaseDemo(result);
+          setCoinbaseSyncFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) setCoinbaseSyncFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     void invoke<RobinhoodOwnerDemoStatus>("robinhood_owner_demo_status")
       .then((result) => {
         if (active) {
@@ -163,6 +244,23 @@ export function App() {
       })
       .catch(() => {
         if (active) setRobinhoodSyncFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void invoke<PolymarketUsOwnerDemoStatus>("polymarket_us_owner_demo_status")
+      .then((result) => {
+        if (active) {
+          setPolymarketUsDemo(result);
+          setPolymarketUsSyncFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) setPolymarketUsSyncFailed(true);
       });
     return () => {
       active = false;
@@ -243,10 +341,15 @@ export function App() {
           <div className="venue-table">
             {venues.map(([name, scope]) => {
               const isRobinhood = name === "Robinhood";
+              const isCoinbase = name === "Coinbase";
               const isKalshi = name === "Kalshi";
+              const isPolymarket = name === "Polymarket";
               const robinhoodVerified = isRobinhood && robinhoodDemo.connection_state === "read_only_ready";
+              const coinbaseVerified = isCoinbase && coinbaseDemo.authenticated && coinbaseDemo.connection_state !== "unsafe_permissions";
               const kalshiVerified = isKalshi && kalshiDemo.connection_state === "read_only_ready";
-              const verified = robinhoodVerified || kalshiVerified;
+              const polymarketVerified = isPolymarket && polymarketUsDemo.authenticated;
+              const publicDataConnected = isPolymarket && polymarketUsDemo.market_data_available;
+              const verified = robinhoodVerified || coinbaseVerified || kalshiVerified || polymarketVerified || publicDataConnected;
               const stateLabel = isRobinhood
                 ? robinhoodSyncFailed
                   ? "Sync unavailable"
@@ -257,21 +360,72 @@ export function App() {
                       : robinhoodDemo.connection_state === "permission_denied"
                         ? "Agentic access denied"
                       : "Not connected"
+                : isCoinbase
+                  ? coinbaseSyncFailed
+                    ? "Sync unavailable"
+                    : coinbaseDemo.connection_state === "unsafe_permissions"
+                      ? "Unsafe key permissions"
+                      : coinbaseDemo.authenticated
+                        ? "Read-only verified"
+                        : "API key required"
                 : isKalshi
                   ? kalshiSyncFailed
                     ? "Sync unavailable"
                     : kalshiVerified
                       ? "Read-only verified"
                       : "Not connected"
-                  : "Coming later";
+                  : polymarketUsSyncFailed
+                    ? "Sync unavailable"
+                    : polymarketVerified
+                      ? "US account verified"
+                      : publicDataConnected
+                        ? "US market data connected"
+                        : "US setup required";
+              const venueDetail = isRobinhood
+                ? `${scope} · official Agentic MCP`
+                : isCoinbase
+                  ? `${scope} · official Advanced Trade`
+                  : isKalshi
+                    ? `${scope} · owner demo via Simmer/DFlow`
+                    : `${scope} · official Polymarket US only`;
               return <div className={`venue-item ${verified ? "verified" : ""}`} key={name}>
                 <span className="venue-mark">{name.slice(0, 1)}</span>
-                <div><strong>{name}</strong><small>{isRobinhood ? `${scope} · official Agentic MCP` : isKalshi ? `${scope} · owner demo via Simmer/DFlow` : scope}</small></div>
+                <div><strong>{name}</strong><small>{venueDetail}</small></div>
                 <span className={verified ? "verified-state" : "not-connected"}>{stateLabel}</span>
-                <button type="button" disabled>{verified ? "Synced" : "Connect"}</button>
+                <button type="button" disabled>{verified ? publicDataConnected && !polymarketVerified ? "Market data" : "Synced" : "Connect"}</button>
               </div>;
             })}
           </div>
+        </section>
+
+        <section className="workspace-section demo-proof" aria-labelledby="coinbase-proof-heading">
+          <div className="section-title">
+            <div><p className="kicker">Official owner connection</p><h2 id="coinbase-proof-heading">Coinbase Advanced Trade, safely redacted</h2></div>
+            <p>This proof checks only key permissions and portfolio account availability. It never displays balances, asset quantities, account IDs, orders, fills, or credentials.</p>
+          </div>
+          <div className="proof-grid">
+            <div><span>Authentication</span><strong>{coinbaseDemo.authenticated ? "Verified" : "API key required"}</strong></div>
+            <div><span>Required permissions</span><strong>{coinbaseDemo.least_privilege_live_scope ? "View + trade only" : coinbaseDemo.can_transfer || coinbaseDemo.can_receive ? "Unsafe — replace key" : "Not verified"}</strong></div>
+            <div><span>BTC or ETH spot account</span><strong>{coinbaseDemo.authenticated ? coinbaseDemo.has_btc_or_eth_account ? "Available" : "Not found" : "—"}</strong></div>
+            <div><span>Transfer permission</span><strong className={coinbaseDemo.can_transfer ? "locked-copy" : ""}>{coinbaseDemo.authenticated ? coinbaseDemo.can_transfer ? "Must be removed" : "Disabled" : "—"}</strong></div>
+            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
+          </div>
+          <p className="proof-note">Use a portfolio-scoped Coinbase CDP ECDSA key with View and Trade only. Transfer and Receive must remain disabled. Order preview, submission, cancellation, and reconciliation are not exposed in this build.</p>
+        </section>
+
+        <section className="workspace-section demo-proof" aria-labelledby="polymarket-us-proof-heading">
+          <div className="section-title">
+            <div><p className="kicker">Compliant US route</p><h2 id="polymarket-us-proof-heading">Polymarket US — not the international crypto CLOB</h2></div>
+            <p>US residents need the separate Polymarket US app, identity approval, and retail developer key. International wallet credentials are never accepted here.</p>
+          </div>
+          <div className="proof-grid">
+            <div><span>US market data</span><strong>{polymarketUsDemo.market_data_available ? "Connected" : "Unavailable"}</strong></div>
+            <div><span>Approved US account</span><strong>{polymarketUsDemo.approved_account_verified ? "Verified" : "KYC + API key required"}</strong></div>
+            <div><span>Buying power</span><strong>{polymarketUsDemo.authenticated ? polymarketUsDemo.has_buying_power ? "Available" : "None" : "—"}</strong></div>
+            <div><span>International Polymarket</span><strong className="locked-copy">Not supported</strong></div>
+            <div><span>Order access</span><strong className="locked-copy">Locked</strong></div>
+          </div>
+          <p className="proof-note">The official US public gateway is connected. Live account access requires approval in the Polymarket US app and a Key ID + one-time secret from polymarket.us/developer. This build has no submit or retry path, preventing duplicate real-money orders after a timeout.</p>
         </section>
 
         <section className="workspace-section demo-proof" aria-labelledby="robinhood-proof-heading">
