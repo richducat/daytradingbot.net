@@ -30,10 +30,11 @@ const faqs = [
   ["Why ask me questions?", "The answers help us suggest a bot and sensible starting settings. They do not approve you, reject you, or take away access to released bots."],
   ["Can I ignore the suggestion?", "Yes. The result is a starting suggestion, not a rule and not investment advice. You can choose any bot that has been released."],
   ["Where do I deposit trading money?", "Not with DayTradingBot. You add funds directly through the broker, exchange, or market account you own. The software is not a bank, broker, exchange, or custodian."],
-  ["Can it place real trades?", "Bluechip includes a Real option for a dedicated Robinhood Agentic account. Checkout stays closed until the live connection, signed installers, and final small-dollar test are finished."],
+  ["Can it place real trades?", "The Bluechip founding beta includes a Real option for a supported Robinhood Agentic account. It starts in Practice. You must connect the account, set your limits, and deliberately choose Real before the app can send an order."],
   ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
   ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
-  ["What would the $98 license include?", "One active Mac or Windows computer, the version 1 desktop app, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
+  ["What does the $98 license include?", "One active Mac or Windows computer, the current Bluechip founding-beta build, guided setup, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
+  ["What happens after I pay?", "Stripe emails your receipt and sends you to a two-minute setup form. After you submit it, a human sends your license, current build, and plain-English install guide within 24 hours."],
 ] as const;
 
 export function App() {
@@ -149,11 +150,11 @@ export function App() {
 
       <section className="customer-journey">
         <div className="section-shell journey-layout">
-          <SectionHeading eyebrow="When checkout opens">Here is the whole process.</SectionHeading>
+          <SectionHeading eyebrow="From questions to setup">Here is the whole process.</SectionHeading>
           <ol>
             <li><span>01</span><div><h3>Choose a bot</h3><p>Use our suggestion or pick any released bot yourself.</p></div></li>
             <li><span>02</span><div><h3>Read the risk disclosure</h3><p>Know what can go wrong before you enter a card number or turn on Real trading.</p></div></li>
-            <li><span>03</span><div><h3>Buy and install the app</h3><p>One desktop license. Your trading money and account fees are separate.</p></div></li>
+            <li><span>03</span><div><h3>Buy and start setup</h3><p>Pay $98 through Stripe, then complete the two-minute setup form. Your trading money and account fees are separate.</p></div></li>
             <li><span>04</span><div><h3>Connect your account</h3><p>Connect it inside the app. Your credentials stay in your computer's secure storage.</p></div></li>
             <li><span>05</span><div><h3>Set limits and press Start</h3><p>Choose Practice or Real. Set the dollars per trade and per day. Press Pause to stop new trades.</p></div></li>
           </ol>
@@ -175,7 +176,7 @@ export function App() {
               <li>Trading capital, account fees, and taxes not included</li>
             </ul>
             <a className="button offer-button" href="/get-started/">Help me choose a bot</a>
-            <small>Checkout is closed during final testing. The quiz is optional guidance; its answers do not approve or deny access.</small>
+            <small>Checkout opens after the required risk acknowledgement. Stripe sends your receipt immediately; personal setup and the current build arrive within 24 hours after the setup form.</small>
           </div>
         </div>
       </section>
@@ -189,13 +190,13 @@ export function App() {
         <p className="eyebrow">Want a suggestion?</p>
         <h2>Tell us what you want. Then make your own choice.</h2>
         <a className="button button-primary" href="/get-started/">Help me choose a bot</a>
-        <p>About two minutes. Your answers stay in this browser during pre-launch testing.</p>
+        <p>About two minutes. Your answers stay in this browser and are not sent to us.</p>
       </section>
 
       <footer className="site-footer">
         <a className="wordmark" href="#top">DAYTRADINGBOT</a>
         <p>Self-directed trading automation. Not investment advice.</p>
-        <div><a href="/risk-disclosure/">Risk</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="mailto:support@daytradingbot.net">Support</a></div>
+        <div><a href="/risk-disclosure/">Risk</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href={`mailto:${siteConfig.supportEmail}`}>Support</a></div>
       </footer>
     </main>
   );

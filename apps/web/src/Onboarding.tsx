@@ -6,6 +6,7 @@ import {
   type MatchAnswers,
   type MatchResult,
 } from "./matching";
+import { siteConfig } from "./siteConfig";
 
 type AnswerKey = keyof MatchAnswers;
 
@@ -27,6 +28,7 @@ type Question = {
 type Confirmations = {
   losses: boolean;
   disclosure: boolean;
+  terms: boolean;
   choice: boolean;
 };
 
@@ -39,6 +41,7 @@ type StoredIntake = {
 const emptyConfirmations: Confirmations = {
   losses: false,
   disclosure: false,
+  terms: false,
   choice: false,
 };
 
@@ -227,13 +230,22 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
       <section className="match-checkout">
         <div>
           <p className="eyebrow">{available ? "Founding price" : "Your choice is still open"}</p>
-          <h2>{available ? "$98 once, when checkout opens." : `${result.agent} is not released yet.`}</h2>
+          <h2>{available ? "$98 once. Checkout is open." : `${result.agent} is not released yet. Bluechip is.`}</h2>
           <p>{available
-            ? "Checkout is closed while final live testing and the installers are finished. Your quiz answers will not block you."
-            : `You can wait for ${result.agent} or choose any bot that has been released. This suggestion never locks you in.`}</p>
+            ? "Buy the Bluechip founding beta through Stripe. After payment, complete the two-minute setup form. A human sends your license, the current build, and the install guide within 24 hours."
+            : `You can wait for ${result.agent} or buy the available Bluechip founding beta now. This suggestion never locks you in.`}</p>
           <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
         </div>
-        <button className="button button-disabled" type="button" disabled>Checkout opens after final testing</button>
+        <div className="checkout-action">
+          <a
+            className="button offer-button"
+            href={siteConfig.checkoutUrl}
+            onClick={() => track("checkout_started", { suggestedAgent: result.agent })}
+          >
+            {available ? "Buy Bluechip — $98" : "Choose Bluechip — $98"}
+          </a>
+          <small>Stripe sends your receipt immediately. Your trading money stays in your own account.</small>
+        </div>
       </section>
 
       <footer className="result-footer">
@@ -256,7 +268,7 @@ export function Onboarding() {
   const isConfirmationStep = step === questions.length;
   const question = questions[step];
   const selected = question ? answers[question.key] : undefined;
-  const allConfirmed = confirmations.losses && confirmations.disclosure && confirmations.choice;
+  const allConfirmed = confirmations.losses && confirmations.disclosure && confirmations.terms && confirmations.choice;
   const canContinue = isConfirmationStep ? allConfirmed : Boolean(selected);
 
   useEffect(() => {
@@ -335,7 +347,7 @@ export function Onboarding() {
             <li>No Social Security number</li>
             <li>No account password or deposit</li>
           </ul>
-          <p>We will suggest a bot and starting setup. Your answers stay in this browser during pre-launch testing.</p>
+          <p>We will suggest a bot and starting setup. Your answers stay in this browser and are not sent to us.</p>
         </aside>
 
         <section className="intake-question" aria-live="polite">
@@ -362,6 +374,10 @@ export function Onboarding() {
                     <label>
                       <input type="checkbox" checked={confirmations.disclosure} onChange={(event) => setConfirmations((current) => ({ ...current, disclosure: event.target.checked }))} />
                       <span><strong>I read the <a href="/risk-disclosure/" target="_blank" rel="noreferrer">risk disclosure</a>.</strong><small>It explains trading losses, account responsibility, and what can go wrong with automation.</small></span>
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={confirmations.terms} onChange={(event) => setConfirmations((current) => ({ ...current, terms: event.target.checked }))} />
+                      <span><strong>I read the <a href="/terms/" target="_blank" rel="noreferrer">founding beta terms</a>.</strong><small>The $98 payment buys software and guided setup. It does not buy trading money or promise returns.</small></span>
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.choice} onChange={(event) => setConfirmations((current) => ({ ...current, choice: event.target.checked }))} />

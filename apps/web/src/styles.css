@@ -212,7 +212,8 @@ h1, h2 { font-family: Iowan Old Style, Baskerville, "Times New Roman", serif; fo
 .match-checkout .eyebrow { color: #3a571b; }
 .match-checkout h2 { margin: 0; font-size: clamp(3rem, 5vw, 5.6rem); line-height: .93; }
 .match-checkout p { max-width: 720px; color: #40502f; line-height: 1.65; }
-.match-checkout .button-disabled { background: #1c2118; color: #c4c9bd; }
+.checkout-action { display: grid; gap: .9rem; }
+.checkout-action small { color: #40502f; line-height: 1.55; }
 .result-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 1.4rem; padding: 2rem 6vw; border-top: 1px solid var(--line); }
 .result-footer button { border: 0; padding: .5rem 0; background: transparent; color: #d0d3ca; cursor: pointer; font-size: .9rem; }
 .result-footer span { margin-left: auto; color: #999e94; font-size: .9rem; }

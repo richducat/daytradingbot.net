@@ -1,6 +1,7 @@
 export const siteConfig = {
   founderPrice: 98,
-  founderSeats: 10,
+  checkoutUrl: "https://buy.stripe.com/14AdRa2gg5AR3CkbMO53O00",
+  supportEmail: "social@eb28.co",
   limits: {
     maxOpeningOrderUsd: 5,
     maxDailyOpeningNotionalUsd: 25,
