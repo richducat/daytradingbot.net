@@ -66,3 +66,23 @@ The owner-only live read proof accepts an access token only through the process 
 ```sh
 ROBINHOOD_ACCESS_TOKEN=... cargo run -p daytradingbot-venues --example robinhood_owner_probe
 ```
+
+## Coinbase and Polymarket US owner proofs
+
+Coinbase Advanced Trade and Polymarket US have fixed-origin, read-only native clients. The owner connection probe reads only the closed Keychain entries used by the desktop app, prints redacted status flags, and has no order, transfer, withdrawal, cancel, or generic-request method:
+
+```sh
+cargo run -p daytradingbot-desktop --bin owner_connection_probe -- --coinbase
+cargo run -p daytradingbot-desktop --bin owner_connection_probe -- --polymarket-us
+```
+
+For local owner setup, the vault importer accepts a credential only through standard input, validates its venue-specific shape, and can write only the four Coinbase/Polymarket Keychain accounts compiled into the tool. Never put a credential directly in the command line:
+
+```sh
+pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'coinbase:key-name'
+pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'coinbase:ecdsa-private-key-pem'
+pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'polymarket-us:key-id'
+pbpaste | cargo run -p daytradingbot-desktop --bin owner_vault_import -- 'polymarket-us:ed25519-secret-key'
+```
+
+These probes prove authentication and least-privilege scope only. Live entries remain locked.
