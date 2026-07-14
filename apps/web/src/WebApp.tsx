@@ -51,6 +51,7 @@ type SessionPayload = {
   expiresAt: string;
   dashboard: Dashboard;
 };
+type SessionResponse = SessionPayload | { authenticated: false };
 
 class BrowserAppError extends Error {
   constructor(readonly status: number, message: string) {
@@ -187,7 +188,13 @@ export function WebApp() {
 
   const refresh = useCallback(async (quiet = false) => {
     try {
-      const payload = await api<SessionPayload>("/v1/web/session");
+      const payload = await api<SessionResponse>("/v1/web/session");
+      if (!payload.authenticated) {
+        setCsrf("");
+        setDashboard(null);
+        setPhase("signed-out");
+        return;
+      }
       acceptSession(payload);
     } catch (caught) {
       if (caught instanceof BrowserAppError && caught.status === 401) {

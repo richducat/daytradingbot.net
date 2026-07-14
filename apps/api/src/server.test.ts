@@ -283,6 +283,11 @@ describe("control-plane API", () => {
     expect(login.headers["set-cookie"]).toContain("SameSite=Strict");
     expect(login.json()).toMatchObject({ authenticated: true, csrfToken: csrf });
 
+    const signedOut = await app.inject({ method: "GET", url: "/v1/web/session" });
+    expect(signedOut.statusCode).toBe(200);
+    expect(signedOut.json()).toEqual({ authenticated: false });
+    expect(signedOut.headers["set-cookie"]).toContain("Max-Age=0");
+
     const rejectedMutation = await app.inject({
       method: "POST",
       url: "/v1/web/settings",

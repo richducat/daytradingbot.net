@@ -293,13 +293,24 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
     { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (request, reply) => {
       reply.header("cache-control", "no-store");
-      const session = await authenticateBrowser(request);
-      return {
-        authenticated: true,
-        csrfToken: session.csrfToken,
-        expiresAt: session.expiresAt.toISOString(),
-        dashboard: await requireBrowserApp().dashboard(session.licenseId),
-      };
+      try {
+        const session = await authenticateBrowser(request);
+        return {
+          authenticated: true,
+          csrfToken: session.csrfToken,
+          expiresAt: session.expiresAt.toISOString(),
+          dashboard: await requireBrowserApp().dashboard(session.licenseId),
+        };
+      } catch (error) {
+        if (
+          error instanceof WebAppError
+          && (error.code === "not_authenticated" || error.code === "session_expired")
+        ) {
+          reply.header("set-cookie", clearSessionCookie());
+          return { authenticated: false };
+        }
+        throw error;
+      }
     },
   );
 
