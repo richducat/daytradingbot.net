@@ -1,7 +1,7 @@
 export const siteConfig = {
   founderPrice: 98,
-  checkoutUrl: "https://buy.stripe.com/14AdRa2gg5AR3CkbMO53O00",
-  supportEmail: "social@eb28.co",
+  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL ?? "https://api.daytradingbot.net").replace(/\/$/, ""),
+  supportEmail: "support@daytradingbot.net",
   limits: {
     maxOpeningOrderUsd: 5,
     maxDailyOpeningNotionalUsd: 25,

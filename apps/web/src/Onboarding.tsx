@@ -178,6 +178,34 @@ function track(event: string, details: Record<string, string | number> = {}) {
 
 function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: () => void; onReset: () => void }) {
   const available = result.status === "available";
+  const [startingCheckout, setStartingCheckout] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+
+  async function startCheckout() {
+    if (startingCheckout) return;
+    setStartingCheckout(true);
+    setCheckoutError("");
+    track("checkout_started", { suggestedAgent: result.agent });
+    try {
+      const response = await fetch(`${siteConfig.apiBaseUrl}/v1/checkout/session`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ acceptedRiskDisclosure: true }),
+      });
+      const payload = await response.json() as { checkoutUrl?: unknown };
+      if (!response.ok || typeof payload.checkoutUrl !== "string") {
+        throw new Error("checkout_unavailable");
+      }
+      const checkoutUrl = new URL(payload.checkoutUrl);
+      if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.stripe.com") {
+        throw new Error("invalid_checkout_url");
+      }
+      window.location.assign(checkoutUrl.toString());
+    } catch {
+      setStartingCheckout(false);
+      setCheckoutError("Checkout could not start. Please try again. If it keeps happening, email support@daytradingbot.net.");
+    }
+  }
 
   return (
     <main className="match-result">
@@ -229,22 +257,24 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
 
       <section className="match-checkout">
         <div>
-          <p className="eyebrow">{available ? "Founding price" : "Your choice is still open"}</p>
+          <p className="eyebrow">{available ? "Launch price" : "Your choice is still open"}</p>
           <h2>{available ? "$98 once. Checkout is open." : `${result.agent} is not released yet. Bluechip is.`}</h2>
           <p>{available
-            ? "Buy the Bluechip founding beta through Stripe. After payment, complete the two-minute setup form. A human sends your license, the current build, and the install guide within 24 hours."
-            : `You can wait for ${result.agent} or buy the available Bluechip founding beta now. This suggestion never locks you in.`}</p>
+            ? "Buy the desktop app through Stripe. Your activation code and Mac or Windows download appear as soon as payment finishes and are also sent by email."
+            : `You can wait for ${result.agent} or start with the available Bluechip bot now. This suggestion never locks you in.`}</p>
           <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
         </div>
         <div className="checkout-action">
-          <a
+          <button
+            type="button"
             className="button offer-button"
-            href={siteConfig.checkoutUrl}
-            onClick={() => track("checkout_started", { suggestedAgent: result.agent })}
+            onClick={() => void startCheckout()}
+            disabled={startingCheckout}
           >
-            {available ? "Buy Bluechip — $98" : "Choose Bluechip — $98"}
-          </a>
-          <small>Stripe sends your receipt immediately. Your trading money stays in your own account.</small>
+            {startingCheckout ? "Opening secure checkout…" : available ? "Buy DayTradingBot — $98" : "Start with Bluechip — $98"}
+          </button>
+          <small>Stripe handles the payment. Your activation code and downloads are delivered immediately after payment.</small>
+          {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
         </div>
       </section>
 
@@ -377,7 +407,7 @@ export function Onboarding() {
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.terms} onChange={(event) => setConfirmations((current) => ({ ...current, terms: event.target.checked }))} />
-                      <span><strong>I read the <a href="/terms/" target="_blank" rel="noreferrer">founding beta terms</a>.</strong><small>The $98 payment buys software and guided setup. It does not buy trading money or promise returns.</small></span>
+                      <span><strong>I read the <a href="/terms/" target="_blank" rel="noreferrer">software license terms</a>.</strong><small>The $98 payment buys software and guided setup. It does not buy trading money or promise returns.</small></span>
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.choice} onChange={(event) => setConfirmations((current) => ({ ...current, choice: event.target.checked }))} />

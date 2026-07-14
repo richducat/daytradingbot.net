@@ -40,7 +40,7 @@ export type LeaseRecord = {
   expiresAtUnix: number;
 };
 
-type ActivateRepositoryRequest = {
+export type ActivateRepositoryRequest = {
   licenseSecretHash: Buffer;
   devicePublicKey: Buffer;
   platform: DesktopPlatform;
@@ -50,7 +50,7 @@ type ActivateRepositoryRequest = {
   expiresAt: Date;
 };
 
-type RenewRepositoryRequest = {
+export type RenewRepositoryRequest = {
   activationSecretHash: Buffer;
   devicePublicKey: Buffer;
   leaseId: string;

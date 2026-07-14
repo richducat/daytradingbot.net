@@ -32,6 +32,7 @@ const WATCHLIST: [&str; 8] = ["AAPL", "NVDA", "TSLA", "SPY", "QQQ", "AMD", "MSFT
 const DIP_THRESHOLD_PERCENT_HUNDREDTHS: i64 = -150;
 const CYCLE_SECONDS: u64 = 15 * 60;
 const MAX_TRADES_PER_CYCLE: usize = 2;
+const START_PREFLIGHT_TIMEOUT_SECONDS: u64 = 25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeTradingMode {
@@ -135,46 +136,54 @@ impl BluechipRuntime {
         config: BluechipConfig,
     ) -> Result<BluechipStatus, &'static str> {
         validate_config(&config)?;
-        let vault = app.state::<CredentialVault>();
-        let token = current_robinhood_access(vault.inner()).await?;
-        let client = RobinhoodAgenticClient::new(token)
-            .map_err(|_| "ROBINHOOD_ACCOUNT_CONNECTION_INVALID")?;
-        let mut session = client
-            .trading_session()
-            .await
-            .map_err(|_| "ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED")?;
-        let buying_power = session
-            .buying_power()
-            .await
-            .map_err(|_| "ROBINHOOD_ACCOUNT_CHECK_FAILED")?;
-        if config.mode == NativeTradingMode::Real {
-            if !license_entries_allowed(
-                app.state::<LicenseGate>().inner(),
-                app.state::<CredentialVault>().inner(),
-            )? {
-                return Err("REAL_TRADING_LICENSE_REQUIRED");
-            }
-            if buying_power < config.max_per_trade_usd {
-                return Err("ADD_FUNDS_TO_ROBINHOOD");
-            }
-            reconcile_orders(app.state::<Ledger>().inner(), &mut session, &config).await?;
-            if app
-                .state::<Ledger>()
-                .unresolved_submissions()
-                .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")?
-                .iter()
-                .any(|attempt| {
-                    matches!(
-                        attempt.state,
-                        SubmissionAttemptState::Submitting
-                            | SubmissionAttemptState::Unknown
-                            | SubmissionAttemptState::Quarantined
-                    )
-                })
-            {
-                return Err("ORDER_RECONCILIATION_REQUIRED");
-            }
-        }
+        tokio::time::timeout(
+            Duration::from_secs(START_PREFLIGHT_TIMEOUT_SECONDS),
+            async {
+                let vault = app.state::<CredentialVault>();
+                let token = current_robinhood_access(vault.inner()).await?;
+                let client = RobinhoodAgenticClient::new(token)
+                    .map_err(|_| "ROBINHOOD_ACCOUNT_CONNECTION_INVALID")?;
+                let mut session = client
+                    .trading_session()
+                    .await
+                    .map_err(|_| "ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED")?;
+                let buying_power = session
+                    .buying_power()
+                    .await
+                    .map_err(|_| "ROBINHOOD_ACCOUNT_CHECK_FAILED")?;
+                if config.mode == NativeTradingMode::Real {
+                    if !license_entries_allowed(
+                        app.state::<LicenseGate>().inner(),
+                        app.state::<CredentialVault>().inner(),
+                    )? {
+                        return Err("REAL_TRADING_LICENSE_REQUIRED");
+                    }
+                    if buying_power < config.max_per_trade_usd {
+                        return Err("ADD_FUNDS_TO_ROBINHOOD");
+                    }
+                    reconcile_orders(app.state::<Ledger>().inner(), &mut session, &config).await?;
+                    if app
+                        .state::<Ledger>()
+                        .unresolved_submissions()
+                        .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")?
+                        .iter()
+                        .any(|attempt| {
+                            matches!(
+                                attempt.state,
+                                SubmissionAttemptState::Submitting
+                                    | SubmissionAttemptState::Unknown
+                                    | SubmissionAttemptState::Quarantined
+                            )
+                        })
+                    {
+                        return Err("ORDER_RECONCILIATION_REQUIRED");
+                    }
+                }
+                Ok::<(), &'static str>(())
+            },
+        )
+        .await
+        .map_err(|_| "ROBINHOOD_CONNECTION_TIMED_OUT")??;
 
         let (cancel_sender, mut cancel_receiver) = oneshot::channel();
         let generation = {

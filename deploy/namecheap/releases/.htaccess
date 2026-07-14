@@ -1,0 +1,11 @@
+Options -Indexes
+
+RewriteEngine On
+RewriteRule ^stable/DayTradingBot-macos-universal\.dmg$ https://github.com/richducat/daytradingbot.net/releases/latest/download/DayTradingBot-macos-universal.dmg [R=302,L,NE]
+RewriteRule ^stable/DayTradingBot-windows-x64\.exe$ https://github.com/richducat/daytradingbot.net/releases/latest/download/DayTradingBot-windows-x64.exe [R=302,L,NE]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Frame-Options "DENY"
+</IfModule>

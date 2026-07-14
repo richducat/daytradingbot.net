@@ -144,6 +144,24 @@ const emptyLicense: LicenseStatus = {
   message: "Activate the app before using real money.",
 };
 
+const connectionCheckTimeoutMs = 16_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("CONNECTION_CHECK_TIMED_OUT")), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 const errorCopy: Record<string, string> = {
   REAL_TRADING_LICENSE_REQUIRED: "Finish activating this copy of DayTradingBot before starting real trading.",
   REAL_TRADING_ONE_AGENT_AT_A_TIME: "Start real trading with one agent at a time for now.",
@@ -151,6 +169,7 @@ const errorCopy: Record<string, string> = {
   ROBINHOOD_ACCOUNT_NOT_CONNECTED: "Connect Robinhood before starting Bluechip.",
   ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED: "Robinhood needs one dedicated Agentic account for Bluechip.",
   ROBINHOOD_AUTHENTICATION_EXPIRED: "Reconnect Robinhood so Bluechip can continue.",
+  ROBINHOOD_CONNECTION_TIMED_OUT: "Robinhood took too long to respond. Nothing was turned on. Check the connection and try again.",
   ADD_FUNDS_TO_ROBINHOOD: "Add at least the per-trade amount to your Robinhood Agentic account.",
   ORDER_RECONCILIATION_REQUIRED: "One earlier Robinhood order needs to be checked before real trading can continue.",
   SIMMER_ACCOUNT_NOT_CONNECTED: "Connect your Polymarket or Kalshi trading wallet before starting this agent.",
@@ -223,6 +242,7 @@ export function App() {
   const [credentialAccount, setCredentialAccount] = useState<CredentialAccount | null>(null);
   const [credentialFields, setCredentialFields] = useState({ first: "", second: "" });
   const [busy, setBusy] = useState(false);
+  const [pendingTradingAction, setPendingTradingAction] = useState<"start" | "pause" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [license, setLicense] = useState<LicenseStatus>(emptyLicense);
@@ -263,12 +283,14 @@ export function App() {
     setBusy(true);
     setNotice(null);
     try {
-      for (const account of ["Robinhood", "Coinbase", "Kalshi", "Polymarket"] satisfies AccountName[]) {
-        await refreshAccount(account);
-      }
-      setNotice("Saved account connections checked.");
-    } catch (error) {
-      setNotice(messageFromError(error));
+      const results = await Promise.allSettled(
+        (["Robinhood", "Coinbase", "Kalshi", "Polymarket"] satisfies AccountName[])
+          .map((account) => withTimeout(refreshAccount(account), connectionCheckTimeoutMs)),
+      );
+      const unavailable = results.filter((result) => result.status === "rejected").length;
+      setNotice(unavailable
+        ? `Connections checked. ${unavailable} ${unavailable === 1 ? "account" : "accounts"} could not be reached; nothing was changed.`
+        : "Saved account connections checked.");
     } finally {
       setBusy(false);
     }
@@ -439,6 +461,7 @@ export function App() {
       return;
     }
     setBusy(true);
+    setPendingTradingAction("start");
     setNotice(null);
     try {
       const result = await invoke<SessionResult>("start_owner_engine_session", {
@@ -460,6 +483,7 @@ export function App() {
       setRealReviewOpen(false);
       setNotice(messageFromError(error));
     } finally {
+      setPendingTradingAction(null);
       setBusy(false);
     }
   };
@@ -488,6 +512,7 @@ export function App() {
 
   const pause = async () => {
     setBusy(true);
+    setPendingTradingAction("pause");
     setNotice(null);
     try {
       const result = await invoke<SessionResult>("pause_owner_engine_session");
@@ -496,6 +521,7 @@ export function App() {
     } catch (error) {
       setNotice(messageFromError(error));
     } finally {
+      setPendingTradingAction(null);
       setBusy(false);
     }
   };
@@ -534,9 +560,9 @@ export function App() {
             <h1>{view === "home" ? "Home" : view === "agents" ? "Trading agents" : view === "accounts" ? "Accounts" : "Activity"}</h1>
           </div>
           {running ? (
-            <button className="pause-button" type="button" onClick={pause} disabled={busy}>Pause trading</button>
+            <button className="pause-button" type="button" onClick={pause} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : "Pause trading"}</button>
           ) : (
-            <button className="start-button compact" type="button" onClick={() => void start()} disabled={busy}>Start trading</button>
+            <button className="start-button compact" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : pendingTradingAction === "start" ? "Starting…" : "Start trading"}</button>
           )}
         </header>
 
@@ -553,9 +579,9 @@ export function App() {
                 <span>{selectedAgents.length ? selectedAgents.map((agent) => agent.name).join(" + ") : "No agent selected"}</span>
                 <strong>{money(dailyBudget)} <small>at risk today</small></strong>
                 {running ? (
-                  <button className="pause-button wide" type="button" onClick={pause} disabled={busy}>Pause trading</button>
+                  <button className="pause-button wide" type="button" onClick={pause} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : "Pause trading"}</button>
                 ) : (
-                  <button className="start-button wide" type="button" onClick={() => void start()} disabled={busy}>{busy ? "Starting…" : "Start trading"}</button>
+                  <button className="start-button wide" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : pendingTradingAction === "start" ? "Starting…" : "Start trading"}</button>
                 )}
               </div>
             </section>
@@ -713,7 +739,7 @@ export function App() {
 
             <footer>
               <button className="back-button" type="button" onClick={() => setupStep === 1 ? setSetupOpen(false) : setSetupStep((step) => step - 1)}>{setupStep === 1 ? "Close" : "Back"}</button>
-              {setupStep < 4 ? <button className="continue-button" type="button" onClick={finishSetupStep}>Continue</button> : <button className="continue-button" type="button" onClick={() => void start()} disabled={busy}>{busy ? "Starting…" : mode === "practice" ? "Start Practice" : "Review real trading"}</button>}
+              {setupStep < 4 ? <button className="continue-button" type="button" onClick={finishSetupStep}>Continue</button> : <button className="continue-button" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : mode === "practice" ? "Start Practice" : "Review real trading"}</button>}
             </footer>
           </section>
         </div>
@@ -726,7 +752,7 @@ export function App() {
             <h2 id="real-review-title">Ready to start real trading?</h2>
             <p>The selected agents can place trades in your connected accounts. The full amount at risk today can be lost.</p>
             <dl><div><dt>Trading agents</dt><dd>{selectedAgents.map((agent) => agent.name).join(", ")}</dd></div><div><dt>Amount at risk today</dt><dd>{money(dailyBudget)}</dd></div><div><dt>Most in one trade</dt><dd>{money(perTrade)}</dd></div></dl>
-            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{busy ? "Starting…" : "Start real trading"}</button></div>
+            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : "Start real trading"}</button></div>
           </section>
         </div>
       ) : null}

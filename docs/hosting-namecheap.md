@@ -1,26 +1,71 @@
-# Namecheap production topology
+# Namecheap production hosting without a new server
 
-DayTradingBot will not use Vercel or shared cPanel hosting. The founder release uses one Namecheap **Quasar VPS** running Ubuntu 24.04 in user-responsible mode, without cPanel/Webuzo.
+DayTradingBot's initial commercial release uses the already-paid Namecheap **Stellar Business** account. This adds no server purchase and does not use Vercel.
 
-## Services
+The trading app runs on each customer's computer. Namecheap only handles the website support work: starting checkout, sending activation codes, activating the app, and serving installers. That workload fits the included Node.js, MariaDB, email, SSL, and backup features without moving customer brokerage credentials or orders to shared hosting.
 
-- Nginx terminates TLS and serves `daytradingbot.net`, `www.daytradingbot.net`, `api.daytradingbot.net`, and `releases.daytradingbot.net`.
-- Node.js 22 runs the Fastify control-plane API under systemd on `127.0.0.1:3000`.
-- PostgreSQL 16 listens only on localhost/its Unix socket.
-- Namecheap PremiumDNS supplies authoritative DNS, DNSSEC, and the documented DNS service SLA.
-- Namecheap Private Email Launch supplies `support@daytradingbot.net`; `licenses@` and `security@` are aliases.
-- Certbot manages the four TLS names. HSTS is introduced only after staged certificate and subdomain verification.
+## Isolated layout
 
-The desktop trust anchor is the public Ed25519 key committed in `.cargo/config.toml`. The matching private key is an operator secret and must be installed on the VPS through a systemd credential; it must never be copied into the repository, website, installer, desktop vault, logs, or database.
+- `daytradingbot.net`: existing public website.
+- `api.daytradingbot.net`: dedicated Node.js 22 application root, `~/daytradingbot-api`.
+- `releases.daytradingbot.net`: a small branded download/redirect site, separate from the API and every other hosted site. Large installer files live in GitHub Releases so they do not consume the shared account's disk-I/O allowance.
+- Dedicated MariaDB database and database user whose names start with the cPanel account prefix.
+- Dedicated `licenses@daytradingbot.net`, `support@daytradingbot.net`, and `security@daytradingbot.net` mailboxes.
+- Dedicated secret directory at `~/.daytradingbot-secrets`, mode `0700`, outside every public document root.
 
-## Data boundary
+Do not place files in the TYFYS document root, reuse its database, change its runtime, or share its environment variables. Sharing a hosting subscription must not mean sharing application data.
 
-The VPS stores purchases, seat reservations, hashed license secrets, activation public keys, signed lease metadata, release manifests, refund requests, and privacy-safe operational events. It never receives venue credentials, broker account numbers, customer positions, or customer order payloads.
+## Build the API upload
 
-## Reliability boundary
+From the repository root:
 
-This is intentionally a single-node topology for ten founding customers. Desktop clients fail closed for new entries when license or policy renewal is unavailable while keeping local cancellation, close, reconciliation, and data export available. Nightly encrypted database/configuration backups must leave the VPS, retain 30 daily and 12 monthly copies, and pass a monthly restore drill.
+```sh
+pnpm install --frozen-lockfile
+pnpm build:namecheap-api
+```
 
-## Account-dependent gate
+The uploadable directory is `artifacts/namecheap-api`. It contains the compiled API, the production package manifest, and the MariaDB schema. It contains no credentials.
 
-The July 12, 2026 account inspection confirmed that Quasar VPS, PremiumDNS, and Private Email do not yet exist for DayTradingBot. Purchasing them requires checkout confirmation. Shared hosting is not an acceptable fallback for the licensing and Stripe webhook control plane.
+## One-time cPanel setup
+
+1. Add `api.daytradingbot.net` and `releases.daytradingbot.net` as isolated domains/subdomains in cPanel.
+2. Create a dedicated MariaDB database and user. Grant that user all privileges on only the DayTradingBot database.
+3. Import `database/mysql/0001_commercial_schema.sql` through phpMyAdmin.
+4. Upload the API package to `~/daytradingbot-api`; never put the API root under `public_html`.
+5. In **Setup Node.js App**, select Node.js 22, Production, application root `daytradingbot-api`, application URL `api.daytradingbot.net`, and startup file `dist/index.js`.
+6. Run the virtual-environment command cPanel displays, then run `npm install --omit=dev` inside the application root.
+7. Add the non-secret environment values from `.env.example`. Store secret values in individual files under `~/.daytradingbot-secrets` and set the corresponding `_FILE` variables.
+8. Restart the Node.js application and verify `/healthz` and `/readyz` before connecting Stripe.
+9. Publish signed installers as public GitHub Release assets only after their signatures and checksums pass release verification. Deploy `deploy/namecheap/releases` to the release document root; its stable branded URLs redirect to the latest verified assets.
+
+## DNS and HTTPS
+
+Keep the public site records in place. Add only the `api` and `releases` records pointing to the shared-hosting server IP shown in cPanel. Wait for both names to resolve and for cPanel AutoSSL to issue valid certificates before adding the Stripe webhook.
+
+If the included cPanel email is used, create the mailboxes first and copy the exact MX, SPF, DKIM, and mail-host records cPanel provides. Do not replace existing email routing speculatively.
+
+## Required production values
+
+- `DATABASE_PROVIDER=mysql`
+- `DATABASE_URL_FILE`: `mysql://USER:URL_ENCODED_PASSWORD@localhost/DATABASE`
+- `STRIPE_SECRET_KEY_FILE`, `STRIPE_WEBHOOK_SECRET_FILE`, and the live `STRIPE_PRICE_ID`
+- `COMMERCE_ENCRYPTION_KEY_FILE`: a random 32-byte base64url value
+- `LICENSE_SIGNING_PRIVATE_KEY_PEM_FILE`: the private half matching the public key embedded in the desktop app
+- `LICENSE_SECRET_PEPPER_FILE`: at least 32 random characters
+- `SMTP_URL_FILE`: an authenticated SMTP URL with a URL-encoded password
+- Both stable installer URLs
+
+The private signing key, encryption key, database password, Stripe secrets, and SMTP password must never be committed, uploaded to a public document root, or pasted into logs.
+
+## Launch proof
+
+Commercial checkout stays unavailable until all of these pass:
+
+1. `https://api.daytradingbot.net/readyz` returns `{"status":"ready"}` over valid HTTPS.
+2. A Stripe test checkout creates exactly one purchase and one activation code when the webhook is retried.
+3. The buyer receives the same code by email and sees the same code on the welcome page.
+4. A clean Mac and Windows installation can activate, start Practice, connect a supported account, and stop safely.
+5. A refund or dispute disables the matching activation.
+6. The public checkout is then switched from Stripe test mode to live mode without placing any trade or incurring any hosting purchase.
+
+If traffic later exceeds the shared account's measured limits, use the reviewed VPS fallback in `docs/hosting-namecheap-vps-fallback.md`; do not pre-purchase it.

@@ -685,6 +685,7 @@ pub async fn pause_owner_engine_session(
     ledger: tauri::State<'_, Ledger>,
     native_runtime: tauri::State<'_, BluechipRuntime>,
 ) -> Result<SessionActionResult, &'static str> {
+    let native_was_running = native_runtime.status().running;
     let _ = native_runtime.pause(&ledger)?;
     if let Some(paths) = OwnerRuntimePaths::discover() {
         stand_down(&paths)?;
@@ -694,7 +695,12 @@ pub async fn pause_owner_engine_session(
             unload_agent(&uid, &agent.engine.legacy_label);
         }
     }
-    let _ = set_simmer_paused(&vault, true).await;
+    // Bluechip is entirely native and never needs the legacy Simmer account bridge.
+    // Avoid reading an unrelated keychain item or waiting on a remote API when the
+    // customer pauses the bundled agent.
+    if !native_was_running {
+        let _ = set_simmer_paused(&vault, true).await;
+    }
     Ok(SessionActionResult {
         mode: "paused",
         selected_agent_ids: Vec::new(),

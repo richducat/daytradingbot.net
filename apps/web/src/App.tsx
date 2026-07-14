@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { isLegalPath, LegalPage } from "./LegalPage";
 import { Onboarding } from "./Onboarding";
 import { siteConfig } from "./siteConfig";
+import { Welcome } from "./Welcome";
 
 const reveal = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
 
@@ -34,7 +35,7 @@ const faqs = [
   ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
   ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
   ["What does the $98 license include?", "One active Mac or Windows computer, the current Bluechip founding-beta build, guided setup, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
-  ["What happens after I pay?", "Stripe emails your receipt and sends you to a two-minute setup form. After you submit it, a human sends your license, current build, and plain-English install guide within 24 hours."],
+  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your activation code and the current Mac or Windows download appear there as soon as payment is confirmed, and we send the same details by email."],
 ] as const;
 
 export function App() {
@@ -42,6 +43,7 @@ export function App() {
   const path = window.location.pathname.endsWith("/") ? window.location.pathname : `${window.location.pathname}/`;
   if (isLegalPath(path)) return <LegalPage path={path} />;
   if (path === "/get-started/") return <Onboarding />;
+  if (path === "/welcome/") return <Welcome />;
 
   return (
     <main>
@@ -154,7 +156,7 @@ export function App() {
           <ol>
             <li><span>01</span><div><h3>Choose a bot</h3><p>Use our suggestion or pick any released bot yourself.</p></div></li>
             <li><span>02</span><div><h3>Read the risk disclosure</h3><p>Know what can go wrong before you enter a card number or turn on Real trading.</p></div></li>
-            <li><span>03</span><div><h3>Buy and start setup</h3><p>Pay $98 through Stripe, then complete the two-minute setup form. Your trading money and account fees are separate.</p></div></li>
+            <li><span>03</span><div><h3>Buy and download</h3><p>Pay $98 through Stripe. Your activation code and app download appear immediately after payment. Your trading money and account fees are separate.</p></div></li>
             <li><span>04</span><div><h3>Connect your account</h3><p>Connect it inside the app. Your credentials stay in your computer's secure storage.</p></div></li>
             <li><span>05</span><div><h3>Set limits and press Start</h3><p>Choose Practice or Real. Set the dollars per trade and per day. Press Pause to stop new trades.</p></div></li>
           </ol>
@@ -176,7 +178,7 @@ export function App() {
               <li>Trading capital, account fees, and taxes not included</li>
             </ul>
             <a className="button offer-button" href="/get-started/">Help me choose a bot</a>
-            <small>Checkout opens after the required risk acknowledgement. Stripe sends your receipt immediately; personal setup and the current build arrive within 24 hours after the setup form.</small>
+            <small>Checkout opens after the required risk acknowledgement. Stripe sends your receipt, then your activation code and current download appear on the private delivery page.</small>
           </div>
         </div>
       </section>

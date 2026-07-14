@@ -10,7 +10,9 @@
   "scripts": {
     "build": "pnpm build:web && pnpm build:api && pnpm build:desktop-ui && pnpm build:rust",
     "build:web": "pnpm --filter @daytradingbot/web build",
+    "publish:web-root": "pnpm build:web && node scripts/publish-web-root.mjs",
     "build:api": "pnpm --filter @daytradingbot/api build",
+    "build:namecheap-api": "pnpm build:api && node scripts/build-namecheap-api-package.mjs",
     "build:desktop-ui": "pnpm --filter @daytradingbot/desktop build",
     "build:owner-demo": "zsh scripts/build-owner-demo-macos.sh",
     "build:rust": "cargo build --workspace --locked",

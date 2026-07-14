@@ -13,5 +13,7 @@ const shutdown = async (signal: string) => {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-await app.listen({ host: config.API_HOST, port: config.API_PORT });
-
+void app.listen({ host: config.API_HOST, port: config.API_PORT }).catch((error: unknown) => {
+  app.log.error({ err: error }, "API failed to start");
+  process.exit(1);
+});
