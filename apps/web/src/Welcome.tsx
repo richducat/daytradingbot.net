@@ -32,6 +32,7 @@ export function Welcome() {
     },
     [],
   );
+  const isSandbox = sessionId?.startsWith("cs_test_") ?? false;
   const [result, setResult] = useState<CheckoutResult | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -106,9 +107,11 @@ export function Welcome() {
         <>
           <section className="welcome-hero">
             <div>
-              <p className="eyebrow">Purchase complete</p>
-              <h1>Your app is ready.</h1>
-              <p>Download DayTradingBot, enter the code below, connect an account you own, and start in Practice or Real.</p>
+              <p className="eyebrow">{isSandbox ? "Sandbox demo complete" : "Purchase complete"}</p>
+              <h1>{isSandbox ? "Checkout and activation are working." : "Your app is ready."}</h1>
+              <p>{isSandbox
+                ? "This test created an activation code and sent the delivery email. No money moved."
+                : "Download DayTradingBot, enter the code below, connect an account you own, and start in Practice or Real."}</p>
               <p className="delivery-email">{result.emailDelivered
                 ? `We also sent these details to ${result.email}.`
                 : `Copy this code now. We are still sending a copy to ${result.email}.`}</p>
@@ -123,13 +126,17 @@ export function Welcome() {
           <section className="download-section">
             <div>
               <p className="eyebrow">Step 1</p>
-              <h2>Download the app.</h2>
-              <p>Choose the computer you will use. One license can be active on one computer at a time.</p>
+              <h2>{isSandbox ? "Use the private owner demo." : "Download the app."}</h2>
+              <p>{isSandbox
+                ? "For the investor demo, use the owner copy already installed on this Mac. Signed public Mac and Windows downloads will appear here for live purchases after release signing is complete."
+                : "Choose the computer you will use. One license can be active on one computer at a time."}</p>
             </div>
-            <div className="download-actions">
-              {result.downloads.macos && <a className="button button-primary" href={result.downloads.macos}>Download for Mac</a>}
-              {result.downloads.windows && <a className="button button-secondary" href={result.downloads.windows}>Download for Windows</a>}
-            </div>
+            {!isSandbox && (
+              <div className="download-actions">
+                {result.downloads.macos && <a className="button button-primary" href={result.downloads.macos}>Download for Mac</a>}
+                {result.downloads.windows && <a className="button button-secondary" href={result.downloads.windows}>Download for Windows</a>}
+              </div>
+            )}
           </section>
 
           <section className="setup-steps">
