@@ -12,31 +12,31 @@ function SectionHeading({ eyebrow, children }: { eyebrow: string; children: Reac
 }
 
 const productFlow = [
-  ["Connect an account you already use", "Connect a supported broker, exchange, or market account. Your trading money stays in that account—not with us."],
-  ["Pick a bot", "Each bot watches one kind of market and follows one clear strategy. You can use our suggestion or choose a different released bot."],
-  ["Set your limits", "Choose Practice or Real, then decide how much the bot may put into one trade and into new trades for the day."],
-  ["Press Start", "See what the bot checks, what it does, and what it skips. Press Pause whenever you want to stop new trades."],
+  ["You stop refreshing charts", "Bluechip checks eight popular stocks and ETFs about every 15 minutes while it is running."],
+  ["The rule stays the same", "It waits for a specific pullback. It does not get impatient, chase a price, or change the plan halfway through the day."],
+  ["You choose the maximum dollars", "Set a limit for each trade and another for the whole day. Bluechip cannot open a trade above either one."],
+  ["You can see every decision", "Open Activity to see what Bluechip checked, why it waited, and whether an order was sent."],
 ] as const;
 
 const screeningReasons = [
-  "what you want help with",
-  "which market interests you",
-  "what kind of strategy sounds right",
-  "which account you already use",
-  "how familiar you are with trading",
-  "how much you want the bot to use",
+  "the bot that fits what you want",
+  "the account you will need",
+  "whether to start in Practice or Real",
+  "a daily dollar limit",
+  "a limit for each trade",
+  "what to expect after checkout",
 ] as const;
 
 const faqs = [
-  ["What exactly is DayTradingBot?", "It is a trading app you can use in your browser or on a Mac. Connect an account you own, pick a bot, choose Practice or Real, set dollar limits, and press Start. The app shows you what the bot does."],
-  ["Why ask me questions?", "The answers help us suggest a bot and sensible starting settings. They do not approve you, reject you, or take away access to released bots."],
-  ["Can I ignore the suggestion?", "Yes. The result is a starting suggestion, not a rule and not investment advice. You can choose any bot that has been released."],
-  ["Where do I deposit trading money?", "Not with DayTradingBot. You add funds directly through the broker, exchange, or market account you own. The software is not a bank, broker, exchange, or custodian."],
-  ["Can it place real trades?", "Bluechip includes a Real option for a supported Robinhood Agentic account. It starts in Practice. You must connect the account, set your limits, and deliberately choose Real before the app can send an order."],
-  ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
-  ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
-  ["What does the $98 license include?", "The browser app, the released Bluechip bot, guided setup, an optional Mac app when the signed download is available, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
-  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your access code and a button to open the browser app appear as soon as payment is confirmed, and we send the same details by email."],
+  ["So what am I actually buying?", "A personal software license for DayTradingBot. The current release includes the browser app, Bluechip, Practice, Real trading controls, your activity history, guided setup, and version 1 updates."],
+  ["What does Bluechip do while I am at work?", "When it is running, Bluechip checks eight stocks and ETFs about every 15 minutes. If one falls enough to meet its rule, it checks the current price, your open positions, pending orders, and the dollar limits you chose before it does anything."],
+  ["Can I watch it before it touches real money?", "Yes. Practice uses current market information and shows what Bluechip would do without sending an order. You decide if and when to switch to Real."],
+  ["Do I send my trading money to DayTradingBot?", "No. Your trading money stays in the dedicated Robinhood Agentic account you control. DayTradingBot is software. It is not a bank, broker, exchange, or place to deposit funds."],
+  ["Can Bluechip place real trades?", "Yes, after you connect a supported Robinhood Agentic account, choose your dollar limits, and deliberately turn on Real trading. Real trading turns off after 24 hours unless you start it again."],
+  ["Can I lose money?", "Yes. A rule-based bot can still make a losing trade, and software or account connections can fail. Your limits cap how much Bluechip may put into new trades. They cannot prevent a loss or promise a profit."],
+  ["Do I need a Mac or an Apple account?", "No. DayTradingBot works in a modern browser on a phone or computer. The Mac app is optional when the signed public download is available."],
+  ["Why do you ask eight questions?", "So you can see a suggested bot, account, mode, and dollar limits before you pay. Your answers are not a test, and they never remove access to a released bot."],
+  ["What happens after I pay?", "Stripe confirms the payment, then your private access code and an Open DayTradingBot button appear on screen. We also send them to the email used at checkout."],
 ] as const;
 
 export function App() {
@@ -51,8 +51,8 @@ export function App() {
     <main>
       <header className="site-header">
         <a className="wordmark" href="#top" aria-label="DayTradingBot home">DAYTRADINGBOT</a>
-        <nav aria-label="Primary navigation"><a href="#product">How it works</a><a href="#example">Bluechip</a><a href="#bots">Bots</a><a href="#price">Price</a><a href="/app/">Sign in</a></nav>
-        <a className="header-cta" href="/get-started/">Get started</a>
+        <nav aria-label="Primary navigation"><a href="#product">Why use it</a><a href="#example">Bluechip</a><a href="#setup">Setup</a><a href="#price">Price</a><a href="/app/">Sign in</a></nav>
+        <a className="header-cta" href="/get-started/">Find my setup</a>
       </header>
 
       <section className="hero" id="top">
@@ -64,14 +64,14 @@ export function App() {
           variants={reveal}
           transition={{ duration: 0.55, ease: "easeOut" }}
         >
-          <p className="eyebrow"><span className="status-dot" /> AI trading bots you control</p>
-          <h1>Pick a bot. Set your limits. Press Start.</h1>
-          <p className="hero-deck">DayTradingBot connects to accounts you already use. Open it in your browser or install it on a Mac, choose Practice or Real, tell your bot how much it can use, and press Start.</p>
+          <p className="eyebrow"><span className="status-dot" /> A stock trading bot you can understand</p>
+          <h1>Stop watching stock charts all day.</h1>
+          <p className="hero-deck">Open Bluechip in any modern browser. It watches eight popular stocks and ETFs, follows one clear buying rule, and stays inside the dollar limits you set. Try every decision in Practice before you let it place a real Robinhood trade.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/get-started/">Get started <span>About 2 minutes</span></a>
-            <a className="text-link" href="/app/">Already have a code? Open the app <span aria-hidden="true">→</span></a>
+            <a className="button button-primary" href="/get-started/">Build my starting setup <span>About 2 minutes</span></a>
+            <a className="text-link" href="#example">See exactly how it works <span aria-hidden="true">→</span></a>
           </div>
-          <p className="hero-note">The questions make a suggestion. They do not decide what you can use. Read the risk disclosure, then choose for yourself.</p>
+          <p className="hero-note">Your $98 license buys the software. Your trading money stays in Robinhood.</p>
         </motion.div>
 
         <motion.figure
@@ -80,16 +80,25 @@ export function App() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
         >
-          <img src="/images/daytradingbot-desktop-setup.png" alt="DayTradingBot showing the guided account connection step" />
-          <figcaption><span>The same guided setup</span> Use it in a browser or in the optional Mac app.</figcaption>
+          <div className="market-example" aria-label="Example Bluechip Practice decision">
+            <div className="market-example-top"><span>Example</span><strong>Practice mode</strong><time>10:15 AM</time></div>
+            <div className="market-example-quote"><div><span>QQQ</span><small>Nasdaq 100 ETF</small></div><strong>Down 1.7%</strong></div>
+            <div className="market-example-checks">
+              <p><span>✓</span> Price move meets Bluechip's rule</p>
+              <p><span>✓</span> No open QQQ position or pending order</p>
+              <p><span>✓</span> Inside your $2 trade and $10 daily limits</p>
+            </div>
+            <div className="market-example-result"><span>Bluechip's decision</span><strong>Would buy $2 of QQQ</strong><small>No order is placed in Practice.</small></div>
+          </div>
+          <figcaption><span>A real rule, shown in plain English.</span> This is an example, not a performance claim.</figcaption>
         </motion.figure>
       </section>
 
       <section className="product-explainer section-shell" id="product">
         <div className="product-statement">
-          <p className="eyebrow">What am I buying?</p>
-          <h2>You are buying the software—not sending us trading money.</h2>
-          <p>Use it in your browser or on a Mac, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
+          <p className="eyebrow">What changes for you</p>
+          <h2>Let Bluechip do the watching. You make the money decisions.</h2>
+          <p>You don't build an algorithm or run a server. You choose the account, the dollars, and whether Bluechip is practicing or placing real trades. Bluechip keeps checking while you're doing something else.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -105,18 +114,19 @@ export function App() {
       <section className="bluechip-example" id="example">
         <div className="section-shell example-layout">
           <div className="example-copy">
-            <p className="eyebrow">A real example: Bluechip</p>
-            <h2>Here is what the first customer bot does.</h2>
-            <p>Bluechip watches a short list of widely held stocks and funds. It looks for a specific kind of price drop, checks the limits you set, and either acts or does nothing.</p>
-            <a className="text-link dark-link" href="/get-started/">Get a bot suggestion <span aria-hidden="true">→</span></a>
+            <p className="eyebrow">Meet Bluechip</p>
+            <h2>One focused stock strategy. Every decision explained.</h2>
+            <p>Bluechip looks for a 1.5% pullback in eight familiar stocks and ETFs. When it finds one, it checks the price, your positions, pending orders, and your limits. If every check passes, it can make a small buy. If one check fails, it waits.</p>
+            <p className="example-honesty">Bluechip can lose money. The value is consistent execution and clear limits, not a promise that every trade wins.</p>
+            <a className="text-link dark-link" href="/get-started/">See if Bluechip fits me <span aria-hidden="true">→</span></a>
           </div>
           <dl className="example-rules">
-            <div><dt>Market watched</dt><dd>AAPL, NVDA, TSLA, SPY, QQQ, AMD, MSFT, GOOGL</dd></div>
-            <div><dt>How often it checks</dt><dd>About every 15 minutes while running</dd></div>
-            <div><dt>What it looks for</dt><dd>A pullback of at least 1.5%</dd></div>
-            <div><dt>How much it may use</dt><dd>$1–$5 per trade, up to $25 in new trades per day</dd></div>
-            <div><dt>What Practice does</dt><dd>Uses current market information and records the decision; sends no order</dd></div>
-            <div><dt>What it does not do</dt><dd>Promise a profit, transfer money, withdraw funds, or trade outside its rules</dd></div>
+            <div><dt>What it watches</dt><dd>AAPL, NVDA, TSLA, SPY, QQQ, AMD, MSFT, and GOOGL</dd></div>
+            <div><dt>When it looks</dt><dd>About every 15 minutes while it is running</dd></div>
+            <div><dt>What gets its attention</dt><dd>One of those stocks or ETFs falling at least 1.5%</dd></div>
+            <div><dt>What it checks next</dt><dd>Current price, existing positions, pending orders, and your dollar limits</dd></div>
+            <div><dt>What Practice does</dt><dd>Shows the decision using current market information without sending an order</dd></div>
+            <div><dt>What Real does</dt><dd>Can send a market buy to the dedicated Robinhood Agentic account you connected</dd></div>
           </dl>
         </div>
       </section>
@@ -124,43 +134,29 @@ export function App() {
       <section className="screening-section" id="match">
         <div className="section-shell screening-layout">
           <div className="screening-title">
-            <p className="eyebrow">Want help choosing?</p>
+            <p className="eyebrow">Know what fits before you buy</p>
             <span className="question-count">8</span>
-            <h2>A few questions. One suggestion. Your call.</h2>
-            <p>We do not ask for a phone number, Social Security number, account password, or deposit.</p>
+            <h2>Tell us how you trade. We will build a starting setup.</h2>
+            <p>You will see the bot, account, mode, and dollar limits we suggest before checkout. No phone number, Social Security number, broker password, or deposit.</p>
           </div>
           <div className="screening-list">
-            <p>We ask about:</p>
+            <p>Your result includes:</p>
             <ol>{screeningReasons.map((reason, index) => <li key={reason}><span>0{index + 1}</span>{reason}</li>)}</ol>
-            <div className="screening-choice"><strong>Nothing you answer locks you out.</strong><p>We suggest a bot and starting settings. You can change the answers or choose any released bot after reading the risk disclosure.</p></div>
-            <a className="button button-primary" href="/get-started/">Help me choose a bot</a>
+            <div className="screening-choice"><strong>You can change every part of the suggestion.</strong><p>The questions help us give you a useful starting point. They never approve you, reject you, or remove a released bot.</p></div>
+            <a className="button button-primary" href="/get-started/">Build my starting setup</a>
           </div>
         </div>
       </section>
 
-      <section className="routing-section" id="bots">
-        <div className="section-shell">
-          <SectionHeading eyebrow="Choose for yourself">Here is what each bot is built for.</SectionHeading>
-          <div className="routing-table">
-            <div className="routing-head"><span>If you want to trade</span><span>Likely suggestion</span><span>Release status</span></div>
-            <div><span>Large stocks and ETFs</span><strong>Bluechip</strong><small className="available">Available first</small></div>
-            <div><span>Short-term crypto moves</span><strong>Sprinter</strong><small>Still being packaged</small></div>
-            <div><span>Weather and public data</span><strong>Stormfront or Barometer</strong><small>Still being packaged</small></div>
-            <div><span>News and prediction markets</span><strong>News Watch or Oracle Gap</strong><small>Still being packaged</small></div>
-          </div>
-          <p className="routing-note">The quiz makes an optional suggestion and explains the account and starting limits. You can choose any released bot. Bots still being packaged are labeled clearly.</p>
-        </div>
-      </section>
-
-      <section className="customer-journey">
+      <section className="customer-journey" id="setup">
         <div className="section-shell journey-layout">
-          <SectionHeading eyebrow="From questions to setup">Here is the whole process.</SectionHeading>
+          <SectionHeading eyebrow="From $98 to your first Practice run">You can be set up in a few clear steps.</SectionHeading>
           <ol>
-            <li><span>01</span><div><h3>Choose a bot</h3><p>Use our suggestion or pick any released bot yourself.</p></div></li>
-            <li><span>02</span><div><h3>Read the risk disclosure</h3><p>Know what can go wrong before you enter a card number or turn on Real trading.</p></div></li>
-            <li><span>03</span><div><h3>Buy and open the app</h3><p>Pay $98 through Stripe. Your access code and browser-app button appear immediately. Nothing has to be downloaded.</p></div></li>
-            <li><span>04</span><div><h3>Connect your account</h3><p>Robinhood handles sign-in. The browser app stores the connection encrypted on our server; the Mac app uses the computer's secure storage.</p></div></li>
-            <li><span>05</span><div><h3>Set limits and press Start</h3><p>Choose Practice or Real. Set the dollars per trade and per day. Press Pause to stop new trades.</p></div></li>
+            <li><span>01</span><div><h3>See your setup first</h3><p>Answer eight questions and review the bot, account, mode, and limits we suggest.</p></div></li>
+            <li><span>02</span><div><h3>Buy the software</h3><p>Pay $98 once through Stripe. Your access code appears as soon as payment is confirmed.</p></div></li>
+            <li><span>03</span><div><h3>Connect Robinhood</h3><p>Robinhood handles the sign-in and approval. DayTradingBot never asks for your Robinhood password.</p></div></li>
+            <li><span>04</span><div><h3>Start in Practice</h3><p>Watch Bluechip make current decisions without placing an order. Every check appears in Activity.</p></div></li>
+            <li><span>05</span><div><h3>Choose Real only when you are ready</h3><p>Review your per-trade and daily limits, turn on Real, and press Pause whenever you want new trades to stop.</p></div></li>
           </ol>
         </div>
       </section>
@@ -168,20 +164,20 @@ export function App() {
       <section className="founder" id="price">
         <div className="section-shell founder-inner">
           <div>
-            <p className="eyebrow">Founding price</p>
+            <p className="eyebrow">One-time price</p>
             <h2>${siteConfig.founderPrice} once.</h2>
-            <p className="price-qualifier">Browser access, optional Mac app, and version 1 updates.</p>
+            <p className="price-qualifier">Use Bluechip in any modern browser. No subscription.</p>
           </div>
           <div className="offer-copy">
             <ul>
-              <li>Browser app and guided account setup—no download required</li>
-              <li>Optional Mac app when the signed public download is available</li>
-              <li>Practice mode and Real trading for released bots</li>
-              <li>A clear activity history and dollar limits you control</li>
-              <li>Trading capital, account fees, and taxes not included</li>
+              <li>Bluechip for Robinhood stocks and ETFs</li>
+              <li>Practice with current market information before using real money</li>
+              <li>Real trading controls with per-trade and daily dollar limits</li>
+              <li>A plain-English history of every check, skip, and order</li>
+              <li>Version 1 updates and the optional signed Mac app when available</li>
             </ul>
-            <a className="button offer-button" href="/get-started/">Help me choose a bot</a>
-            <small>Checkout opens after the risk acknowledgement. Stripe sends your receipt, then your access code and browser-app button appear on the private delivery page.</small>
+            <a className="button offer-button" href="/get-started/">See my setup before I buy</a>
+            <small>Trading money, Robinhood fees, taxes, and other account costs are separate. No trading result is promised.</small>
           </div>
         </div>
       </section>
@@ -192,15 +188,15 @@ export function App() {
       </section>
 
       <section className="final-cta">
-        <p className="eyebrow">Want a suggestion?</p>
-        <h2>Tell us what you want. Then make your own choice.</h2>
-        <a className="button button-primary" href="/get-started/">Help me choose a bot</a>
-        <p>About two minutes. Your answers stay in this browser and are not sent to us.</p>
+        <p className="eyebrow">See if Bluechip fits you</p>
+        <h2>Get a starting setup before you spend $98.</h2>
+        <a className="button button-primary" href="/get-started/">Show me my setup</a>
+        <p>About two minutes. No phone number, broker login, or deposit.</p>
       </section>
 
       <footer className="site-footer">
         <a className="wordmark" href="#top">DAYTRADINGBOT</a>
-        <p>Self-directed trading automation. Not investment advice.</p>
+        <p>Bluechip watches. You set the limits. Trading can lose money.</p>
         <div><a href="/risk-disclosure/">Risk</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href={`mailto:${siteConfig.supportEmail}`}>Support</a></div>
       </footer>
     </main>

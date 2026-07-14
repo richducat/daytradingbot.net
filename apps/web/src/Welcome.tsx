@@ -38,7 +38,7 @@ export function Welcome() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    document.title = "Your DayTradingBot app is ready";
+    document.title = "Your Bluechip dashboard is ready | DayTradingBot";
     if (!sessionId) {
       setError("This page needs the private checkout link Stripe sent after payment.");
       return;
@@ -88,15 +88,15 @@ export function Welcome() {
       {!result && !error && (
         <section className="welcome-state" aria-live="polite">
           <p className="eyebrow">Payment received</p>
-          <h1>Getting your access ready.</h1>
-          <p>We are creating your access code and opening the browser app. This usually takes a few seconds.</p>
+          <h1>We are opening your Bluechip dashboard.</h1>
+          <p>Your private access code is being created now. This usually takes a few seconds.</p>
           <div className="delivery-progress" aria-hidden="true"><span /></div>
         </section>
       )}
 
       {error && (
         <section className="welcome-state" role="alert">
-          <p className="eyebrow">We need to reconnect this page</p>
+          <p className="eyebrow">Delivery needs one more try</p>
           <h1>Your purchase is not lost.</h1>
           <p>{error}</p>
           <a className="button button-primary" href={`mailto:${siteConfig.supportEmail}`}>Email support</a>
@@ -108,10 +108,10 @@ export function Welcome() {
           <section className="welcome-hero">
             <div>
               <p className="eyebrow">{isSandbox ? "Sandbox demo complete" : "Purchase complete"}</p>
-              <h1>{isSandbox ? "Checkout and activation are working." : "Your app is ready."}</h1>
+              <h1>{isSandbox ? "Checkout and access are working." : "You're in. Open your bot."}</h1>
               <p>{isSandbox
                 ? "This test created an activation code and sent the delivery email. No money moved."
-                : "Open DayTradingBot, enter the code below, connect an account you own, and start in Practice or Real."}</p>
+                : "Copy the code below, open your Bluechip dashboard, and start with a Practice run. Nothing needs to be downloaded."}</p>
               <p className="delivery-email">{result.emailDelivered
                 ? `We also sent these details to ${result.email}.`
                 : `Copy this code now. We are still sending a copy to ${result.email}.`}</p>
@@ -126,26 +126,26 @@ export function Welcome() {
           <section className="download-section">
             <div>
               <p className="eyebrow">Step 1</p>
-              <h2>{isSandbox ? "Open the owner demo." : "Open the app."}</h2>
+              <h2>{isSandbox ? "Open the owner demo." : "Open Bluechip in your browser."}</h2>
               <p>{isSandbox
                 ? "For the investor demo, open the browser app with the owner code. The signed public Mac download remains optional."
-                : "Use the browser app now. You can also install the Mac app when the signed public download is available."}</p>
+                : "Paste your access code, connect Robinhood, choose the most Bluechip may use, and start in Practice. The Mac app is optional."}</p>
             </div>
             <div className="download-actions">
-              <a className="button button-primary" href={result.downloads.webApp ?? "/app/"}>Open browser app</a>
+              <a className="button button-primary" href={result.downloads.webApp ?? "/app/"}>Open my Bluechip dashboard</a>
               {!isSandbox && result.downloads.macos && <a className="button button-secondary" href={result.downloads.macos}>Download for Mac</a>}
             </div>
           </section>
 
           <section className="setup-steps">
-            <article><span>02</span><h2>Sign in.</h2><p>Open the browser app and paste your access code. No download is required.</p></article>
-            <article><span>03</span><h2>Connect your account.</h2><p>Connect one dedicated Robinhood Agentic account. Trading money stays in Robinhood.</p></article>
-            <article><span>04</span><h2>Pick your bot and limits.</h2><p>Choose a bot, choose Practice or Real, set how much it may use per trade and per day, then press Start.</p></article>
+            <article><span>02</span><h2>Paste your code.</h2><p>Your access code opens the dashboard on any modern phone or computer browser.</p></article>
+            <article><span>03</span><h2>Connect Robinhood.</h2><p>Robinhood handles sign-in. Your trading money stays in its dedicated Agentic account.</p></article>
+            <article><span>04</span><h2>Start with Practice.</h2><p>Review the suggested dollar limits, start Bluechip, and watch its first current-market decision without placing an order.</p></article>
           </section>
 
           <footer className="result-footer welcome-footer">
             <a href={`mailto:${siteConfig.supportEmail}`}>Need setup help?</a>
-            <span>Real trading can lose money. The app does not promise a profit.</span>
+            <span>Real trading can lose money. Bluechip does not promise a profit.</span>
           </footer>
         </>
       )}

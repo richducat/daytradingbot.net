@@ -65,15 +65,15 @@ const accountLabels: Record<AccountChoice, string> = {
 };
 
 const summaries: Record<AgentName, string> = {
-  Bluechip: "Watches a short list of widely held stocks and ETFs for meaningful pullbacks.",
-  Stormfront: "Compares weather-market prices with current public forecasts.",
-  Barometer: "Compares Kalshi weather contracts with current public forecasts.",
-  "Oracle Gap": "Looks for gaps between event-market prices and a group of AI forecasts.",
-  "Smart Money": "Tracks selected prediction-market activity for repeatable patterns.",
-  "News Watch": "Watches trusted news sources for events that can move prediction markets.",
-  Sprinter: "Looks for short bursts of momentum in fast Bitcoin and crypto markets.",
-  "Last Call": "Looks for carefully priced opportunities shortly before a market settles.",
-  "X Pulse": "Tracks social activity for markets tied to posting volume and attention.",
+  Bluechip: "Bluechip watches eight popular stocks and ETFs for a 1.5% pullback, then checks your positions, pending orders, and dollar limits before it acts.",
+  Stormfront: "Stormfront compares weather-market prices with current public forecasts.",
+  Barometer: "Barometer compares Kalshi weather contracts with current public forecasts.",
+  "Oracle Gap": "Oracle Gap looks for a meaningful gap between event-market prices and a group of AI forecasts.",
+  "Smart Money": "Smart Money watches selected prediction-market activity for repeatable patterns.",
+  "News Watch": "News Watch follows trusted sources for confirmed events that could move a prediction market.",
+  Sprinter: "Sprinter looks for short bursts of momentum in fast Bitcoin and crypto markets.",
+  "Last Call": "Last Call looks for carefully priced opportunities shortly before a market settles.",
+  "X Pulse": "X Pulse watches posting activity and attention for markets tied to social volume.",
 };
 
 function eventAgent(answers: MatchAnswers): AgentName {
@@ -155,11 +155,11 @@ export function recommendAgent(answers: MatchAnswers): MatchResult {
   return {
     status: available ? "available" : "coming_soon",
     agent,
-    title: available ? `${agent} fits your answers best.` : `${agent} fits your answers best—but it is not released yet.`,
+    title: available ? `Start with ${agent}.` : `${agent} fits, but it is not ready for sale yet.`,
     summary: summaries[agent],
     reason: answers.market === "unsure"
-      ? `We used your goal, preferred strategy, and ${accountLabels[answers.account]} to make this suggestion.`
-      : `We used your market, preferred strategy, experience, and current account to make this suggestion.` ,
+      ? `Your goal, the kind of strategy you chose, and ${accountLabels[answers.account]} led us here.`
+      : "Your market, preferred strategy, experience, and current account led us here.",
     accountNeeded: requiredAccount(agent),
     recommendedMode,
     dailyLimit,

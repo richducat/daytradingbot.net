@@ -125,6 +125,7 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 .connect-step article button, .pick-row button { min-height: 42px; padding: .6rem .9rem; border: 1px solid var(--app-lime); background: transparent; color: var(--app-lime); font: inherit; font-weight: 800; cursor: pointer; }
 .setup-check { color: var(--app-lime); font-size: 1.4rem; font-weight: 900; }
 .pick-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.auto-pick { flex: 0 0 auto; padding: .55rem .75rem; border: 1px solid #77994e; color: var(--app-lime); font-size: .78rem; font-weight: 850; }
 .steady-tag { padding: .4rem .6rem; border: 1px solid #77994e; color: #cfff9a; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
 .agent-step dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border: 1px solid var(--app-line); }
 .agent-step dl div { display: grid; gap: .5rem; padding: 1rem; border-right: 1px solid var(--app-line); }
@@ -173,9 +174,9 @@ button:disabled { cursor: not-allowed !important; opacity: .5; }
 }
 
 @media (max-width: 650px) {
-  .browser-login > section { width: min(90vw, 520px); padding-top: 3rem; }
+  .browser-login > section { width: min(90vw, 520px); padding-top: 2rem; }
   .login-copy h1 { font-size: clamp(3.5rem, 17vw, 5.4rem); }
-  .login-card { box-shadow: 8px 8px 0 var(--app-lime); }
+  .login-card { order: -1; box-shadow: 8px 8px 0 var(--app-lime); }
   .browser-sidebar { grid-template-columns: 1fr; gap: 1rem; }
   .browser-sidebar nav { justify-content: stretch; overflow-x: auto; }
   .browser-sidebar nav button { flex: 1; justify-content: center; }

@@ -48,106 +48,106 @@ const emptyConfirmations: Confirmations = {
 const questions: Question[] = [
   {
     key: "goal",
-    eyebrow: "Your goal",
-    title: "What do you want the bot to help with?",
-    help: "There is no wrong answer. This just helps us make a useful first suggestion.",
-    why: "Why we ask: different goals call for different bots and starting settings.",
+    eyebrow: "What you want",
+    title: "What would make a trading bot useful to you?",
+    help: "Pick the closest answer. This isn't a test.",
+    why: "Why we ask: your main reason for using a bot helps us choose the right starting setup.",
     options: [
-      { value: "learn", label: "Learn before I risk money", detail: "I want to watch what a bot would do in Practice." },
-      { value: "save_time", label: "Spend less time watching markets", detail: "I want software to check a defined market for me." },
-      { value: "use_rules", label: "Put firm rules around my trading", detail: "I want fixed limits and a repeatable approach." },
-      { value: "fast_returns", label: "Look for short-term opportunities", detail: "I want the bot focused on faster-moving setups, and I understand they can lose money." },
+      { value: "learn", label: "See how a bot trades before I use money", detail: "I want a Practice run I can watch and review." },
+      { value: "save_time", label: "Stop watching charts all day", detail: "I want the bot checking the market while I do other things." },
+      { value: "use_rules", label: "Stick to a plan instead of trading on impulse", detail: "I want the same rule and dollar limits followed every time." },
+      { value: "fast_returns", label: "Look for short-term setups", detail: "I am interested in faster trades and understand they can also lose money faster." },
     ],
   },
   {
     key: "market",
-    eyebrow: "The market",
-    title: "Which market are you interested in?",
-    help: "Different bots use different accounts, information, and trading strategies.",
-    why: "Why we ask: this determines which bots and account connections can work for you.",
+    eyebrow: "Where it looks",
+    title: "Which market do you want the bot watching?",
+    help: "Each market needs a different bot and account connection.",
+    why: "Why we ask: this tells us which bot could actually work with the market you want.",
     options: [
-      { value: "stocks", label: "Stocks and ETFs", detail: "Companies and funds traded through Robinhood." },
-      { value: "crypto", label: "Bitcoin and crypto", detail: "Short-term crypto opportunities through a supported exchange." },
+      { value: "stocks", label: "Stocks and ETFs", detail: "Companies and funds traded through Robinhood. Bluechip is available for this now." },
+      { value: "crypto", label: "Bitcoin and crypto", detail: "Faster-moving crypto markets through a supported exchange." },
       { value: "events", label: "Prediction and event markets", detail: "Weather, news, and event contracts on Kalshi or Polymarket US." },
-      { value: "unsure", label: "I am not sure yet", detail: "Use my other answers to narrow this down." },
+      { value: "unsure", label: "Pick for me", detail: "Use the rest of my answers to choose the clearest fit." },
     ],
   },
   {
     key: "approach",
-    eyebrow: "The approach",
-    title: "What kind of strategy sounds right to you?",
-    help: "You do not need to know trading terminology. Pick the explanation you are most comfortable following.",
-    why: "Why we ask: you should understand the basic reason a bot acts, even when the software does the work.",
+    eyebrow: "How it decides",
+    title: "Which trading idea makes the most sense to you?",
+    help: "You don't need trader vocabulary. Choose the explanation you would feel comfortable reviewing later.",
+    why: "Why we ask: even when the bot does the work, you should understand why it acts.",
     options: [
-      { value: "pullbacks", label: "Price pullbacks", detail: "Look for established stocks or funds that have dropped by a defined amount." },
-      { value: "public_data", label: "Public data and forecasts", detail: "Compare market prices with weather forecasts or other public data." },
-      { value: "news", label: "Trusted news", detail: "Watch for verified events that can change a market." },
-      { value: "momentum", label: "Short-term momentum", detail: "Look for fast price or attention changes." },
-      { value: "market_activity", label: "Experienced market activity", detail: "Watch selected market participants for repeatable patterns." },
-      { value: "unsure", label: "Pick the clearest fit for me", detail: "Use my market and account answers to decide." },
+      { value: "pullbacks", label: "Buy a pullback", detail: "Watch for an established stock or fund dropping by a set amount." },
+      { value: "public_data", label: "Trade from public data", detail: "Compare a market price with weather forecasts or other public information." },
+      { value: "news", label: "React to confirmed news", detail: "Watch trusted sources for an event that could change a market." },
+      { value: "momentum", label: "Follow a fast-moving price", detail: "Look for a short burst of price or attention." },
+      { value: "market_activity", label: "Follow experienced traders", detail: "Watch selected market participants for a repeatable pattern." },
+      { value: "unsure", label: "Pick for me", detail: "Choose the clearest match from my market and account answers." },
     ],
   },
   {
     key: "account",
-    eyebrow: "Your account",
-    title: "Which account do you use?",
-    help: "Your money stays with that company. DayTradingBot does not accept deposits or hold customer funds.",
-    why: "Why we ask: each bot works with specific account connections. You can still choose a different released bot.",
+    eyebrow: "Where your money stays",
+    title: "Where do you already trade?",
+    help: "You never move trading money to DayTradingBot. It stays in the account you control.",
+    why: "Why we ask: a bot can only run through an account it supports.",
     options: [
-      { value: "robinhood_agentic", label: "Robinhood Agentic account", detail: "I already have Robinhood's dedicated account for automated trading." },
-      { value: "robinhood", label: "Regular Robinhood account", detail: "I use Robinhood but have not set up an Agentic account." },
-      { value: "coinbase", label: "Coinbase", detail: "I have a Coinbase account I control." },
-      { value: "kalshi", label: "Kalshi", detail: "I have an eligible Kalshi account I control." },
+      { value: "robinhood_agentic", label: "Robinhood Agentic", detail: "I already have Robinhood's separate account for authorized trading apps." },
+      { value: "robinhood", label: "Robinhood", detail: "I use Robinhood but haven't created its Agentic account yet." },
+      { value: "coinbase", label: "Coinbase", detail: "I trade crypto through a Coinbase account I control." },
+      { value: "kalshi", label: "Kalshi", detail: "I have an eligible Kalshi account." },
       { value: "polymarket", label: "Polymarket US", detail: "I have an approved U.S. retail account." },
-      { value: "none", label: "None of these yet", detail: "I would need clear account setup instructions." },
+      { value: "none", label: "I don't have one yet", detail: "Show me which account the suggested bot needs." },
     ],
   },
   {
     key: "experience",
-    eyebrow: "Your experience",
-    title: "How familiar are you with trading?",
-    help: "This helps us suggest a starting amount and whether to try Practice first.",
-    why: "Why we ask: someone new may want a smaller starting suggestion than an active trader.",
+    eyebrow: "How hands-on you are",
+    title: "How much trading have you done yourself?",
+    help: "This changes the starting amount and mode we suggest, not what you are allowed to use.",
+    why: "Why we ask: someone still learning may want a smaller first setup than someone who trades every week.",
     options: [
-      { value: "new", label: "New", detail: "I am still learning how orders, positions, and losses work." },
-      { value: "some", label: "Some experience", detail: "I have placed trades and understand that losses happen." },
-      { value: "active", label: "Active trader", detail: "I regularly manage trades, positions, and account risk." },
+      { value: "new", label: "I'm learning", detail: "I am still getting comfortable with orders, positions, and losses." },
+      { value: "some", label: "I've placed trades", detail: "I know how to buy and sell and understand that losses happen." },
+      { value: "active", label: "I trade often", detail: "I regularly manage positions and decide how much money to risk." },
     ],
   },
   {
     key: "reviewFrequency",
-    eyebrow: "Your involvement",
-    title: "How often do you want to check in?",
-    help: "The app shows every action, skipped trade, and account message so you can review what happened.",
-    why: "Why we ask: if you check in less often, we will suggest starting in Practice.",
+    eyebrow: "How often you will look",
+    title: "Realistically, how often will you check the app?",
+    help: "Activity shows every check, skipped trade, and order so you can see what happened while you were away.",
+    why: "Why we ask: if you won't review it often, Practice is a better place to begin.",
     options: [
-      { value: "daily", label: "At least once each trading day", detail: "I can check activity and account notices daily." },
-      { value: "few_times_week", label: "A few times each week", detail: "I can review the app regularly, but not constantly." },
-      { value: "rarely", label: "Rarely", detail: "I want to turn it on and leave it alone for long periods." },
+      { value: "daily", label: "Every trading day", detail: "I can review Activity and account notices daily." },
+      { value: "few_times_week", label: "A few times a week", detail: "I will check regularly, just not every day." },
+      { value: "rarely", label: "Only once in a while", detail: "I want to turn it on and leave it alone for long stretches." },
     ],
   },
   {
     key: "dailyBudget",
-    eyebrow: "Your dollar limit",
-    title: "What is the most it can put into new trades each day?",
-    help: "This is a ceiling, not a target. The bot may use less or place no trade at all.",
-    why: "Why we ask: we can give you a clear starting suggestion instead of an empty box.",
+    eyebrow: "Your hard dollar limit",
+    title: "What is the most it may put into new trades in one day?",
+    help: "This is a ceiling. Choosing $10 doesn't mean the bot must spend $10.",
+    why: "Why we ask: your answer gives us a concrete starting setup instead of handing you an empty box.",
     options: [
-      { value: "5", label: "$5 per day", detail: "The smallest starting plan." },
-      { value: "10", label: "$10 per day", detail: "A modest plan for someone with prior experience." },
-      { value: "25", label: "$25 per day", detail: "The built-in customer maximum; never required." },
+      { value: "5", label: "$5 a day", detail: "The smallest available starting limit." },
+      { value: "10", label: "$10 a day", detail: "A middle starting point that can still be changed later." },
+      { value: "25", label: "$25 a day", detail: "The built-in maximum for new customer trades. It is never required." },
     ],
   },
   {
     key: "startPreference",
-    eyebrow: "Practice or Real",
-    title: "How do you want to start?",
-    help: "Practice uses current market information and records what the bot would do without placing an order.",
-    why: "Why we ask: we may suggest Practice first, but you make the final choice.",
+    eyebrow: "Watch it or let it trade",
+    title: "How would you feel most comfortable starting?",
+    help: "Practice uses current market information and shows the decision without placing an order.",
+    why: "Why we ask: we will recommend a first mode, but the final choice is yours.",
     options: [
-      { value: "practice", label: "Practice first", detail: "I want to understand the bot before any real order." },
-      { value: "real_later", label: "Practice, then consider Real", detail: "I may use real money after I review the activity." },
-      { value: "real_now", label: "Real money immediately", detail: "I would prefer to skip Practice." },
+      { value: "practice", label: "Let me watch it first", detail: "I want to understand the decisions before any real order." },
+      { value: "real_later", label: "Practice first, then I may go Real", detail: "I want to review Activity before I use real money." },
+      { value: "real_now", label: "I want the option to trade right away", detail: "I would prefer to skip Practice after I read the risks and set my limits." },
     ],
   },
 ];
@@ -213,58 +213,58 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
     <main className="match-result">
       <header className="intake-header">
         <a className="wordmark" href="/">DAYTRADINGBOT</a>
-        <span>Your suggestion</span>
+        <span>Your starting setup</span>
       </header>
       <section className="match-hero">
-        <p className="eyebrow">Our suggestion—not a rule</p>
+        <p className="eyebrow">Based on what you told us</p>
         <h1>{result.title}</h1>
         <p className="match-lead">{result.summary}</p>
-        <p className="match-choice">This is a starting point. You can choose any released bot in the app.</p>
+        <p className="match-choice">This is yours to change. You can edit the answers or choose a different released bot.</p>
       </section>
 
       <section className="match-plan" aria-labelledby="plan-heading">
         <div className="match-plan-intro">
-          <p className="eyebrow">A simple place to start</p>
-          <h2 id="plan-heading">Here is the setup we would try first.</h2>
-          <p>{result.reason} Change any of it before you start.</p>
+          <p className="eyebrow">Your day-one setup</p>
+          <h2 id="plan-heading">Here is where we would begin.</h2>
+          <p>{result.reason} You can change every setting before the bot runs.</p>
         </div>
         <dl className="plan-rows">
-          <div><dt>Suggested bot</dt><dd>{result.agent}</dd></div>
-          <div><dt>Account it uses</dt><dd>{result.accountNeeded}</dd></div>
-          <div><dt>Suggested way to start</dt><dd>{result.recommendedMode}</dd></div>
-          <div><dt>Suggested amount per trade</dt><dd>${result.perTradeLimit}</dd></div>
-          <div><dt>Suggested amount per day</dt><dd>${result.dailyLimit}</dd></div>
+          <div><dt>Bot</dt><dd>{result.agent}</dd></div>
+          <div><dt>Connects to</dt><dd>{result.accountNeeded}</dd></div>
+          <div><dt>Start in</dt><dd>{result.recommendedMode}</dd></div>
+          <div><dt>Most in one trade</dt><dd>${result.perTradeLimit}</dd></div>
+          <div><dt>Most in new trades today</dt><dd>${result.dailyLimit}</dd></div>
         </dl>
       </section>
 
       {(result.needsAccountSetup || result.realTradingCaution) && (
         <section className="match-notices" aria-label="Helpful notes">
-          {result.needsAccountSetup && <p><strong>You may need a different account connection.</strong> {result.agent} uses {result.accountNeeded}. You can set that up later or choose another released bot.</p>}
-          {result.realTradingCaution && <p><strong>Our starting suggestion.</strong> {result.realTradingCaution}</p>}
+          {result.needsAccountSetup && <p><strong>You will need the right account.</strong> {result.agent} uses {result.accountNeeded}. You can set it up later or choose another released bot.</p>}
+          {result.realTradingCaution && <p><strong>Why we picked this starting mode.</strong> {result.realTradingCaution}</p>}
         </section>
       )}
 
       <section className="after-match">
         <div>
-          <p className="eyebrow">You stay in charge</p>
-          <h2>You decide what happens next.</h2>
+          <p className="eyebrow">What happens after checkout</p>
+          <h2>Your first Practice run takes four steps.</h2>
         </div>
         <ol>
-          <li><span>01</span><div><strong>Keep or change the bot</strong><p>Use this suggestion, edit your answers, or choose any released bot.</p></div></li>
-          <li><span>02</span><div><strong>Read the fine print</strong><p>Real trades can lose money. The bot does not promise a profit.</p></div></li>
-          <li><span>03</span><div><strong>Buy and connect</strong><p>Open the browser app or use the optional Mac app, then connect an account you own. Trading money stays in that account.</p></div></li>
-          <li><span>04</span><div><strong>Set your limits and press Start</strong><p>Choose Practice or Real, set the dollar limits, and pause new trades whenever you want.</p></div></li>
+          <li><span>01</span><div><strong>Get your private access code</strong><p>It appears on screen after Stripe confirms payment and is also sent by email.</p></div></li>
+          <li><span>02</span><div><strong>Open DayTradingBot in your browser</strong><p>Paste the code. Nothing needs to be downloaded.</p></div></li>
+          <li><span>03</span><div><strong>Connect the account your bot uses</strong><p>The company holding the account handles sign-in. Your trading money stays there.</p></div></li>
+          <li><span>04</span><div><strong>Review the limits and start Practice</strong><p>Watch current decisions first. Move to Real only if and when you choose.</p></div></li>
         </ol>
       </section>
 
       <section className="match-checkout">
         <div>
-          <p className="eyebrow">{available ? "Launch price" : "Your choice is still open"}</p>
-          <h2>{available ? "$98 once. Use it in your browser." : `${result.agent} is not released yet. Bluechip is.`}</h2>
+          <p className="eyebrow">{available ? "One-time price" : "An honest answer"}</p>
+          <h2>{available ? "One payment. Bluechip is yours to use in the browser." : `${result.agent} is not for sale yet. Bluechip is.`}</h2>
           <p>{available
-            ? "Buy DayTradingBot through Stripe. After payment, your access code and a button to open the browser app appear immediately and are also sent by email. The optional Mac download appears when its signed public release is ready."
-            : `You can wait for ${result.agent} or start with the available Bluechip bot now. This suggestion never locks you in.`}</p>
-          <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
+            ? "The $98 license includes Bluechip, Practice, Real trading controls, guided setup, Activity, and version 1 updates. Your trading money stays in Robinhood."
+            : `Based on your answers, ${result.agent} fits better than Bluechip. If you also want a Robinhood stock bot, you may still choose Bluechip. We will not pretend it is the same strategy.`}</p>
+          <a className="text-link dark-link" href="/#example">See exactly what Bluechip does <span aria-hidden="true">→</span></a>
         </div>
         <div className="checkout-action">
           <button
@@ -273,9 +273,9 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
             onClick={() => void startCheckout()}
             disabled={startingCheckout}
           >
-            {startingCheckout ? "Opening secure checkout…" : available ? "Buy DayTradingBot — $98" : "Start with Bluechip — $98"}
+            {startingCheckout ? "Opening secure checkout…" : available ? "Get Bluechip for $98" : "Choose Bluechip instead for $98"}
           </button>
-          <small>Stripe handles the payment. Your access code and browser-app link are delivered immediately after payment.</small>
+          <small>Stripe handles payment. Your access code and Open DayTradingBot button appear after payment is confirmed.</small>
           {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
         </div>
       </section>
@@ -305,8 +305,8 @@ export function Onboarding() {
 
   useEffect(() => {
     document.title = showResult
-      ? "Your bot suggestion — DayTradingBot"
-      : "Help me choose a bot — DayTradingBot";
+      ? "Your starting setup | DayTradingBot"
+      : "Build my trading-bot setup | DayTradingBot";
   }, [showResult]);
 
   useEffect(() => {
@@ -370,16 +370,16 @@ export function Onboarding() {
 
       <div className="intake-layout">
         <aside className="intake-assurance">
-          <p className="eyebrow">Help me choose</p>
-          <h2>A few quick questions. Then you choose.</h2>
+          <p className="eyebrow">Your two-minute setup</p>
+          <h2>Let's make this fit your life and your comfort level.</h2>
           <ul>
-            <li>About two minutes</li>
+            <li>See a complete setup before checkout</li>
             <li>One question at a time</li>
-            <li>Nothing you answer locks you out</li>
-            <li>No Social Security number</li>
-            <li>No account password or deposit</li>
+            <li>Change any answer</li>
+            <li>No Social Security number or phone number</li>
+            <li>No broker password or deposit</li>
           </ul>
-          <p>We will suggest a bot and starting setup. Your answers stay in this browser and are not sent to us.</p>
+          <p>Your answers stay in this browser. We use them only to build the result you see on screen.</p>
         </aside>
 
         <section className="intake-question" aria-live="polite">
@@ -395,25 +395,25 @@ export function Onboarding() {
               <p className="step-label">Step {step + 1} of {questions.length + 1}</p>
               {isConfirmationStep ? (
                 <>
-                  <p className="eyebrow">Before your result</p>
-                  <h1>Read this before you see your suggestion.</h1>
-                  <p className="question-help">These boxes confirm that you saw the fine print. They do not decide which tools you can use.</p>
+                  <p className="eyebrow">One last check</p>
+                  <h1>Make sure you know what you are buying.</h1>
+                  <p className="question-help">This is where we slow down for 30 seconds. Nothing here changes the bot based on how you answered.</p>
                   <div className="confirmation-list">
                     <label>
                       <input type="checkbox" checked={confirmations.losses} onChange={(event) => setConfirmations((current) => ({ ...current, losses: event.target.checked }))} />
-                      <span><strong>I understand real trading can lose money.</strong><small>AI and Practice results do not guarantee a profit.</small></span>
+                      <span><strong>I know real trades can lose money.</strong><small>Practice decisions cannot predict what a future real trade will earn or lose.</small></span>
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.disclosure} onChange={(event) => setConfirmations((current) => ({ ...current, disclosure: event.target.checked }))} />
-                      <span><strong>I read the <a href="/risk-disclosure/" target="_blank" rel="noreferrer">risk disclosure</a>.</strong><small>It explains trading losses, account responsibility, and what can go wrong with automation.</small></span>
+                      <span><strong>I read the <a href="/risk-disclosure/" target="_blank" rel="noreferrer">risk disclosure</a>.</strong><small>It covers trading losses, account responsibility, and software failures.</small></span>
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.terms} onChange={(event) => setConfirmations((current) => ({ ...current, terms: event.target.checked }))} />
-                      <span><strong>I read the <a href="/terms/" target="_blank" rel="noreferrer">software license terms</a>.</strong><small>The $98 payment buys software and guided setup. It does not buy trading money or promise returns.</small></span>
+                      <span><strong>I read the <a href="/terms/" target="_blank" rel="noreferrer">software license terms</a>.</strong><small>The $98 payment buys software. Trading money and account costs are separate.</small></span>
                     </label>
                     <label>
                       <input type="checkbox" checked={confirmations.choice} onChange={(event) => setConfirmations((current) => ({ ...current, choice: event.target.checked }))} />
-                      <span><strong>I understand this quiz only makes a suggestion.</strong><small>I can choose any released bot, and I remain responsible for my account and trades.</small></span>
+                      <span><strong>I know this setup is mine to change.</strong><small>I choose the bot, account, dollar limits, and whether to use Practice or Real.</small></span>
                     </label>
                   </div>
                 </>
@@ -459,7 +459,7 @@ export function Onboarding() {
               Back
             </button>
             <button className="button button-primary" type="button" disabled={!canContinue} onClick={continueIntake}>
-              {isConfirmationStep ? "See my suggestion" : "Continue"}
+              {isConfirmationStep ? "Show me my setup" : "Continue"}
             </button>
           </div>
         </section>
