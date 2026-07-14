@@ -3,6 +3,7 @@ import { isLegalPath, LegalPage } from "./LegalPage";
 import { Onboarding } from "./Onboarding";
 import { siteConfig } from "./siteConfig";
 import { Welcome } from "./Welcome";
+import { WebApp } from "./WebApp";
 
 const reveal = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0 } };
 
@@ -27,15 +28,15 @@ const screeningReasons = [
 ] as const;
 
 const faqs = [
-  ["What exactly is DayTradingBot?", "It is a desktop app. You connect an account you own, pick a trading bot, choose Practice or Real, set dollar limits, and press Start. The app shows you what the bot does."],
+  ["What exactly is DayTradingBot?", "It is a trading app you can use in your browser or on a Mac. Connect an account you own, pick a bot, choose Practice or Real, set dollar limits, and press Start. The app shows you what the bot does."],
   ["Why ask me questions?", "The answers help us suggest a bot and sensible starting settings. They do not approve you, reject you, or take away access to released bots."],
   ["Can I ignore the suggestion?", "Yes. The result is a starting suggestion, not a rule and not investment advice. You can choose any bot that has been released."],
   ["Where do I deposit trading money?", "Not with DayTradingBot. You add funds directly through the broker, exchange, or market account you own. The software is not a bank, broker, exchange, or custodian."],
-  ["Can it place real trades?", "The Bluechip founding beta includes a Real option for a supported Robinhood Agentic account. It starts in Practice. You must connect the account, set your limits, and deliberately choose Real before the app can send an order."],
+  ["Can it place real trades?", "Bluechip includes a Real option for a supported Robinhood Agentic account. It starts in Practice. You must connect the account, set your limits, and deliberately choose Real before the app can send an order."],
   ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
   ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
-  ["What does the $98 license include?", "One active Mac, the current Bluechip founding-beta build, guided setup, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
-  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your activation code and the current Mac download appear there as soon as payment is confirmed, and we send the same details by email."],
+  ["What does the $98 license include?", "The browser app, the released Bluechip bot, guided setup, an optional Mac app when the signed download is available, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
+  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your access code and a button to open the browser app appear as soon as payment is confirmed, and we send the same details by email."],
 ] as const;
 
 export function App() {
@@ -44,13 +45,14 @@ export function App() {
   if (isLegalPath(path)) return <LegalPage path={path} />;
   if (path === "/get-started/") return <Onboarding />;
   if (path === "/welcome/") return <Welcome />;
+  if (path === "/app/") return <WebApp />;
 
   return (
     <main>
       <header className="site-header">
         <a className="wordmark" href="#top" aria-label="DayTradingBot home">DAYTRADINGBOT</a>
-        <nav aria-label="Primary navigation"><a href="#product">How it works</a><a href="#example">Bluechip</a><a href="#bots">Bots</a><a href="#price">Price</a></nav>
-        <a className="header-cta" href="/get-started/">Help me choose</a>
+        <nav aria-label="Primary navigation"><a href="#product">How it works</a><a href="#example">Bluechip</a><a href="#bots">Bots</a><a href="#price">Price</a><a href="/app/">Sign in</a></nav>
+        <a className="header-cta" href="/get-started/">Get started</a>
       </header>
 
       <section className="hero" id="top">
@@ -64,10 +66,10 @@ export function App() {
         >
           <p className="eyebrow"><span className="status-dot" /> AI trading bots you control</p>
           <h1>Pick a bot. Set your limits. Press Start.</h1>
-          <p className="hero-deck">DayTradingBot is a desktop app that connects to accounts you already use. Choose a bot, choose Practice or Real, tell it how much it can use, and press Start.</p>
+          <p className="hero-deck">DayTradingBot connects to accounts you already use. Open it in your browser or install it on a Mac, choose Practice or Real, tell your bot how much it can use, and press Start.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/get-started/">Help me choose a bot <span>About 2 minutes</span></a>
-            <a className="text-link" href="#bots">See all bots <span aria-hidden="true">↓</span></a>
+            <a className="button button-primary" href="/get-started/">Get started <span>About 2 minutes</span></a>
+            <a className="text-link" href="/app/">Already have a code? Open the app <span aria-hidden="true">→</span></a>
           </div>
           <p className="hero-note">The questions make a suggestion. They do not decide what you can use. Read the risk disclosure, then choose for yourself.</p>
         </motion.div>
@@ -78,16 +80,16 @@ export function App() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.12, ease: "easeOut" }}
         >
-          <img src="/images/daytradingbot-desktop-setup.png" alt="The DayTradingBot desktop app showing the account connection step" />
-          <figcaption><span>Actual desktop setup screen</span> Connect your account inside the app after purchase.</figcaption>
+          <img src="/images/daytradingbot-desktop-setup.png" alt="DayTradingBot showing the guided account connection step" />
+          <figcaption><span>The same guided setup</span> Use it in a browser or in the optional Mac app.</figcaption>
         </motion.figure>
       </section>
 
       <section className="product-explainer section-shell" id="product">
         <div className="product-statement">
           <p className="eyebrow">What am I buying?</p>
-          <h2>You are buying the app—not sending us trading money.</h2>
-          <p>Install it on your Mac, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
+          <h2>You are buying the software—not sending us trading money.</h2>
+          <p>Use it in your browser or on a Mac, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -156,8 +158,8 @@ export function App() {
           <ol>
             <li><span>01</span><div><h3>Choose a bot</h3><p>Use our suggestion or pick any released bot yourself.</p></div></li>
             <li><span>02</span><div><h3>Read the risk disclosure</h3><p>Know what can go wrong before you enter a card number or turn on Real trading.</p></div></li>
-            <li><span>03</span><div><h3>Buy and download</h3><p>Pay $98 through Stripe. Your activation code and app download appear immediately after payment. Your trading money and account fees are separate.</p></div></li>
-            <li><span>04</span><div><h3>Connect your account</h3><p>Connect it inside the app. Your credentials stay in your computer's secure storage.</p></div></li>
+            <li><span>03</span><div><h3>Buy and open the app</h3><p>Pay $98 through Stripe. Your access code and browser-app button appear immediately. Nothing has to be downloaded.</p></div></li>
+            <li><span>04</span><div><h3>Connect your account</h3><p>Robinhood handles sign-in. The browser app stores the connection encrypted on our server; the Mac app uses the computer's secure storage.</p></div></li>
             <li><span>05</span><div><h3>Set limits and press Start</h3><p>Choose Practice or Real. Set the dollars per trade and per day. Press Pause to stop new trades.</p></div></li>
           </ol>
         </div>
@@ -168,17 +170,18 @@ export function App() {
           <div>
             <p className="eyebrow">Founding price</p>
             <h2>${siteConfig.founderPrice} once.</h2>
-            <p className="price-qualifier">One active Mac. Version 1 and version 1 updates.</p>
+            <p className="price-qualifier">Browser access, optional Mac app, and version 1 updates.</p>
           </div>
           <div className="offer-copy">
             <ul>
-              <li>Desktop app and guided account setup</li>
+              <li>Browser app and guided account setup—no download required</li>
+              <li>Optional Mac app when the signed public download is available</li>
               <li>Practice mode and Real trading for released bots</li>
               <li>A clear activity history and dollar limits you control</li>
               <li>Trading capital, account fees, and taxes not included</li>
             </ul>
             <a className="button offer-button" href="/get-started/">Help me choose a bot</a>
-            <small>Checkout opens after the required risk acknowledgement. Stripe sends your receipt, then your activation code and current download appear on the private delivery page.</small>
+            <small>Checkout opens after the risk acknowledgement. Stripe sends your receipt, then your access code and browser-app button appear on the private delivery page.</small>
           </div>
         </div>
       </section>

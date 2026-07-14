@@ -11,8 +11,9 @@ await rm(output, { recursive: true, force: true });
 await mkdir(path.join(output, "database", "mysql"), { recursive: true });
 await cp(path.join(apiRoot, "dist"), path.join(output, "dist"), { recursive: true });
 await cp(
-  path.join(root, "database", "mysql", "0001_commercial_schema.sql"),
-  path.join(output, "database", "mysql", "0001_commercial_schema.sql"),
+  path.join(root, "database", "mysql"),
+  path.join(output, "database", "mysql"),
+  { recursive: true },
 );
 await cp(path.join(root, ".env.example"), path.join(output, ".env.example"));
 await cp(
@@ -28,6 +29,7 @@ const productionPackage = {
   engines: { node: ">=22 <23" },
   scripts: {
     start: "node dist/index.js",
+    "run:web-worker": "node dist/run-worker.js",
     "verify:mysql": "node dist/verify-mysql-commercial.js",
   },
   dependencies: apiPackage.dependencies,

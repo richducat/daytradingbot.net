@@ -8,6 +8,7 @@ type CheckoutResult = {
   emailDelivered: boolean;
   downloads: {
     macos?: string;
+    webApp?: string;
   };
 };
 
@@ -87,8 +88,8 @@ export function Welcome() {
       {!result && !error && (
         <section className="welcome-state" aria-live="polite">
           <p className="eyebrow">Payment received</p>
-          <h1>Getting your app ready.</h1>
-          <p>We are creating your activation code and checking the current downloads. This usually takes a few seconds.</p>
+          <h1>Getting your access ready.</h1>
+          <p>We are creating your access code and opening the browser app. This usually takes a few seconds.</p>
           <div className="delivery-progress" aria-hidden="true"><span /></div>
         </section>
       )}
@@ -110,13 +111,13 @@ export function Welcome() {
               <h1>{isSandbox ? "Checkout and activation are working." : "Your app is ready."}</h1>
               <p>{isSandbox
                 ? "This test created an activation code and sent the delivery email. No money moved."
-                : "Download DayTradingBot, enter the code below, connect an account you own, and start in Practice or Real."}</p>
+                : "Open DayTradingBot, enter the code below, connect an account you own, and start in Practice or Real."}</p>
               <p className="delivery-email">{result.emailDelivered
                 ? `We also sent these details to ${result.email}.`
                 : `Copy this code now. We are still sending a copy to ${result.email}.`}</p>
             </div>
             <div className="activation-card">
-              <span>Your activation code</span>
+              <span>Your access code</span>
               <code>{result.activationCode}</code>
               <button type="button" onClick={() => void copyCode()}>{copied ? "Copied" : "Copy code"}</button>
             </div>
@@ -125,21 +126,20 @@ export function Welcome() {
           <section className="download-section">
             <div>
               <p className="eyebrow">Step 1</p>
-              <h2>{isSandbox ? "Use the private owner demo." : "Download the app."}</h2>
+              <h2>{isSandbox ? "Open the owner demo." : "Open the app."}</h2>
               <p>{isSandbox
-                ? "For the investor demo, use the private owner copy already installed on this Mac. The signed public Mac download will appear here for live purchases after Apple release signing is complete."
-                : "Download it on the Mac you will use. One license can be active on one Mac at a time."}</p>
+                ? "For the investor demo, open the browser app with the owner code. The signed public Mac download remains optional."
+                : "Use the browser app now. You can also install the Mac app when the signed public download is available."}</p>
             </div>
-            {!isSandbox && (
-              <div className="download-actions">
-                {result.downloads.macos && <a className="button button-primary" href={result.downloads.macos}>Download for Mac</a>}
-              </div>
-            )}
+            <div className="download-actions">
+              <a className="button button-primary" href={result.downloads.webApp ?? "/app/"}>Open browser app</a>
+              {!isSandbox && result.downloads.macos && <a className="button button-secondary" href={result.downloads.macos}>Download for Mac</a>}
+            </div>
           </section>
 
           <section className="setup-steps">
-            <article><span>02</span><h2>Activate it.</h2><p>Open DayTradingBot and paste your activation code. You only do this once on this computer.</p></article>
-            <article><span>03</span><h2>Connect your account.</h2><p>Choose Robinhood, Coinbase, Kalshi, or Polymarket and follow the secure connection steps. Trading money stays in that account.</p></article>
+            <article><span>02</span><h2>Sign in.</h2><p>Open the browser app and paste your access code. No download is required.</p></article>
+            <article><span>03</span><h2>Connect your account.</h2><p>Connect one dedicated Robinhood Agentic account. Trading money stays in Robinhood.</p></article>
             <article><span>04</span><h2>Pick your bot and limits.</h2><p>Choose a bot, choose Practice or Real, set how much it may use per trade and per day, then press Start.</p></article>
           </section>
 

@@ -8,6 +8,7 @@ import type { RowDataPacket } from "mysql2";
 import { MySqlCommerceRepository } from "./commerce-mysql.js";
 import { MySqlLicenseRepository } from "./licensing-mysql.js";
 import { LicenseService } from "./licensing.js";
+import { MySqlWebAppRepository } from "./webapp.js";
 
 interface LicenseStatusRow extends RowDataPacket {
   status: string;
@@ -77,15 +78,77 @@ try {
   });
   assert.equal(renewed.signedLease.claims.license_id, activation.signedLease.claims.license_id);
 
+  const browser = new MySqlWebAppRepository(
+    pool,
+    randomBytes(32).toString("base64url"),
+    randomBytes(32).toString("base64url"),
+    pepper,
+  );
+  const browserSession = await browser.createSession(first.activationCode);
+  const authenticated = await browser.authenticate(browserSession.sessionToken);
+  assert.equal(authenticated.licenseId, activation.signedLease.claims.license_id);
+  await browser.ensureSettings(authenticated.licenseId);
+  await browser.saveSettings(authenticated.licenseId, "practice", 1_000, 200);
+  await browser.recordActivity(
+    authenticated.licenseId,
+    "practice",
+    "market_check",
+    "Browser app database verification.",
+  );
+  assert.equal((await browser.listActivity(authenticated.licenseId)).length, 1);
+
   await commerce.markPurchaseByPaymentIntent(paymentIntentId, "refunded");
   const [rows] = await pool.execute<LicenseStatusRow[]>(
     "SELECT status FROM licenses WHERE purchase_id = ?",
     [first.purchaseId],
   );
   assert.equal(rows[0]?.status, "refunded");
-  process.stdout.write("MariaDB commerce, activation, renewal, delivery, and refund flow verified.\n");
+  process.stdout.write("MariaDB commerce, browser session, settings, activity, activation, renewal, delivery, and refund flow verified.\n");
 } finally {
   if (purchaseId) {
+    await pool.execute(
+      `DELETE f FROM web_trade_fills f
+       JOIN web_trade_intents i ON i.intent_id = f.intent_id
+       JOIN licenses l ON l.license_id = i.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE i FROM web_trade_intents i
+       JOIN licenses l ON l.license_id = i.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE a FROM web_trading_activity a
+       JOIN licenses l ON l.license_id = a.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE s FROM web_trading_settings s
+       JOIN licenses l ON l.license_id = s.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE o FROM web_oauth_states o
+       JOIN licenses l ON l.license_id = o.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE c FROM web_trading_connections c
+       JOIN licenses l ON l.license_id = c.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
+    await pool.execute(
+      `DELETE s FROM web_sessions s
+       JOIN licenses l ON l.license_id = s.license_id
+       WHERE l.purchase_id = ?`,
+      [purchaseId],
+    );
     await pool.execute(
       `DELETE ll FROM license_leases ll
        JOIN activations a ON a.activation_id = ll.activation_id

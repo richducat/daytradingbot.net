@@ -15,6 +15,7 @@ const ENCRYPTION_VERSION = 1;
 
 export type DownloadLinks = {
   macos?: string;
+  webApp?: string;
 };
 
 export type CheckoutStatus = {
@@ -539,12 +540,13 @@ export class SmtpLicenseMailer implements LicenseMailer {
     downloads: DownloadLinks;
   }): Promise<void> {
     const downloads = [
+      input.downloads.webApp ? `Use in your browser: ${input.downloads.webApp}` : undefined,
       input.downloads.macos ? `Mac: ${input.downloads.macos}` : undefined,
     ].filter((value): value is string => Boolean(value));
     await this.transport.sendMail({
       from: this.from,
       to: input.to,
-      subject: "Your DayTradingBot app and activation code",
+      subject: "Your DayTradingBot access code",
       text: [
         "Your DayTradingBot purchase is ready.",
         "",
@@ -552,7 +554,7 @@ export class SmtpLicenseMailer implements LicenseMailer {
         "",
         ...downloads,
         "",
-        "Install the app, enter the activation code, connect an account you own, and begin in Practice.",
+        "Open the browser app or install the Mac app, enter the activation code, connect an account you own, and begin in Practice.",
         `Need help? Email ${this.supportEmail}.`,
         "",
         "Real trading can lose money. DayTradingBot does not promise a profit or hold your trading funds.",

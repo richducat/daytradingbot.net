@@ -8,7 +8,7 @@ export const siteConfig = {
     maxDailyLossUsd: 10,
   },
   accounts: [
-    { name: "Robinhood", market: "Stocks and ETFs", status: "Bluechip Practice and Real are in the founder app" },
+    { name: "Robinhood", market: "Stocks and ETFs", status: "Bluechip Practice and Real are available in the browser app" },
     { name: "Coinbase", market: "Bitcoin and Ethereum", status: "Account connection is ready; trading agent comes next" },
     { name: "Kalshi", market: "Event contracts", status: "Account connection is ready; agents come next" },
     { name: "Polymarket", market: "Prediction markets", status: "Approved U.S. account connection is ready; agents come next" },

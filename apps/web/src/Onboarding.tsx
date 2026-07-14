@@ -252,7 +252,7 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
         <ol>
           <li><span>01</span><div><strong>Keep or change the bot</strong><p>Use this suggestion, edit your answers, or choose any released bot.</p></div></li>
           <li><span>02</span><div><strong>Read the fine print</strong><p>Real trades can lose money. The bot does not promise a profit.</p></div></li>
-          <li><span>03</span><div><strong>Buy and connect</strong><p>Buy the desktop app, then connect an account you own. Trading money stays in that account.</p></div></li>
+          <li><span>03</span><div><strong>Buy and connect</strong><p>Open the browser app or use the optional Mac app, then connect an account you own. Trading money stays in that account.</p></div></li>
           <li><span>04</span><div><strong>Set your limits and press Start</strong><p>Choose Practice or Real, set the dollar limits, and pause new trades whenever you want.</p></div></li>
         </ol>
       </section>
@@ -260,9 +260,9 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
       <section className="match-checkout">
         <div>
           <p className="eyebrow">{available ? "Launch price" : "Your choice is still open"}</p>
-          <h2>{available ? "$98 once. Mac-only launch." : `${result.agent} is not released yet. Bluechip is.`}</h2>
+          <h2>{available ? "$98 once. Use it in your browser." : `${result.agent} is not released yet. Bluechip is.`}</h2>
           <p>{available
-            ? "Buy the Mac app through Stripe. Checkout opens when the signed Mac download is ready; until then, no card is charged. After payment, your activation code and download appear immediately and are also sent by email."
+            ? "Buy DayTradingBot through Stripe. After payment, your access code and a button to open the browser app appear immediately and are also sent by email. The optional Mac download appears when its signed public release is ready."
             : `You can wait for ${result.agent} or start with the available Bluechip bot now. This suggestion never locks you in.`}</p>
           <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
         </div>
@@ -275,7 +275,7 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
           >
             {startingCheckout ? "Opening secure checkout…" : available ? "Buy DayTradingBot — $98" : "Start with Bluechip — $98"}
           </button>
-          <small>Stripe handles the payment. Your activation code and downloads are delivered immediately after payment.</small>
+          <small>Stripe handles the payment. Your access code and browser-app link are delivered immediately after payment.</small>
           {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
         </div>
       </section>

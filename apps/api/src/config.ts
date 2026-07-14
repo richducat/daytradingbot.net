@@ -8,6 +8,16 @@ const ConfigSchema = z.object({
   DATABASE_PROVIDER: z.enum(["postgres", "mysql"]).default("postgres"),
   DATABASE_URL: z.string().min(1),
   PUBLIC_SITE_URL: z.url().default("https://daytradingbot.net"),
+  PUBLIC_API_URL: z.url().default("https://api.daytradingbot.net"),
+  WEBAPP_ENABLED: z.enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((value) => value === "true" || value === "1"),
+  REAL_TRADING_ENABLED: z.enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((value) => value === "true" || value === "1"),
+  WEB_SESSION_SECRET: z.string().min(32).optional(),
+  TRADING_CREDENTIAL_ENCRYPTION_KEY: z.string().min(43).optional(),
+  WORKER_SECRET: z.string().min(32).optional(),
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_PRICE_ID: z.string().min(1).optional(),
@@ -45,6 +55,12 @@ export function loadConfig(env: Environment = process.env): ApiConfig {
     DATABASE_PROVIDER: env.DATABASE_PROVIDER,
     DATABASE_URL: secretValue(env, "DATABASE_URL"),
     PUBLIC_SITE_URL: env.PUBLIC_SITE_URL,
+    PUBLIC_API_URL: env.PUBLIC_API_URL,
+    WEBAPP_ENABLED: env.WEBAPP_ENABLED,
+    REAL_TRADING_ENABLED: env.REAL_TRADING_ENABLED,
+    WEB_SESSION_SECRET: secretValue(env, "WEB_SESSION_SECRET"),
+    TRADING_CREDENTIAL_ENCRYPTION_KEY: secretValue(env, "TRADING_CREDENTIAL_ENCRYPTION_KEY"),
+    WORKER_SECRET: secretValue(env, "WORKER_SECRET"),
     STRIPE_SECRET_KEY: secretValue(env, "STRIPE_SECRET_KEY"),
     STRIPE_WEBHOOK_SECRET: secretValue(env, "STRIPE_WEBHOOK_SECRET"),
     STRIPE_PRICE_ID: env.STRIPE_PRICE_ID,

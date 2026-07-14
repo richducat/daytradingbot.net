@@ -8,6 +8,13 @@ const baseHtml = await readFile(path.join(dist, "index.html"), "utf8");
 
 const routes = [
   {
+    path: "app",
+    title: "DayTradingBot browser app",
+    description: "Sign in to connect Robinhood, choose Practice or Real, set dollar limits, and run Bluechip from a browser.",
+    ogTitle: "DayTradingBot browser app",
+    robots: "noindex, nofollow",
+  },
+  {
     path: "get-started",
     title: "Help me choose a bot — DayTradingBot",
     description: "Answer eight quick questions for an optional bot and starting-settings suggestion. Your answers never block access to released bots.",
@@ -17,7 +24,7 @@ const routes = [
   {
     path: "welcome",
     title: "Your DayTradingBot app is ready",
-    description: "Private delivery of a DayTradingBot activation code and installer after confirmed payment.",
+    description: "Private delivery of a DayTradingBot access code and browser-app link after confirmed payment.",
     ogTitle: "Your DayTradingBot app is ready",
     robots: "noindex, nofollow",
   },
@@ -38,7 +45,7 @@ const routes = [
   {
     path: "terms",
     title: "Founder license terms — DayTradingBot",
-    description: "DayTradingBot license terms, bot choice, risk acknowledgement, one-device use, and refunds.",
+    description: "DayTradingBot license terms, browser access, bot choice, risk acknowledgement, Mac use, and refunds.",
     ogTitle: "Founder license terms — DayTradingBot",
     robots: "index, follow, max-image-preview:large",
   },
