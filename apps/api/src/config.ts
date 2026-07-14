@@ -11,12 +11,14 @@ const ConfigSchema = z.object({
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_PRICE_ID: z.string().min(1).optional(),
+  CHECKOUT_ENABLED: z.enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((value) => value === "true" || value === "1"),
   COMMERCE_ENCRYPTION_KEY: z.string().min(43).optional(),
   SMTP_URL: z.string().min(1).optional(),
   LICENSE_EMAIL_FROM: z.string().email().default("licenses@daytradingbot.net"),
   SUPPORT_EMAIL: z.string().email().default("support@daytradingbot.net"),
   MACOS_DOWNLOAD_URL: z.url().optional(),
-  WINDOWS_DOWNLOAD_URL: z.url().optional(),
   LICENSE_SIGNING_PRIVATE_KEY_PEM: z.string().min(1).optional(),
   LICENSE_SECRET_PEPPER: z.string().min(32).optional(),
 });
@@ -46,12 +48,12 @@ export function loadConfig(env: Environment = process.env): ApiConfig {
     STRIPE_SECRET_KEY: secretValue(env, "STRIPE_SECRET_KEY"),
     STRIPE_WEBHOOK_SECRET: secretValue(env, "STRIPE_WEBHOOK_SECRET"),
     STRIPE_PRICE_ID: env.STRIPE_PRICE_ID,
+    CHECKOUT_ENABLED: env.CHECKOUT_ENABLED,
     COMMERCE_ENCRYPTION_KEY: secretValue(env, "COMMERCE_ENCRYPTION_KEY"),
     SMTP_URL: secretValue(env, "SMTP_URL"),
     LICENSE_EMAIL_FROM: env.LICENSE_EMAIL_FROM,
     SUPPORT_EMAIL: env.SUPPORT_EMAIL,
     MACOS_DOWNLOAD_URL: env.MACOS_DOWNLOAD_URL,
-    WINDOWS_DOWNLOAD_URL: env.WINDOWS_DOWNLOAD_URL,
     LICENSE_SIGNING_PRIVATE_KEY_PEM:
       secretValue(env, "LICENSE_SIGNING_PRIVATE_KEY_PEM")
       ?? (env.LICENSE_SIGNING_KEY_FILE

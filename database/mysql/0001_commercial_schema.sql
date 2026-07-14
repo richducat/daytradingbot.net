@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS activations (
     license_id CHAR(36) NOT NULL,
     device_public_key BINARY(32) NOT NULL,
     activation_secret_hash BINARY(32) NOT NULL,
-    platform ENUM('windows-x64', 'macos-universal') NOT NULL,
+    platform ENUM('macos-universal') NOT NULL,
     status ENUM('active', 'deactivated') NOT NULL DEFAULT 'active',
     activated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     deactivated_at DATETIME(6) NULL,

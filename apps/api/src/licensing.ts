@@ -11,7 +11,7 @@ import type { Pool, PoolClient } from "pg";
 const LEASE_FORMAT_VERSION = 1;
 const LEASE_SECONDS = 7 * 24 * 60 * 60;
 
-export type DesktopPlatform = "windows-x64" | "macos-universal";
+export type DesktopPlatform = "macos-universal";
 
 export type SignedLeaseWire = {
   claims: {

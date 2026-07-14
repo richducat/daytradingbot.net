@@ -9,6 +9,7 @@ const config: ApiConfig = {
   DATABASE_PROVIDER: "postgres",
   DATABASE_URL: "postgresql://unused",
   PUBLIC_SITE_URL: "https://daytradingbot.net",
+  CHECKOUT_ENABLED: true,
   LICENSE_EMAIL_FROM: "licenses@daytradingbot.net",
   SUPPORT_EMAIL: "support@daytradingbot.net",
 };
@@ -118,6 +119,22 @@ describe("control-plane API", () => {
     expect(response.json()).toMatchObject({ error: "activation_unavailable" });
   });
 
+  it("rejects Windows activation because the commercial app is Mac-only", async () => {
+    const app = buildServer(config, { readinessCheck: async () => undefined });
+    servers.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/licenses/activate",
+      payload: {
+        licenseCode: "DTB-FOUNDER-TEST-0001",
+        devicePublicKey: Buffer.alloc(32, 4).toString("base64url"),
+        platform: "windows-x64",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
   it("rejects checkout requests without affirmative risk acceptance", async () => {
     const app = buildServer(config, { readinessCheck: async () => undefined });
     servers.push(app);
@@ -128,6 +145,26 @@ describe("control-plane API", () => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  it("keeps checkout closed until the commercial Mac download is ready", async () => {
+    const app = buildServer({ ...config, CHECKOUT_ENABLED: false }, {
+      readinessCheck: async () => undefined,
+      commerceService: {
+        createCheckoutSession: async () => ({ checkoutUrl: "https://checkout.stripe.com/never" }),
+        checkoutStatus: async () => { throw new Error("not used"); },
+        handleWebhook: async () => undefined,
+      },
+    });
+    servers.push(app);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/checkout/session",
+      payload: { acceptedRiskDisclosure: true },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({ error: "checkout_unavailable" });
   });
 
   it("allows the public site to call checkout without opening CORS to other sites", async () => {

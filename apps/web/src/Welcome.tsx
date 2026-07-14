@@ -8,7 +8,6 @@ type CheckoutResult = {
   emailDelivered: boolean;
   downloads: {
     macos?: string;
-    windows?: string;
   };
 };
 
@@ -128,13 +127,12 @@ export function Welcome() {
               <p className="eyebrow">Step 1</p>
               <h2>{isSandbox ? "Use the private owner demo." : "Download the app."}</h2>
               <p>{isSandbox
-                ? "For the investor demo, use the owner copy already installed on this Mac. Signed public Mac and Windows downloads will appear here for live purchases after release signing is complete."
-                : "Choose the computer you will use. One license can be active on one computer at a time."}</p>
+                ? "For the investor demo, use the private owner copy already installed on this Mac. The signed public Mac download will appear here for live purchases after Apple release signing is complete."
+                : "Download it on the Mac you will use. One license can be active on one Mac at a time."}</p>
             </div>
             {!isSandbox && (
               <div className="download-actions">
                 {result.downloads.macos && <a className="button button-primary" href={result.downloads.macos}>Download for Mac</a>}
-                {result.downloads.windows && <a className="button button-secondary" href={result.downloads.windows}>Download for Windows</a>}
               </div>
             )}
           </section>

@@ -86,7 +86,6 @@ function service(input: {
       stripeWebhookSecret: "whsec_test",
       downloads: {
         macos: "https://releases.daytradingbot.net/DayTradingBot.dmg",
-        windows: "https://releases.daytradingbot.net/DayTradingBot.exe",
       },
     },
     input.mailer,

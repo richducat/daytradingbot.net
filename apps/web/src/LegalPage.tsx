@@ -27,10 +27,10 @@ const legalPages = {
   "/terms/": {
     eyebrow: "Software license terms",
     title: "One license. One active device.",
-    intro: "The launch offer is a one-time $98 software license for one active Windows or Mac device.",
+    intro: "The launch offer is a one-time $98 software license for one active Mac.",
     sections: [
       ["Bot picker and risk acknowledgement", "The questionnaire helps configure the software but does not restrict which released bot a customer may choose. A clear risk acknowledgement may be required before checkout and before Real trading. Neither is investment advice or a guarantee of performance."],
-      ["License and delivery", "The license covers the current DayTradingBot desktop app, guided setup, and v1 updates for one active device. After payment, the activation code and current Mac and Windows downloads are delivered on screen and by email. Venue accounts, market data, transaction fees, taxes, and trading capital are separate."],
+      ["License and delivery", "The license covers the current DayTradingBot Mac app, guided setup, and v1 updates for one active Mac. After payment, the activation code and current Mac download are delivered on screen and by email. Venue accounts, market data, transaction fees, taxes, and trading capital are separate."],
       ["Live use", "Live entries remain disabled until the customer connects a supported account and explicitly enables live operation. Customers may lower risk limits but cannot raise the built-in maximums."],
       ["Refund", "The launch offer includes a 30-day get-running refund for installation or supported connection problems. Trading losses, fees, and strategy performance are not refundable."],
       ["Acceptable use", "The software may not be resold, shared across multiple active devices, used to evade venue eligibility controls, or modified to bypass license, safety, or risk enforcement."],

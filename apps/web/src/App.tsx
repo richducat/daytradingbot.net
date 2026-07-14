@@ -34,8 +34,8 @@ const faqs = [
   ["Can it place real trades?", "The Bluechip founding beta includes a Real option for a supported Robinhood Agentic account. It starts in Practice. You must connect the account, set your limits, and deliberately choose Real before the app can send an order."],
   ["What if the suggested bot is not released?", "You can wait for it or choose a bot that is available. The suggestion never locks you in."],
   ["Why do I have to read the fine print?", "Because Real trading can lose money and automated software can fail. We require a clear risk acknowledgement, but your questionnaire answers do not decide which tools you may use."],
-  ["What does the $98 license include?", "One active Mac or Windows computer, the current Bluechip founding-beta build, guided setup, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
-  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your activation code and the current Mac or Windows download appear there as soon as payment is confirmed, and we send the same details by email."],
+  ["What does the $98 license include?", "One active Mac, the current Bluechip founding-beta build, guided setup, and version 1 updates. Trading capital, venue fees, taxes, and account charges are separate."],
+  ["What happens after I pay?", "Stripe sends you straight to a private delivery page. Your activation code and the current Mac download appear there as soon as payment is confirmed, and we send the same details by email."],
 ] as const;
 
 export function App() {
@@ -87,7 +87,7 @@ export function App() {
         <div className="product-statement">
           <p className="eyebrow">What am I buying?</p>
           <h2>You are buying the app—not sending us trading money.</h2>
-          <p>Install it on your Mac or Windows computer, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
+          <p>Install it on your Mac, connect an account you own, and choose which bot runs. Your money stays with your broker, exchange, or market account.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -168,7 +168,7 @@ export function App() {
           <div>
             <p className="eyebrow">Founding price</p>
             <h2>${siteConfig.founderPrice} once.</h2>
-            <p className="price-qualifier">One active Mac or Windows computer. Version 1 and version 1 updates.</p>
+            <p className="price-qualifier">One active Mac. Version 1 and version 1 updates.</p>
           </div>
           <div className="offer-copy">
             <ul>

@@ -192,18 +192,20 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ acceptedRiskDisclosure: true }),
       });
-      const payload = await response.json() as { checkoutUrl?: unknown };
+      const payload = await response.json() as { checkoutUrl?: unknown; message?: unknown };
       if (!response.ok || typeof payload.checkoutUrl !== "string") {
-        throw new Error("checkout_unavailable");
+        throw new Error(typeof payload.message === "string" ? payload.message : "checkout_unavailable");
       }
       const checkoutUrl = new URL(payload.checkoutUrl);
       if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.stripe.com") {
         throw new Error("invalid_checkout_url");
       }
       window.location.assign(checkoutUrl.toString());
-    } catch {
+    } catch (caught) {
       setStartingCheckout(false);
-      setCheckoutError("Checkout could not start. Please try again. If it keeps happening, email support@daytradingbot.net.");
+      setCheckoutError(caught instanceof Error && caught.message !== "checkout_unavailable"
+        ? caught.message
+        : "Checkout could not start. Please try again. If it keeps happening, email support@daytradingbot.net.");
     }
   }
 
@@ -258,9 +260,9 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
       <section className="match-checkout">
         <div>
           <p className="eyebrow">{available ? "Launch price" : "Your choice is still open"}</p>
-          <h2>{available ? "$98 once. Checkout is open." : `${result.agent} is not released yet. Bluechip is.`}</h2>
+          <h2>{available ? "$98 once. Mac-only launch." : `${result.agent} is not released yet. Bluechip is.`}</h2>
           <p>{available
-            ? "Buy the desktop app through Stripe. Your activation code and Mac or Windows download appear as soon as payment finishes and are also sent by email."
+            ? "Buy the Mac app through Stripe. Checkout opens when the signed Mac download is ready; until then, no card is charged. After payment, your activation code and download appear immediately and are also sent by email."
             : `You can wait for ${result.agent} or start with the available Bluechip bot now. This suggestion never locks you in.`}</p>
           <a className="text-link dark-link" href="/#bots">Compare all bots <span aria-hidden="true">→</span></a>
         </div>

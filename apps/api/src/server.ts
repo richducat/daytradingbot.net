@@ -119,7 +119,6 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
   );
   const downloads: DownloadLinks = {
     ...(config.MACOS_DOWNLOAD_URL ? { macos: config.MACOS_DOWNLOAD_URL } : {}),
-    ...(config.WINDOWS_DOWNLOAD_URL ? { windows: config.WINDOWS_DOWNLOAD_URL } : {}),
   };
   const commerceConfigured = Boolean(
     databaseConfigured
@@ -129,8 +128,7 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
     && config.COMMERCE_ENCRYPTION_KEY
     && config.LICENSE_SECRET_PEPPER
     && config.SMTP_URL
-    && config.MACOS_DOWNLOAD_URL
-    && config.WINDOWS_DOWNLOAD_URL,
+    && config.MACOS_DOWNLOAD_URL,
   );
   const commerceRepository = postgresPool && config.COMMERCE_ENCRYPTION_KEY && config.LICENSE_SECRET_PEPPER
     ? new PostgresCommerceRepository(
@@ -216,7 +214,7 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
           properties: {
             licenseCode: { type: "string", minLength: 16, maxLength: 84 },
             devicePublicKey: { type: "string", pattern: "^[A-Za-z0-9_-]{43}$" },
-            platform: { type: "string", enum: ["windows-x64", "macos-universal"] },
+            platform: { type: "string", enum: ["macos-universal"] },
           },
         },
       },
@@ -310,10 +308,12 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
       },
     },
     async (_request, reply) => {
-      if (!commerceService) {
+      if (!commerceService || !config.CHECKOUT_ENABLED) {
         return reply.code(503).send({
           error: "checkout_unavailable",
-          message: "Checkout is temporarily unavailable. Please try again shortly.",
+          message: config.CHECKOUT_ENABLED
+            ? "Checkout is temporarily unavailable. Please try again shortly."
+            : "Checkout opens after the signed and Apple-notarized Mac download is ready. No card has been charged.",
         });
       }
       try {

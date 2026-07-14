@@ -49,11 +49,12 @@ If the included cPanel email is used, create the mailboxes first and copy the ex
 - `DATABASE_PROVIDER=mysql`
 - `DATABASE_URL_FILE`: `mysql://USER:URL_ENCODED_PASSWORD@localhost/DATABASE`
 - `STRIPE_SECRET_KEY_FILE`, `STRIPE_WEBHOOK_SECRET_FILE`, and the live `STRIPE_PRICE_ID`
+- `CHECKOUT_ENABLED=false` until the signed and notarized Mac installer is published; set it to `true` only after the stable URL passes on a clean Mac
 - `COMMERCE_ENCRYPTION_KEY_FILE`: a random 32-byte base64url value
 - `LICENSE_SIGNING_PRIVATE_KEY_PEM_FILE`: the private half matching the public key embedded in the desktop app
 - `LICENSE_SECRET_PEPPER_FILE`: at least 32 random characters
 - `SMTP_URL_FILE`: an authenticated SMTP URL with a URL-encoded password
-- Both stable installer URLs
+- The stable Mac installer URL
 
 The private signing key, encryption key, database password, Stripe secrets, and SMTP password must never be committed, uploaded to a public document root, or pasted into logs.
 
@@ -64,7 +65,7 @@ Commercial checkout stays unavailable until all of these pass:
 1. `https://api.daytradingbot.net/readyz` returns `{"status":"ready"}` over valid HTTPS.
 2. A Stripe test checkout creates exactly one purchase and one activation code when the webhook is retried.
 3. The buyer receives the same code by email and sees the same code on the welcome page.
-4. A clean Mac and Windows installation can activate, start Practice, connect a supported account, and stop safely.
+4. A clean Mac installation can activate, start Practice, connect a supported account, and stop safely.
 5. A refund or dispute disables the matching activation.
 6. The public checkout is then switched from Stripe test mode to live mode without placing any trade or incurring any hosting purchase.
 

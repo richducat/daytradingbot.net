@@ -70,7 +70,7 @@ describe("license service", () => {
     await expect(service.activate({
       licenseCode: "not-a-code",
       devicePublicKey: Buffer.alloc(32, 8).toString("base64url"),
-      platform: "windows-x64",
+      platform: "macos-universal",
     })).rejects.toMatchObject({ code: "invalid_license" });
   });
 });

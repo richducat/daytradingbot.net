@@ -424,11 +424,7 @@ pub async fn activate_license(
         .json(&ApiActivationRequest {
             license_code: &request.license_code,
             device_public_key: &encoded_public_key,
-            platform: if cfg!(target_os = "windows") {
-                "windows-x64"
-            } else {
-                "macos-universal"
-            },
+            platform: "macos-universal",
         })
         .send()
         .await

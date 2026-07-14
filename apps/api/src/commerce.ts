@@ -15,7 +15,6 @@ const ENCRYPTION_VERSION = 1;
 
 export type DownloadLinks = {
   macos?: string;
-  windows?: string;
 };
 
 export type CheckoutStatus = {
@@ -541,7 +540,6 @@ export class SmtpLicenseMailer implements LicenseMailer {
   }): Promise<void> {
     const downloads = [
       input.downloads.macos ? `Mac: ${input.downloads.macos}` : undefined,
-      input.downloads.windows ? `Windows: ${input.downloads.windows}` : undefined,
     ].filter((value): value is string => Boolean(value));
     await this.transport.sendMail({
       from: this.from,

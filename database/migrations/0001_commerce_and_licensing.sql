@@ -75,7 +75,7 @@ CREATE TABLE activations (
     license_id uuid NOT NULL REFERENCES licenses(license_id),
     device_public_key bytea NOT NULL,
     activation_secret_hash bytea NOT NULL UNIQUE,
-    platform text NOT NULL CHECK (platform IN ('windows-x64', 'macos-universal')),
+    platform text NOT NULL CHECK (platform = 'macos-universal'),
     status activation_status NOT NULL DEFAULT 'active',
     activated_at timestamptz NOT NULL DEFAULT now(),
     deactivated_at timestamptz,
