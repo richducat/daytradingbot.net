@@ -75,7 +75,7 @@
       "status": "published",
       "queueOrder": 1,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-11"
+      "dateModified": "2026-07-17"
     },
     {
       "slug": "are-trading-bots-legal-in-the-us",
@@ -203,7 +203,7 @@
       "status": "published",
       "queueOrder": 3,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-11"
+      "dateModified": "2026-07-17"
     },
     {
       "slug": "how-to-verify-a-trading-bots-track-record",
@@ -446,10 +446,10 @@
         "is-an-ai-trading-bot-safe",
         "what-is-paper-trading-mode"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 7,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-17",
+      "dateModified": "2026-07-17"
     },
     {
       "slug": "how-do-trading-bot-scams-work",
