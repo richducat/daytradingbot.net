@@ -141,7 +141,7 @@
       "status": "published",
       "queueOrder": 2,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-12"
+      "dateModified": "2026-07-18"
     },
     {
       "slug": "robinhood-agentic-trading-api-explained",
@@ -326,7 +326,7 @@
       "status": "published",
       "queueOrder": 5,
       "datePublished": "2026-07-11",
-      "dateModified": "2026-07-11"
+      "dateModified": "2026-07-18"
     },
     {
       "slug": "can-a-trading-bot-promise-results",
@@ -513,10 +513,10 @@
         "can-a-trading-bot-promise-results",
         "are-trading-bot-screenshots-real"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 8,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-18",
+      "dateModified": "2026-07-18"
     },
     {
       "slug": "how-do-trading-bot-vendors-charge",
