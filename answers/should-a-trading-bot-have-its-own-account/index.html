@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Answers: straight talk on trading bots and automated trading | EB28</title>
-  <meta name="description" content="Plain-English answers to the questions retail traders actually ask about trading bots — safety, legality, scams, track records — each one backed by our own public tape." />
+  <title>Should a Trading Bot Have Its Own Account? Yes — Here&#39;s the Architecture | EB28 Answers</title>
+  <meta name="description" content="Yes, always. A bot should live in a dedicated, isolated compartment — a sub-account or separate account — funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from &#39;my savings&#39; to &#39;the $50 I put in the compartment&#39;, and any vendor who resist" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
-  <link rel="canonical" href="https://daytradingbot.net/answers/" />
+  <link rel="canonical" href="https://daytradingbot.net/answers/should-a-trading-bot-have-its-own-account/" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:site_name" content="DayTradingBot.net" />
   <meta property="og:type" content="article" />
-  <meta property="og:title" content="Answers: straight talk on trading bots and automated trading | EB28" />
-  <meta property="og:description" content="Plain-English answers to the questions retail traders actually ask about trading bots — safety, legality, scams, track records — each one backed by our own public tape." />
-  <meta property="og:url" content="https://daytradingbot.net/answers/" />
+  <meta property="og:title" content="Should a Trading Bot Have Its Own Account? Yes — Here&#39;s the Architecture | EB28 Answers" />
+  <meta property="og:description" content="Yes, always. A bot should live in a dedicated, isolated compartment — a sub-account or separate account — funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from &#39;my savings&#39; to &#39;the $50 I put in the compartment&#39;, and any vendor who resist" />
+  <meta property="og:url" content="https://daytradingbot.net/answers/should-a-trading-bot-have-its-own-account/" />
   <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.svg" />
   <style>
@@ -116,7 +116,7 @@
       .tapeline { flex-direction: column; gap: .1rem; }
     }
     </style>
-  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "CollectionPage", "name": "EB28 Answers", "url": "https://daytradingbot.net/answers/", "description": "Plain-English answers to the questions retail traders actually ask about trading bots \u2014 safety, legality, scams, track records \u2014 each one backed by our own public tape.", "publisher": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://daytradingbot.net/"}, {"@type": "ListItem", "position": 2, "name": "Answers", "item": "https://daytradingbot.net/answers/"}]}]</script>
+  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Should a trading bot have its own account?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, always. A bot should live in a dedicated, isolated compartment \u2014 a sub-account or separate account \u2014 funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from 'my savings' to 'the $50 I put in the compartment', and any vendor who resists this structure is asking for more access than the job requires."}}, {"@type": "Question", "name": "Isn't a separate account a hassle?", "acceptedAnswer": {"@type": "Answer", "text": "It is one setup step, and it replaces an unbounded risk with a bounded one. No other single decision in automated trading buys as much safety for as little effort."}}, {"@type": "Question", "name": "What if a vendor says isolation isn't necessary?", "acceptedAnswer": {"@type": "Answer", "text": "That vendor is asking for more access than the job requires, which is itself the answer. Decline."}}, {"@type": "Question", "name": "Can I run multiple bots in one compartment?", "acceptedAnswer": {"@type": "Answer", "text": "You can, but you lose per-bot accountability \u2014 the journal of each strategy gets tangled with the others. One compartment per strategy keeps every record clean."}}]}, {"@context": "https://schema.org", "@type": "Article", "headline": "Should a Trading Bot Have Its Own Account? Yes \u2014 Here's the Architecture", "description": "Yes, always. A bot should live in a dedicated, isolated compartment \u2014 a sub-account or separate account \u2014 funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from 'my savings' to 'the $50 I put in the compartment', and any vendor who resist", "datePublished": "2026-07-21", "dateModified": "2026-07-21", "mainEntityOfPage": "https://daytradingbot.net/answers/should-a-trading-bot-have-its-own-account/", "author": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}, "publisher": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://daytradingbot.net/"}, {"@type": "ListItem", "position": 2, "name": "Answers", "item": "https://daytradingbot.net/answers/"}, {"@type": "ListItem", "position": 3, "name": "Should a trading bot have its own account?", "item": "https://daytradingbot.net/answers/should-a-trading-bot-have-its-own-account/"}]}]</script>
   <script>(function(){fetch('/analytics-config.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(cfg){var id=cfg&&String(cfg.ga4MeasurementId||'').trim();if(!id)return;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(id);document.head.appendChild(s);window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config',id);}).catch(function(){});})();</script>
 </head>
 <body>
@@ -141,25 +141,59 @@
 <main>
 
       <section class="hero wrap">
-        <span class="pill">EB28 Answers</span>
-        <h1>Trading-bot questions, answered without the hype</h1>
-        <p class="lead">The questions retail traders actually type into a search bar — safety, legality,
-          scams, track records — answered in plain English by a team that runs its own desk in public.
-          Every page carries data from our live tape, and none of it is investment advice.</p>
-        <div class="stats">
-          <div class="stat"><b>10</b><span>answers live</span></div>
-          <div class="stat"><b>15</b><span>market days on our tape</span></div>
-          <div class="stat"><b>696</b><span>setups reviewed</span></div>
-          <div class="stat"><b>0</b><span>orders placed</span></div>
+        <span class="pill">EB28 Answers · retail trading trust</span>
+        <h1>Should a trading bot have its own account?</h1>
+        <div class="shortanswer">
+          <span class="label">Short answer</span>
+          Yes, always. A bot should live in a dedicated, isolated compartment — a sub-account or separate account — funded with only the amount you have deliberately decided to expose. Isolation converts the worst-case scenario from &#39;my savings&#39; to &#39;the $50 I put in the compartment&#39;, and any vendor who resists this structure is asking for more access than the job requires.
         </div>
-        <div class="btnrow">
-          <a class="btn" href="/fundmanager/">Watch the live tape</a>
-          <a class="btn ghost" href="/tape/">Daily shift reports</a>
+        <div class="meta-row">
+          <span class="meta-chip">Last updated July 21, 2026</span>
+          <span class="meta-chip">First published July 21, 2026</span>
+          <span class="meta-chip">Backed by our public tape</span>
         </div>
       </section>
+      <section class="section wrap"><h2>Why isolation is the single highest-value safety feature</h2><p>Software fails in creative ways: bugs, bad data, unexpected market conditions, or plain misdesign. You cannot audit every line of a vendor&#39;s code, but you can cap the blast radius. An isolated account with a deliberate balance is a structural guarantee that no failure mode, however exotic, reaches beyond it.</p><p>This is why Robinhood&#39;s agentic architecture is built around a dedicated sub-account: the agent operates inside a compartment you create, and the rest of your money is not merely off-limits by policy — it is unreachable by construction. Our Bluechip desk requires this setup; there is no supported way to point it at a main account.</p><ul><li>Blast radius: worst case is capped at the compartment&#39;s balance.</li><li>Clean accounting: the compartment&#39;s history is entirely the bot&#39;s record.</li><li>Psychological clarity: money in the compartment is money you decided to put at risk.</li><li>Instant defunding: emptying the compartment is a kill switch the broker enforces.</li></ul></section><section class="section wrap"><h2>How to size the compartment</h2><p>Fund it with an amount whose complete loss would annoy you but change nothing about your life. During any evaluation period, smaller is smarter — our own desk trades $5 fractional clips during its beta precisely so the compartment can stay small while still generating a real, checkable record.</p><p>Resist the urge to scale up because the record looks good. Scale decisions should follow time and variety of conditions observed, not recent results — and the compartment structure means you can always scale deliberately, rather than being scaled by enthusiasm.</p></section>
+      
       <section class="section wrap">
-        <p class="eyebrow">All answers</p>
-        <div class="grid"><a class="card" href="/answers/should-a-trading-bot-have-its-own-account/"><span class="kicker">Updated July 21, 2026</span><h3>Should a trading bot have its own account?</h3><p>Yes, always. A bot should live in a dedicated, isolated compartment — a sub-account or separate account — funded with only the amount you have deliberately deci…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/how-do-trading-bot-vendors-charge/"><span class="kicker">Updated July 19, 2026</span><h3>How do trading bot vendors charge, and why does it matter?</h3><p>The pricing model tells you whose side the vendor is on. Flat license fees and subscriptions keep incentives clean: the vendor is paid for software, not for you…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/how-do-trading-bot-scams-work/"><span class="kicker">Updated July 18, 2026</span><h3>How do trading bot scams work?</h3><p>Most trading bot scams never trade at all — the &#39;bot&#39; is a story used to collect deposits. The playbook is consistent: manufactured social proof, screenshots of…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/what-is-a-kill-switch-in-automated-trading/"><span class="kicker">Updated July 17, 2026</span><h3>What is a kill switch in automated trading?</h3><p>A kill switch is a single control that stops all automated trading activity immediately — no queue, no wind-down period, no support ticket. In a well-designed r…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/can-a-trading-bot-promise-results/"><span class="kicker">Updated July 19, 2026</span><h3>Can a trading bot promise you results?</h3><p>No. Markets are uncertain, trading involves risk of loss, and no software — however sophisticated — can promise what an uncertain market will do. Honest vendors…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/what-is-paper-trading-mode/"><span class="kicker">Updated July 18, 2026</span><h3>What is paper trading mode?</h3><p>Paper trading mode is a full dress rehearsal: the software watches real market prices and records every decision it would make, but no real order is placed and …</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/how-to-verify-a-trading-bots-track-record/"><span class="kicker">Updated July 19, 2026</span><h3>How do you verify a trading bot&#39;s track record?</h3><p>Demand a continuous, timestamped, public record that includes the losing days — not a screenshot, not a highlight reel, not a backtest. A verifiable track recor…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/robinhood-agentic-trading-api-explained/"><span class="kicker">Updated July 21, 2026</span><h3>What is Robinhood&#39;s Agentic Trading API?</h3><p>Robinhood&#39;s Agentic Trading API is the official interface that lets software agents interact with a Robinhood account — inside a dedicated agentic sub-account, …</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/are-trading-bots-legal-in-the-us/"><span class="kicker">Updated July 18, 2026</span><h3>Are trading bots legal in the US?</h3><p>Yes — using software to place trades in your own brokerage account is legal in the United States, and brokers increasingly offer official APIs built for exactly…</p><span class="read">Read the answer →</span></a><a class="card" href="/answers/is-an-ai-trading-bot-safe/"><span class="kicker">Updated July 21, 2026</span><h3>Is an AI trading bot safe?</h3><p>An AI trading bot is only as safe as its permissions, its account isolation, and your ability to stop it. The software category is not inherently dangerous, but…</p><span class="read">Read the answer →</span></a></div>
+        <p class="eyebrow">First-party data — from our own desk</p>
+        <div class="tapepanel">
+          <div class="panel-head">
+            <span class="panel-title">The EB28 Bluechip tape, as of July 21, 2026</span>
+            <span class="livechip"><i></i>Public record</span>
+          </div>
+          <div class="tapeline"><span class="t">record</span><span>15 market days journaled ·
+            1014 cycles run · 696 setups reviewed · 0 orders placed ·
+            mode: review-only (paper)</span></div>
+          <div class="tapeline"><span class="t">why</span><span>We publish this on every answer page because advice
+            about verifying trading software rings hollow without a record of our own to check. Quiet days and
+            warnings included.</span></div>
+          <div class="tapeline"><span class="t">check</span><span>Live dashboard: <a href="/fundmanager/"
+            style="color:#fbbf24">eb28.co/fundmanager</a> · daily archive: <a href="/tape/"
+            style="color:#fbbf24">eb28.co/tape</a></span></div>
+        </div>
+      </section>
+    
+      <section class="section wrap faq"><h2>More questions people ask</h2><details><summary>Isn&#39;t a separate account a hassle?</summary><p>It is one setup step, and it replaces an unbounded risk with a bounded one. No other single decision in automated trading buys as much safety for as little effort.</p></details><details><summary>What if a vendor says isolation isn&#39;t necessary?</summary><p>That vendor is asking for more access than the job requires, which is itself the answer. Decline.</p></details><details><summary>Can I run multiple bots in one compartment?</summary><p>You can, but you lose per-bot accountability — the journal of each strategy gets tangled with the others. One compartment per strategy keeps every record clean.</p></details></section>
+      
+          <section class="section wrap sources">
+            <h2>Regulator resources and sources</h2>
+            <p>Independent, official reading — not affiliated with EB28:</p>
+            <ul><li><a href="https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins" rel="noopener noreferrer" target="_blank">SEC / Investor.gov alerts and bulletins</a></li><li><a href="https://www.finra.org/investors/insights" rel="noopener noreferrer" target="_blank">FINRA investor insights</a></li></ul>
+          </section>
+        
+      
+          <section class="section wrap">
+            <p class="eyebrow">Keep going</p>
+            <div class="grid"><a class="card" href="/answers/robinhood-agentic-trading-api-explained/"><span class="kicker">Related answer</span><h3>What is Robinhood&#39;s Agentic Trading API?</h3><span class="read">Read the answer →</span></a><a class="card" href="/answers/is-an-ai-trading-bot-safe/"><span class="kicker">Related answer</span><h3>Is an AI trading bot safe?</h3><span class="read">Read the answer →</span></a><a class="card" href="/answers/what-is-a-kill-switch-in-automated-trading/"><span class="kicker">Related answer</span><h3>What is a kill switch in automated trading?</h3><span class="read">Read the answer →</span></a></div>
+          </section>
+        
+      <section class="section wrap">
+        <div class="btnrow">
+          <a class="btn" href="/fundmanager/">Watch our live tape</a>
+          <a class="btn ghost" href="/answers/">All answers</a>
+          <a class="btn ghost" href="/bluechip/">The desk behind this site</a>
+        </div>
       </section>
     
 </main>

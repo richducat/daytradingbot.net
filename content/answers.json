@@ -75,7 +75,7 @@
       "status": "published",
       "queueOrder": 1,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-17"
+      "dateModified": "2026-07-21"
     },
     {
       "slug": "are-trading-bots-legal-in-the-us",
@@ -203,7 +203,7 @@
       "status": "published",
       "queueOrder": 3,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-17"
+      "dateModified": "2026-07-21"
     },
     {
       "slug": "how-to-verify-a-trading-bots-track-record",
@@ -637,10 +637,10 @@
         "is-an-ai-trading-bot-safe",
         "what-is-a-kill-switch-in-automated-trading"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 10,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-21",
+      "dateModified": "2026-07-21"
     },
     {
       "slug": "what-is-a-public-trade-tape",
