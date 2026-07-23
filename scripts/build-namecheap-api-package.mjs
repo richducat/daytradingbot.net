@@ -35,6 +35,7 @@ const productionPackage = {
   scripts: {
     start: "node dist/index.js",
     "run:web-worker": "node dist/run-worker.js",
+    "migrate:mysql": "node dist/apply-mysql-migration.js",
     "verify:mysql": "node dist/verify-mysql-commercial.js",
   },
   dependencies: apiPackage.dependencies,

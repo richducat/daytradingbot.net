@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
+    "migrate:mysql": "node dist/apply-mysql-migration.js",
     "start": "node dist/index.js",
     "run:web-worker": "node dist/run-worker.js",
     "provision:owner-license": "tsx src/provision-owner-license.ts",
