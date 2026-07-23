@@ -34,6 +34,7 @@ const CYCLE_SECONDS: u64 = 15 * 60;
 const MAX_TRADES_PER_CYCLE: usize = 1;
 const START_PREFLIGHT_TIMEOUT_SECONDS: u64 = 25;
 const REAL_AUTHORIZATION_HOURS: i64 = 24;
+const UNCERTAIN_PLACEMENT_ACTIVITY: &str = "Robinhood has not confirmed whether this order was accepted. Before any new trade, Bluechip will safely check it again using the exact same Robinhood order reference.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeTradingMode {
@@ -361,18 +362,15 @@ async fn run_cycle(
         .await
         .map_err(|_| "ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED")?;
     if config.mode == NativeTradingMode::Real {
-        let recovery_consumed_cycle = reconcile_orders(
+        let recovery_outcome = reconcile_orders(
             ledger.inner(),
             &mut session,
             config,
             ReconcileMode::Running { app, generation },
         )
         .await?;
-        if recovery_consumed_cycle {
-            return Ok(
-                "Bluechip finished checking one earlier Robinhood order. It will wait until the next market check before considering another trade."
-                    .into(),
-            );
+        if let Some(outcome) = recovery_outcome {
+            return Ok(recovery_cycle_message(outcome).into());
         }
     }
 
@@ -693,7 +691,7 @@ async fn run_cycle(
                     AgentActivityKind::Error,
                     Some(symbol.as_str()),
                     Some(amount),
-                    "Robinhood's response was unclear. Bluechip will not retry this trade.",
+                    UNCERTAIN_PLACEMENT_ACTIVITY,
                 )?;
                 return Err("ORDER_RECONCILIATION_REQUIRED");
             }
@@ -712,7 +710,7 @@ async fn reconcile_orders(
     session: &mut RobinhoodTradingSession<'_>,
     config: &BluechipConfig,
     mode: ReconcileMode<'_>,
-) -> Result<bool, &'static str> {
+) -> Result<Option<RecoveryOutcome>, &'static str> {
     let attempts = ledger
         .unresolved_submissions()
         .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
@@ -743,18 +741,19 @@ async fn reconcile_orders(
     }
 
     let ReconcileMode::Running { app, generation } = mode else {
-        return Ok(false);
+        return Ok(None);
     };
     let Some(attempt) = first_recovery_candidate(&attempts) else {
-        return Ok(false);
+        return Ok(None);
     };
 
     // A recovery uses Robinhood's real placement endpoint, even though the
     // persisted ref_id makes it idempotent. End this cycle after exactly one
     // such call so multiple unresolved records can never fan out into multiple
     // placement calls.
-    recover_unknown_order(ledger, session, config, attempt, app, generation).await?;
-    Ok(true)
+    recover_unknown_order(ledger, session, config, attempt, app, generation)
+        .await
+        .map(Some)
 }
 
 fn first_recovery_candidate(
@@ -774,10 +773,21 @@ enum ReconcileMode<'a> {
     Running { app: &'a AppHandle, generation: u64 },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RecoveryOutcome {
     Acknowledged,
     Rejected,
+}
+
+fn recovery_cycle_message(outcome: RecoveryOutcome) -> &'static str {
+    match outcome {
+        RecoveryOutcome::Acknowledged => {
+            "Robinhood found the earlier order. Bluechip recorded its current status and will wait until the next market check before considering another trade."
+        }
+        RecoveryOutcome::Rejected => {
+            "Robinhood confirmed the earlier order was not accepted. No order was opened. Bluechip will wait until the next market check before considering another trade."
+        }
+    }
 }
 
 /// Robinhood documents `ref_id` as an upstream idempotency key: sending the
@@ -820,15 +830,80 @@ async fn recover_unknown_order(
                 .map_err(|_| "ROBINHOOD_ORDER_CHECK_FAILED")?
                 .ok_or("ORDER_RECONCILIATION_REQUIRED")?;
             settle_order(ledger, config, attempt.intent_id, &order)?;
+            record_recovered_order_activity(ledger, config, attempt, &order)?;
             Ok(RecoveryOutcome::Acknowledged)
         }
         Err(RobinhoodPlacementError::Rejected) => {
             ledger
                 .reject_unknown_open_submission(attempt.intent_id, "idempotent_recovery_rejected")
                 .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+            record_activity(
+                ledger,
+                config,
+                AgentActivityKind::Skipped,
+                Some(attempt.instrument.as_str()),
+                None,
+                "Robinhood confirmed the earlier order was not accepted. No order was opened.",
+            )?;
             Ok(RecoveryOutcome::Rejected)
         }
-        Err(RobinhoodPlacementError::Unknown) => Err("ORDER_RECONCILIATION_REQUIRED"),
+        Err(RobinhoodPlacementError::Unknown) => {
+            record_activity(
+                ledger,
+                config,
+                AgentActivityKind::Error,
+                Some(attempt.instrument.as_str()),
+                None,
+                "Robinhood still has not confirmed the earlier order. Bluechip stopped before sending any new trade.",
+            )?;
+            Err("ORDER_RECONCILIATION_REQUIRED")
+        }
+    }
+}
+
+fn record_recovered_order_activity(
+    ledger: &Ledger,
+    config: &BluechipConfig,
+    attempt: &daytradingbot_ledger::SubmissionAttemptRecord,
+    order: &RobinhoodEquityOrder,
+) -> Result<(), &'static str> {
+    let (kind, message) = recovered_order_activity(order.state);
+    record_activity(
+        ledger,
+        config,
+        kind,
+        Some(attempt.instrument.as_str()),
+        None,
+        message,
+    )
+}
+
+fn recovered_order_activity(state: RobinhoodEquityOrderState) -> (AgentActivityKind, &'static str) {
+    match state {
+        RobinhoodEquityOrderState::Pending => (
+            AgentActivityKind::OrderSubmitted,
+            "Robinhood found the earlier order. It is waiting to be filled.",
+        ),
+        RobinhoodEquityOrderState::PartiallyFilled => (
+            AgentActivityKind::OrderSubmitted,
+            "Robinhood found the earlier order. It is partially filled and remains open.",
+        ),
+        RobinhoodEquityOrderState::Filled => (
+            AgentActivityKind::OrderSubmitted,
+            "Robinhood found the earlier order and reports it as filled.",
+        ),
+        RobinhoodEquityOrderState::Canceled => (
+            AgentActivityKind::Skipped,
+            "Robinhood found the earlier order and reports it as canceled.",
+        ),
+        RobinhoodEquityOrderState::Rejected => (
+            AgentActivityKind::Skipped,
+            "Robinhood found the earlier order and reports it as rejected. No order remains open.",
+        ),
+        RobinhoodEquityOrderState::Unknown => (
+            AgentActivityKind::OrderSubmitted,
+            "Robinhood found the earlier order, but its current status is still updating.",
+        ),
     }
 }
 
@@ -1235,6 +1310,32 @@ mod tests {
         let selected = first_recovery_candidate(&attempts).expect("one recovery candidate");
         assert_eq!(selected.intent_id, first_intent_id);
         assert_ne!(selected.intent_id, second_intent_id);
+    }
+
+    #[test]
+    fn uncertain_and_recovered_order_copy_is_truthful() {
+        assert!(UNCERTAIN_PLACEMENT_ACTIVITY.contains("exact same Robinhood order reference"));
+        assert!(!UNCERTAIN_PLACEMENT_ACTIVITY.contains("will not retry"));
+
+        assert!(
+            recovery_cycle_message(RecoveryOutcome::Acknowledged)
+                .starts_with("Robinhood found the earlier order.")
+        );
+        assert!(
+            recovery_cycle_message(RecoveryOutcome::Rejected)
+                .contains("earlier order was not accepted")
+        );
+
+        let (pending_kind, pending_message) =
+            recovered_order_activity(RobinhoodEquityOrderState::Pending);
+        assert_eq!(pending_kind, AgentActivityKind::OrderSubmitted);
+        assert!(pending_message.contains("waiting to be filled"));
+
+        let (rejected_kind, rejected_message) =
+            recovered_order_activity(RobinhoodEquityOrderState::Rejected);
+        assert_eq!(rejected_kind, AgentActivityKind::Skipped);
+        assert!(rejected_message.contains("rejected"));
+        assert!(!rejected_message.contains("order_id"));
     }
 
     #[test]
