@@ -141,7 +141,7 @@
       "status": "published",
       "queueOrder": 2,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-18"
+      "dateModified": "2026-07-22"
     },
     {
       "slug": "robinhood-agentic-trading-api-explained",
@@ -449,7 +449,7 @@
       "status": "published",
       "queueOrder": 7,
       "datePublished": "2026-07-17",
-      "dateModified": "2026-07-17"
+      "dateModified": "2026-07-22"
     },
     {
       "slug": "how-do-trading-bot-scams-work",
@@ -699,10 +699,10 @@
         "are-trading-bot-screenshots-real",
         "what-is-paper-trading-mode"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 11,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-22",
+      "dateModified": "2026-07-22"
     },
     {
       "slug": "is-a-trading-bot-the-same-as-financial-advice",
