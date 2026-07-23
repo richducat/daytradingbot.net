@@ -14,6 +14,21 @@ interface LicenseStatusRow extends RowDataPacket {
   status: string;
 }
 
+interface TableNameRow extends RowDataPacket {
+  table_name: string;
+}
+
+const forbiddenSharedHostTables = [
+  "web_oauth_states",
+  "web_real_authorizations",
+  "web_trade_fills",
+  "web_trade_intents",
+  "web_trading_activity",
+  "web_trading_connections",
+  "web_trading_settings",
+  "web_worker_status",
+] as const;
+
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
@@ -35,6 +50,19 @@ const pepper = randomBytes(32).toString("base64url");
 let purchaseId: string | undefined;
 
 try {
+  const [forbiddenTables] = await pool.query<TableNameRow[]>(
+    `SELECT table_name
+       FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_name IN (${forbiddenSharedHostTables.map(() => "?").join(", ")})`,
+    [...forbiddenSharedHostTables],
+  );
+  assert.deepEqual(
+    forbiddenTables.map((row) => row.table_name).sort(),
+    [],
+    "shared hosting still contains retired brokerage or trading tables",
+  );
+
   const commerce = new MySqlCommerceRepository(pool, encryptionKey, pepper);
   const first = await commerce.provisionPaidPurchase({
     sessionId,
@@ -81,21 +109,12 @@ try {
   const browser = new MySqlWebAppRepository(
     pool,
     randomBytes(32).toString("base64url"),
-    randomBytes(32).toString("base64url"),
     pepper,
   );
   const browserSession = await browser.createSession(first.activationCode);
   const authenticated = await browser.authenticate(browserSession.sessionToken);
   assert.equal(authenticated.licenseId, activation.signedLease.claims.license_id);
-  await browser.ensureSettings(authenticated.licenseId);
-  await browser.saveSettings(authenticated.licenseId, "practice", 1_000, 200);
-  await browser.recordActivity(
-    authenticated.licenseId,
-    "practice",
-    "market_check",
-    "Browser app database verification.",
-  );
-  assert.equal((await browser.listActivity(authenticated.licenseId)).length, 1);
+  await browser.revokeSession(authenticated.sessionId);
 
   await commerce.markPurchaseByPaymentIntent(paymentIntentId, "refunded");
   const [rows] = await pool.execute<LicenseStatusRow[]>(
@@ -103,46 +122,9 @@ try {
     [first.purchaseId],
   );
   assert.equal(rows[0]?.status, "refunded");
-  process.stdout.write("MariaDB commerce, browser session, settings, activity, activation, renewal, delivery, and refund flow verified.\n");
+  process.stdout.write("MariaDB commerce, browser session, activation, renewal, delivery, and refund flow verified.\n");
 } finally {
   if (purchaseId) {
-    await pool.execute(
-      `DELETE f FROM web_trade_fills f
-       JOIN web_trade_intents i ON i.intent_id = f.intent_id
-       JOIN licenses l ON l.license_id = i.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
-    await pool.execute(
-      `DELETE i FROM web_trade_intents i
-       JOIN licenses l ON l.license_id = i.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
-    await pool.execute(
-      `DELETE a FROM web_trading_activity a
-       JOIN licenses l ON l.license_id = a.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
-    await pool.execute(
-      `DELETE s FROM web_trading_settings s
-       JOIN licenses l ON l.license_id = s.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
-    await pool.execute(
-      `DELETE o FROM web_oauth_states o
-       JOIN licenses l ON l.license_id = o.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
-    await pool.execute(
-      `DELETE c FROM web_trading_connections c
-       JOIN licenses l ON l.license_id = c.license_id
-       WHERE l.purchase_id = ?`,
-      [purchaseId],
-    );
     await pool.execute(
       `DELETE s FROM web_sessions s
        JOIN licenses l ON l.license_id = s.license_id

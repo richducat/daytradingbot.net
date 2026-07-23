@@ -116,7 +116,7 @@
       .tapeline { flex-direction: column; gap: .1rem; }
     }
     </style>
-  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a public trade tape?", "acceptedAnswer": {"@type": "Answer", "text": "A public trade tape is a continuously published record of every decision a trading operation makes \u2014 entries, exits, passes, and quiet days \u2014 visible to anyone, as it happens. It is the strongest transparency standard a trading product can adopt, because it removes the vendor's ability to curate the story after outcomes are known."}}, {"@type": "Question", "name": "Is a live dashboard the same as a tape?", "acceptedAnswer": {"@type": "Answer", "text": "A dashboard shows current state; a tape preserves history. You need both: the dashboard for what is true now, the tape for what has been true all along."}}, {"@type": "Question", "name": "Why would a vendor publish losing days voluntarily?", "acceptedAnswer": {"@type": "Answer", "text": "Because it is the only way to be believed by careful buyers. A record with losses in it is evidence; a record without them is advertising."}}, {"@type": "Question", "name": "Where is your tape?", "acceptedAnswer": {"@type": "Answer", "text": "The live dashboard is at daytradingbot.net/fundmanager, and the daily archive \u2014 one page per market day, generated from the desk journal \u2014 is at daytradingbot.net/tape."}}]}, {"@context": "https://schema.org", "@type": "Article", "headline": "What Is a Public Trade Tape? The Transparency Standard for Trading Bots", "description": "A public trade tape is a continuously published record of every decision a trading operation makes \u2014 entries, exits, passes, and quiet days \u2014 visible to anyone, as it happens. It is the strongest transparency standard a trading product can adopt, because it removes the vendor's ability to curate the", "datePublished": "2026-07-22", "dateModified": "2026-07-22", "mainEntityOfPage": "https://daytradingbot.net/answers/what-is-a-public-trade-tape/", "author": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}, "publisher": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://daytradingbot.net/"}, {"@type": "ListItem", "position": 2, "name": "Answers", "item": "https://daytradingbot.net/answers/"}, {"@type": "ListItem", "position": 3, "name": "What is a public trade tape?", "item": "https://daytradingbot.net/answers/what-is-a-public-trade-tape/"}]}]</script>
+  <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a public trade tape?", "acceptedAnswer": {"@type": "Answer", "text": "A public trade tape is a continuously published record of every decision a trading operation makes \u2014 entries, exits, passes, and quiet days \u2014 visible to anyone, as it happens. It is the strongest transparency standard a trading product can adopt, because it removes the vendor's ability to curate the story after outcomes are known."}}, {"@type": "Question", "name": "Is a live dashboard the same as a tape?", "acceptedAnswer": {"@type": "Answer", "text": "A dashboard shows current state; a tape preserves history. You need both: the dashboard for what is true now, the tape for what has been true all along."}}, {"@type": "Question", "name": "Why would a vendor publish losing days voluntarily?", "acceptedAnswer": {"@type": "Answer", "text": "Because it is the only way to be believed by careful buyers. A record with losses in it is evidence; a record without them is advertising."}}, {"@type": "Question", "name": "Where is your tape?", "acceptedAnswer": {"@type": "Answer", "text": "The public tape and daily archive are at daytradingbot.net/tape."}}]}, {"@context": "https://schema.org", "@type": "Article", "headline": "What Is a Public Trade Tape? The Transparency Standard for Trading Bots", "description": "A public trade tape is a continuously published record of every decision a trading operation makes \u2014 entries, exits, passes, and quiet days \u2014 visible to anyone, as it happens. It is the strongest transparency standard a trading product can adopt, because it removes the vendor's ability to curate the", "datePublished": "2026-07-22", "dateModified": "2026-07-22", "mainEntityOfPage": "https://daytradingbot.net/answers/what-is-a-public-trade-tape/", "author": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}, "publisher": {"@type": "Organization", "name": "EB28", "url": "https://daytradingbot.net"}}, {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://daytradingbot.net/"}, {"@type": "ListItem", "position": 2, "name": "Answers", "item": "https://daytradingbot.net/answers/"}, {"@type": "ListItem", "position": 3, "name": "What is a public trade tape?", "item": "https://daytradingbot.net/answers/what-is-a-public-trade-tape/"}]}]</script>
   <script>(function(){fetch('/analytics-config.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(cfg){var id=cfg&&String(cfg.ga4MeasurementId||'').trim();if(!id)return;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(id);document.head.appendChild(s);window.dataLayer=window.dataLayer||[];function gtag(){window.dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config',id);}).catch(function(){});})();</script>
 </head>
 <body>
@@ -128,7 +128,7 @@
           <span>DayTradingBot <span class="sub">· by EB28</span></span>
         </a>
         <nav class="nav-links" aria-label="Primary">
-          <a href="/fundmanager/">Live tape</a>
+          <a href="/tape/">Live tape</a>
           <a href="/tape/">Daily archive</a>
           <a href="/weekly/">Weekly</a>
           <a href="/answers/" style="color:var(--ink);font-weight:700">Answers</a>
@@ -136,7 +136,7 @@
         </nav>
       </div>
     </header>
-    <a class="banner" href="/fundmanager/">📡 The tape is live right now — watch the desk work before you believe a word we say →</a>
+    <a class="banner" href="/tape/">📡 The tape is live right now — watch the desk work before you believe a word we say →</a>
     
 <main>
 
@@ -168,13 +168,12 @@
           <div class="tapeline"><span class="t">why</span><span>We publish this on every answer page because advice
             about verifying trading software rings hollow without a record of our own to check. Quiet days and
             warnings included.</span></div>
-          <div class="tapeline"><span class="t">check</span><span>Live dashboard: <a href="/fundmanager/"
-            style="color:#fbbf24">eb28.co/fundmanager</a> · daily archive: <a href="/tape/"
-            style="color:#fbbf24">eb28.co/tape</a></span></div>
+          <div class="tapeline"><span class="t">check</span><span>Public tape and daily archive: <a href="/tape/"
+            style="color:#fbbf24">daytradingbot.net/tape</a></span></div>
         </div>
       </section>
     
-      <section class="section wrap faq"><h2>More questions people ask</h2><details><summary>Is a live dashboard the same as a tape?</summary><p>A dashboard shows current state; a tape preserves history. You need both: the dashboard for what is true now, the tape for what has been true all along.</p></details><details><summary>Why would a vendor publish losing days voluntarily?</summary><p>Because it is the only way to be believed by careful buyers. A record with losses in it is evidence; a record without them is advertising.</p></details><details><summary>Where is your tape?</summary><p>The live dashboard is at daytradingbot.net/fundmanager, and the daily archive — one page per market day, generated from the desk journal — is at daytradingbot.net/tape.</p></details></section>
+      <section class="section wrap faq"><h2>More questions people ask</h2><details><summary>Is a live dashboard the same as a tape?</summary><p>A dashboard shows current state; a tape preserves history. You need both: the dashboard for what is true now, the tape for what has been true all along.</p></details><details><summary>Why would a vendor publish losing days voluntarily?</summary><p>Because it is the only way to be believed by careful buyers. A record with losses in it is evidence; a record without them is advertising.</p></details><details><summary>Where is your tape?</summary><p>The public tape and daily archive are at daytradingbot.net/tape.</p></details></section>
       
           <section class="section wrap sources">
             <h2>Regulator resources and sources</h2>
@@ -190,7 +189,7 @@
         
       <section class="section wrap">
         <div class="btnrow">
-          <a class="btn" href="/fundmanager/">Watch our live tape</a>
+          <a class="btn" href="/tape/">Watch our live tape</a>
           <a class="btn ghost" href="/answers/">All answers</a>
           <a class="btn ghost" href="/bluechip/">The desk behind this site</a>
         </div>
@@ -202,7 +201,7 @@
     <footer class="site-footer">
       <div class="wrap footer-inner">
         <span>© 2026 EB28 · DayTradingBot.net · Every number on this page comes from our own desk journal and public tape.</span>
-        <span><a href="/fundmanager/">Live tape</a> · <a href="/tape/">Daily archive</a> ·
+        <span><a href="/tape/">Live tape</a> · <a href="/tape/">Daily archive</a> ·
           <a href="/weekly/">Weekly</a> · <a href="/answers/">Answers</a> ·
           <a href="https://eb28.co/blog/">EB28 blog</a> · <a href="/sitemap.xml">Sitemap</a></span>
       </div>

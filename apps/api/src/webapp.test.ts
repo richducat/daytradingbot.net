@@ -1,13 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   clearSessionCookie,
+  MySqlWebAppRepository,
   parseSessionCookie,
   sessionCookie,
+  WebAppService,
   webSessionCookieName,
-  workerSecretMatches,
 } from "./webapp.js";
 
-describe("browser app security helpers", () => {
+describe("browser access security", () => {
   it("uses a host-only secure HttpOnly session cookie", () => {
     const token = "a".repeat(43);
     const header = sessionCookie(token);
@@ -20,10 +21,34 @@ describe("browser app security helpers", () => {
     expect(clearSessionCookie()).toContain("Max-Age=0");
   });
 
-  it("rejects malformed cookies and worker secrets", () => {
+  it("rejects malformed session cookies", () => {
     expect(parseSessionCookie(`${webSessionCookieName}=short`)).toBeUndefined();
-    expect(workerSecretMatches("x".repeat(32), "x".repeat(32))).toBe(true);
-    expect(workerSecretMatches("x".repeat(32), "x".repeat(31))).toBe(false);
-    expect(workerSecretMatches("short", "short")).toBe(false);
+    expect(parseSessionCookie(undefined)).toBeUndefined();
+  });
+
+  it("returns entitlement only and enforces the session CSRF token", async () => {
+    const repository = {
+      createSession: vi.fn(),
+      authenticate: vi.fn(),
+      revokeSession: vi.fn(async () => undefined),
+    };
+    const service = new WebAppService(repository as unknown as MySqlWebAppRepository);
+    const session = {
+      licenseId: "license-1",
+      sessionId: "session-1",
+      csrfToken: "c".repeat(43),
+      expiresAt: new Date("2026-07-22T12:00:00.000Z"),
+    };
+
+    expect(await service.dashboard(session.licenseId)).toEqual({
+      app: "daytradingbot-web",
+      entitlement: { status: "active" },
+    });
+    expect(() => service.requireCsrf(session, "x".repeat(43))).toThrowError(
+      expect.objectContaining({ code: "invalid_csrf" }),
+    );
+    expect(() => service.requireCsrf(session, session.csrfToken)).not.toThrow();
+    await service.logout(session);
+    expect(repository.revokeSession).toHaveBeenCalledWith("session-1");
   });
 });

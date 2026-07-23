@@ -22,7 +22,6 @@ import {
   PostgresLicenseRepository,
   type DesktopPlatform,
 } from "./licensing.js";
-import { launchPolicy } from "./policy.js";
 import {
   clearSessionCookie,
   MySqlWebAppRepository,
@@ -32,7 +31,6 @@ import {
   WebAppService,
   type WebAppOperations,
   type WebSession,
-  workerSecretMatches,
 } from "./webapp.js";
 
 type ServerDependencies = {
@@ -86,8 +84,7 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
   const app = Fastify({
     bodyLimit: 64 * 1024,
     trustProxy: ["127.0.0.1", "::1"],
-    // OAuth callbacks contain a short-lived authorization code in the query
-    // string. Disable framework request logs so that code never reaches disk.
+    // Access and activation codes must never reach request logs.
     logController: new LogController({ disableRequestLogging: true }),
     logger,
   });
@@ -181,18 +178,13 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
     config.WEBAPP_ENABLED
     && mysqlPool
     && config.WEB_SESSION_SECRET
-    && config.TRADING_CREDENTIAL_ENCRYPTION_KEY
     && config.LICENSE_SECRET_PEPPER
       ? new WebAppService(
         new MySqlWebAppRepository(
           mysqlPool,
           config.WEB_SESSION_SECRET,
-          config.TRADING_CREDENTIAL_ENCRYPTION_KEY,
           config.LICENSE_SECRET_PEPPER,
         ),
-        config.PUBLIC_API_URL,
-        config.PUBLIC_SITE_URL,
-        config.REAL_TRADING_ENABLED,
       )
       : undefined
   );
@@ -204,10 +196,6 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
     }
     if (config.NODE_ENV === "production" && config.WEBAPP_ENABLED && !webAppService) {
       throw new Error("browser app services are not configured");
-    }
-    if (config.NODE_ENV === "production" && config.WEBAPP_ENABLED) {
-      if (!config.WORKER_SECRET) throw new Error("browser trading worker is not configured");
-      if (!await webAppService?.workerReady()) throw new Error("browser trading worker is stale");
     }
   });
 
@@ -241,8 +229,6 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
       return reply.code(503).send({ status: "not_ready" });
     }
   });
-
-  app.get("/v1/policy", async () => ({ version: 1, policy: launchPolicy }));
 
   const requireBrowserApp = (): WebAppOperations => {
     if (!webAppService) throw new WebAppError("webapp_unavailable");
@@ -337,135 +323,6 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
       reply.header("cache-control", "no-store");
       const session = await authenticateBrowser(request);
       return requireBrowserApp().dashboard(session.licenseId);
-    },
-  );
-
-  app.post(
-    "/v1/web/connections/robinhood/start",
-    { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const session = await authenticateMutation(request);
-      reply.header("cache-control", "no-store");
-      return requireBrowserApp().beginRobinhoodConnection(session.licenseId);
-    },
-  );
-
-  app.get(
-    "/v1/web/connections/robinhood/callback",
-    {
-      config: { rateLimit: { max: 20, timeWindow: "10 minutes" } },
-      schema: {
-        querystring: {
-          type: "object",
-          additionalProperties: true,
-          properties: {
-            state: { type: "string", maxLength: 128 },
-            code: { type: "string", maxLength: 4096 },
-            error: { type: "string", maxLength: 256 },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const query = request.query as { state?: string; code?: string; error?: string };
-      const redirect = await requireBrowserApp().completeRobinhoodConnection(query);
-      reply.header("cache-control", "no-store");
-      reply.header("referrer-policy", "no-referrer");
-      return reply.redirect(redirect, 303);
-    },
-  );
-
-  app.post(
-    "/v1/web/connections/robinhood/check",
-    { config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const session = await authenticateMutation(request);
-      reply.header("cache-control", "no-store");
-      return requireBrowserApp().checkRobinhoodConnection(session.licenseId);
-    },
-  );
-
-  app.post(
-    "/v1/web/connections/robinhood/disconnect",
-    { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
-    async (request) => {
-      const session = await authenticateMutation(request);
-      await requireBrowserApp().disconnectRobinhood(session.licenseId);
-      return { disconnected: true };
-    },
-  );
-
-  app.post(
-    "/v1/web/settings",
-    {
-      config: { rateLimit: { max: 30, timeWindow: "10 minutes" } },
-      schema: {
-        body: {
-          type: "object",
-          additionalProperties: false,
-          required: ["mode", "dailyBudgetUsd", "maxPerTradeUsd"],
-          properties: {
-            mode: { type: "string", enum: ["practice", "real"] },
-            dailyBudgetUsd: { type: "number", minimum: 1, maximum: 25, multipleOf: 0.01 },
-            maxPerTradeUsd: { type: "number", minimum: 1, maximum: 5, multipleOf: 0.01 },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const session = await authenticateMutation(request);
-      const body = request.body as { mode: "practice" | "real"; dailyBudgetUsd: number; maxPerTradeUsd: number };
-      reply.header("cache-control", "no-store");
-      return requireBrowserApp().saveSettings(session.licenseId, body);
-    },
-  );
-
-  app.post(
-    "/v1/web/trading/start",
-    {
-      config: { rateLimit: { max: 10, timeWindow: "10 minutes" } },
-      schema: {
-        body: {
-          type: "object",
-          additionalProperties: false,
-          required: ["mode", "acceptedRealRisk"],
-          properties: {
-            mode: { type: "string", enum: ["practice", "real"] },
-            acceptedRealRisk: { type: "boolean" },
-          },
-        },
-      },
-    },
-    async (request, reply) => {
-      const session = await authenticateMutation(request);
-      const body = request.body as { mode: "practice" | "real"; acceptedRealRisk: boolean };
-      reply.header("cache-control", "no-store");
-      return requireBrowserApp().start(session.licenseId, body);
-    },
-  );
-
-  app.post(
-    "/v1/web/trading/pause",
-    { config: { rateLimit: { max: 20, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const session = await authenticateMutation(request);
-      reply.header("cache-control", "no-store");
-      return requireBrowserApp().pause(session.licenseId);
-    },
-  );
-
-  app.post(
-    "/v1/internal/run-due-trading-cycles",
-    { config: { rateLimit: { max: 20, timeWindow: "10 minutes" } } },
-    async (request, reply) => {
-      const authorization = request.headers.authorization;
-      const provided = typeof authorization === "string" && authorization.startsWith("Bearer ")
-        ? authorization.slice(7)
-        : undefined;
-      if (!config.WORKER_SECRET || !workerSecretMatches(config.WORKER_SECRET, provided)) {
-        return reply.code(401).send({ error: "not_authenticated" });
-      }
-      return requireBrowserApp().runDueCycles();
     },
   );
 
@@ -671,23 +528,12 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
         ? 401
         : error.code === "invalid_csrf"
           ? 403
-          : error.code === "pause_before_changing"
-            ? 409
-            : error.code === "invalid_limits" || error.code === "real_risk_acknowledgement_required"
-              ? 400
-              : 503;
+          : 503;
       const messages: Partial<Record<WebAppError["code"], string>> = {
         invalid_code: "That purchase code was not recognized.",
         not_authenticated: "Sign in to use the browser app.",
         session_expired: "Your browser session ended. Sign in again.",
         invalid_csrf: "Refresh the page and try again.",
-        connection_required: "Connect one dedicated Robinhood Agentic account first.",
-        connection_unavailable: "Robinhood could not be connected right now.",
-        invalid_limits: "Choose $1–$25 for the day and $1–$5 for each trade.",
-        pause_before_changing: "Pause trading before changing these settings.",
-        real_trading_unavailable: "Real trading is temporarily unavailable. Practice still works.",
-        real_risk_acknowledgement_required: "Review the real-trading warning before starting.",
-        trading_unavailable: "Bluechip's market checker has not checked in. No trading can start until it is back online.",
       };
       return reply.code(status).send({
         error: error.code,

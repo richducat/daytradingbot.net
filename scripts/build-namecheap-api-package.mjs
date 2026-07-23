@@ -9,11 +9,36 @@ const apiPackage = JSON.parse(await readFile(path.join(apiRoot, "package.json"),
 
 await rm(output, { recursive: true, force: true });
 await mkdir(path.join(output, "database", "mysql"), { recursive: true });
-await cp(path.join(apiRoot, "dist"), path.join(output, "dist"), { recursive: true });
+await mkdir(path.join(output, "dist"), { recursive: true });
+
+const productionModules = [
+  "apply-mysql-migration.js",
+  "commerce-mysql.js",
+  "commerce.js",
+  "config.js",
+  "index.js",
+  "licensing-mysql.js",
+  "licensing.js",
+  "provision-owner-license.js",
+  "server.js",
+  "verify-mysql-commercial.js",
+  "webapp.js",
+];
+for (const moduleName of productionModules) {
+  await cp(path.join(apiRoot, "dist", moduleName), path.join(output, "dist", moduleName));
+}
+
 await cp(
-  path.join(root, "database", "mysql"),
-  path.join(output, "database", "mysql"),
-  { recursive: true },
+  path.join(root, "database", "mysql", "0001_commercial_schema.sql"),
+  path.join(output, "database", "mysql", "0001_commercial_schema.sql"),
+);
+await cp(
+  path.join(root, "deploy", "namecheap", "api", "0002_web_sessions_only.sql"),
+  path.join(output, "database", "mysql", "0002_web_sessions_only.sql"),
+);
+await cp(
+  path.join(root, "deploy", "namecheap", "api", "0003_remove_shared_host_trading.sql"),
+  path.join(output, "database", "mysql", "0003_remove_shared_host_trading.sql"),
 );
 await cp(path.join(root, ".env.example"), path.join(output, ".env.example"));
 await cp(
@@ -21,10 +46,10 @@ await cp(
   path.join(output, "README.md"),
 );
 await cp(
-  path.join(root, "deploy", "namecheap", "api", "run-web-worker-with-recovery.sh"),
-  path.join(output, "run-web-worker-with-recovery.sh"),
+  path.join(root, "deploy", "namecheap", "api", "recover-api-health.sh"),
+  path.join(output, "recover-api-health.sh"),
 );
-await chmod(path.join(output, "run-web-worker-with-recovery.sh"), 0o755);
+await chmod(path.join(output, "recover-api-health.sh"), 0o755);
 
 const productionPackage = {
   name: apiPackage.name,
@@ -34,11 +59,11 @@ const productionPackage = {
   engines: { node: ">=22 <23" },
   scripts: {
     start: "node dist/index.js",
-    "run:web-worker": "node dist/run-worker.js",
     "migrate:mysql": "node dist/apply-mysql-migration.js",
     "verify:mysql": "node dist/verify-mysql-commercial.js",
   },
   dependencies: apiPackage.dependencies,
+  overrides: apiPackage.overrides,
 };
 
 await writeFile(

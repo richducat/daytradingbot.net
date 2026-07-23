@@ -12,7 +12,6 @@ const config: ApiConfig = {
   PUBLIC_SITE_URL: "https://daytradingbot.net",
   PUBLIC_API_URL: "https://api.daytradingbot.net",
   WEBAPP_ENABLED: false,
-  REAL_TRADING_ENABLED: false,
   CHECKOUT_ENABLED: true,
   LICENSE_EMAIL_FROM: "licenses@daytradingbot.net",
   SUPPORT_EMAIL: "support@daytradingbot.net",
@@ -197,6 +196,29 @@ describe("control-plane API", () => {
     expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
   });
 
+  it("does not expose brokerage, trading-control, policy, or worker routes", async () => {
+    const app = buildServer(config, { readinessCheck: async () => undefined });
+    servers.push(app);
+    const retiredRoutes = [
+      { method: "GET" as const, url: "/v1/policy" },
+      { method: "POST" as const, url: "/v1/web/connections/robinhood/start" },
+      { method: "GET" as const, url: "/v1/web/connections/robinhood/callback" },
+      { method: "POST" as const, url: "/v1/web/connections/robinhood/check" },
+      { method: "POST" as const, url: "/v1/web/connections/robinhood/disconnect" },
+      { method: "POST" as const, url: "/v1/web/connections/robinhood/token" },
+      { method: "POST" as const, url: "/v1/web/settings" },
+      { method: "POST" as const, url: "/v1/web/trading/start" },
+      { method: "POST" as const, url: "/v1/web/trading/pause" },
+      { method: "POST" as const, url: "/v1/internal/run-due-trading-cycles" },
+    ];
+
+    for (const route of retiredRoutes) {
+      const response = await app.inject(route);
+      expect(response.statusCode, route.url).toBe(404);
+      expect(response.json(), route.url).toEqual({ error: "not_found" });
+    }
+  });
+
   it("signs into the browser app with a secure cookie and enforces origin plus CSRF", async () => {
     const token = "t".repeat(43);
     const csrf = "c".repeat(43);
@@ -208,37 +230,9 @@ describe("control-plane API", () => {
     };
     const dashboard: WebDashboard = {
       app: "daytradingbot-web",
-      realTradingEnabled: true,
-      runtime: { ready: true, lastSuccessfulCheckAt: "2026-07-21T11:59:00.000Z" },
-      connection: {
-        provider: "robinhood",
-        connected: false,
-        state: "not_connected",
-        hasBuyingPower: false,
-        lastCheckedAt: null,
-      },
-      settings: {
-        agentId: "bluechip",
-        mode: "practice",
-        dailyBudgetUsd: 10,
-        maxPerTradeUsd: 2,
-        running: false,
-        lastCheckedAt: null,
-        nextCheckAt: null,
-        statusMessage: "Ready when you are.",
-      },
-      activity: [],
-      agent: {
-        id: "bluechip",
-        name: "Bluechip",
-        account: "Robinhood",
-        market: "Stocks and ETFs",
-        summary: "Looks for pullbacks.",
-        cadenceMinutes: 15,
-        riskLevel: "steady",
-      },
+      entitlement: { status: "active" },
     };
-    let settingsSaved = false;
+    let loggedOut = false;
     const webAppService: WebAppOperations = {
       login: async () => ({ ...session, sessionToken: token }),
       authenticate: async (provided) => {
@@ -248,17 +242,8 @@ describe("control-plane API", () => {
       requireCsrf: (_session, provided) => {
         if (provided !== csrf) throw new Error("wrong csrf");
       },
-      logout: async () => undefined,
+      logout: async () => { loggedOut = true; },
       dashboard: async () => dashboard,
-      beginRobinhoodConnection: async () => ({ authorizationUrl: "https://robinhood.com/oauth" }),
-      completeRobinhoodConnection: async () => "https://daytradingbot.net/app/",
-      checkRobinhoodConnection: async () => dashboard.connection,
-      disconnectRobinhood: async () => undefined,
-      saveSettings: async () => { settingsSaved = true; return dashboard; },
-      start: async () => dashboard,
-      pause: async () => dashboard,
-      runDueCycles: async () => ({ claimed: 0, completed: 0, failed: 0 }),
-      workerReady: async () => true,
     };
     const app = buildServer(config, {
       readinessCheck: async () => undefined,
@@ -290,29 +275,37 @@ describe("control-plane API", () => {
     expect(signedOut.json()).toEqual({ authenticated: false });
     expect(signedOut.headers["set-cookie"]).toContain("Max-Age=0");
 
-    const rejectedMutation = await app.inject({
+    const dashboardResponse = await app.inject({
+      method: "GET",
+      url: "/v1/web/dashboard",
+      headers: { cookie: `__Host-dtb_session=${token}` },
+    });
+    expect(dashboardResponse.statusCode).toBe(200);
+    expect(dashboardResponse.json()).toEqual(dashboard);
+
+    const rejectedLogout = await app.inject({
       method: "POST",
-      url: "/v1/web/settings",
+      url: "/v1/web/session/logout",
       headers: {
         origin: "https://wrong.example",
         cookie: `__Host-dtb_session=${token}`,
         "x-csrf-token": csrf,
       },
-      payload: { mode: "practice", dailyBudgetUsd: 10, maxPerTradeUsd: 2 },
     });
-    expect(rejectedMutation.statusCode).toBe(403);
+    expect(rejectedLogout.statusCode).toBe(403);
+    expect(loggedOut).toBe(false);
 
-    const saved = await app.inject({
+    const logout = await app.inject({
       method: "POST",
-      url: "/v1/web/settings",
+      url: "/v1/web/session/logout",
       headers: {
         origin: "https://daytradingbot.net",
         cookie: `__Host-dtb_session=${token}`,
         "x-csrf-token": csrf,
       },
-      payload: { mode: "practice", dailyBudgetUsd: 10, maxPerTradeUsd: 2 },
     });
-    expect(saved.statusCode).toBe(200);
-    expect(settingsSaved).toBe(true);
+    expect(logout.statusCode).toBe(200);
+    expect(logout.json()).toEqual({ authenticated: false });
+    expect(loggedOut).toBe(true);
   });
 });

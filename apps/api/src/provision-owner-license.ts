@@ -36,7 +36,7 @@ function sameHash(existing: Buffer, candidate: Buffer): boolean {
   return existing.length === candidate.length && timingSafeEqual(existing, candidate);
 }
 
-type ProvisioningStatus = "created" | "already_exists" | "reactivated";
+type ProvisioningStatus = "created" | "already_exists";
 
 async function provisionPostgres(): Promise<ProvisioningStatus> {
   const pool = new PostgresPool({ connectionString: databaseUrl });
@@ -50,11 +50,8 @@ async function provisionPostgres(): Promise<ProvisioningStatus> {
     let status: ProvisioningStatus;
     if (row) {
       if (!sameHash(row.license_secret_hash, licenseHash)) throw new Error("OWNER_LICENSE_CONFLICT");
-      await client.query(
-        "UPDATE licenses SET status = 'active', revoked_at = NULL WHERE license_id = $1",
-        [row.license_id],
-      );
-      status = row.status === "active" ? "already_exists" : "reactivated";
+      if (row.status !== "active") throw new Error("OWNER_LICENSE_INACTIVE");
+      status = "already_exists";
     } else {
       await client.query(
         `INSERT INTO licenses (source, license_secret_hash, status)
@@ -92,11 +89,8 @@ async function provisionMySql(): Promise<ProvisioningStatus> {
     let status: ProvisioningStatus;
     if (row) {
       if (!sameHash(row.license_secret_hash, licenseHash)) throw new Error("OWNER_LICENSE_CONFLICT");
-      await connection.execute<ResultSetHeader>(
-        "UPDATE licenses SET status = 'active', revoked_at = NULL WHERE license_id = ?",
-        [row.license_id],
-      );
-      status = row.status === "active" ? "already_exists" : "reactivated";
+      if (row.status !== "active") throw new Error("OWNER_LICENSE_INACTIVE");
+      status = "already_exists";
     } else {
       await connection.execute<ResultSetHeader>(
         `INSERT INTO licenses (license_id, source, license_secret_hash, status)

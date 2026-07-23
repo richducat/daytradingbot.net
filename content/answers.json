@@ -681,7 +681,7 @@
         },
         {
           "question": "Where is your tape?",
-          "answer": "The live dashboard is at daytradingbot.net/fundmanager, and the daily archive — one page per market day, generated from the desk journal — is at daytradingbot.net/tape."
+          "answer": "The public tape and daily archive are at daytradingbot.net/tape."
         }
       ],
       "sources": [

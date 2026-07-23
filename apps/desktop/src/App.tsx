@@ -249,6 +249,9 @@ export function App() {
   const [activationOpen, setActivationOpen] = useState(false);
   const [purchaseCode, setPurchaseCode] = useState("");
   const renewalAttempted = useRef(false);
+  const realReviewBackdrop = useRef<HTMLDivElement>(null);
+  const realReviewDialog = useRef<HTMLElement>(null);
+  const realReviewCancel = useRef<HTMLButtonElement>(null);
 
   const refresh = async () => {
     const catalogRequest = invoke<AgentCatalog>("trading_agent_catalog").then((result) => {
@@ -322,6 +325,46 @@ export function App() {
       .then(setLicense)
       .catch(() => undefined);
   }, [license.renewal_needed]);
+
+  useEffect(() => {
+    if (!realReviewOpen) return;
+    const backdrop = realReviewBackdrop.current;
+    const dialog = realReviewDialog.current;
+    if (!backdrop || !dialog) return;
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const siblings = Array.from(backdrop.parentElement?.children ?? [])
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== backdrop)
+      .map((element) => ({ element, wasInert: element.inert }));
+    siblings.forEach(({ element }) => { element.inert = true; });
+    window.requestAnimationFrame(() => realReviewCancel.current?.focus());
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setRealReviewOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])"));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      siblings.forEach(({ element, wasInert }) => { element.inert = wasInert; });
+      previouslyFocused?.focus();
+    };
+  }, [realReviewOpen]);
 
   const accounts = useMemo<Array<{ name: AccountName; detail: string; connected: boolean; funded: boolean; action: string }>>(
     () => [
@@ -746,13 +789,20 @@ export function App() {
       ) : null}
 
       {realReviewOpen ? (
-        <div className="modal-backdrop highest" role="presentation">
-          <section className="real-review" role="alertdialog" aria-modal="true" aria-labelledby="real-review-title">
+        <div className="modal-backdrop highest" role="presentation" ref={realReviewBackdrop}>
+          <section className="real-review" role="alertdialog" aria-modal="true" aria-labelledby="real-review-title" aria-describedby="real-review-description" ref={realReviewDialog}>
             <p className="eyebrow">Real money</p>
-            <h2 id="real-review-title">Ready to start real trading?</h2>
-            <p>The selected agents can place trades in your connected accounts. The full amount at risk today can be lost.</p>
-            <dl><div><dt>Trading agents</dt><dd>{selectedAgents.map((agent) => agent.name).join(", ")}</dd></div><div><dt>Amount at risk today</dt><dd>{money(dailyBudget)}</dd></div><div><dt>Most in one trade</dt><dd>{money(perTrade)}</dd></div></dl>
-            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : "Start real trading"}</button></div>
+            <h2 id="real-review-title">Allow Bluechip to trade on Robinhood?</h2>
+            <p id="real-review-description">For up to 24 hours, Bluechip may place recurring market buys in your dedicated Robinhood Agentic account. It cannot transfer or withdraw money. Every trade can lose its full value.</p>
+            <dl>
+              <div><dt>Trading agent</dt><dd>{selectedAgents.map((agent) => agent.name).join(", ")}</dd></div>
+              <div><dt>Stocks Bluechip may choose</dt><dd>AAPL, NVDA, TSLA, SPY, QQQ, AMD, MSFT, or GOOGL</dd></div>
+              <div><dt>Order</dt><dd>Buy at the current market price, in U.S. dollars</dd></div>
+              <div><dt>Maximum total</dt><dd>{money(dailyBudget)} per day</dd></div>
+              <div><dt>Maximum per trade</dt><dd>{money(perTrade)}</dd></div>
+              <div><dt>Permission</dt><dd>Recurring for up to 24 hours, or until you pause it</dd></div>
+            </dl>
+            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)} ref={realReviewCancel}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : "Allow these trades for 24 hours"}</button></div>
           </section>
         </div>
       ) : null}
@@ -792,7 +842,7 @@ export function App() {
               <>
                 <p>Enter your access code. One code can be active on one computer at a time.</p>
                 <label>
-                  <span>Purchase code</span>
+                  <span>Access code</span>
                   <input type="text" autoComplete="off" spellCheck={false} placeholder="DTB-…" value={purchaseCode} onChange={(event) => setPurchaseCode(event.target.value.toUpperCase())} />
                 </label>
                 <small>The code only activates the app. Your brokerage and wallet connections remain on this computer.</small>

@@ -1,6 +1,8 @@
 export const siteConfig = {
   founderPrice: 98,
   apiBaseUrl: (import.meta.env.VITE_API_BASE_URL ?? "https://api.daytradingbot.net").replace(/\/$/, ""),
+  macosDownloadUrl: import.meta.env.VITE_MACOS_DOWNLOAD_URL
+    ?? "https://releases.daytradingbot.net/stable/DayTradingBot-macos-universal.dmg",
   supportEmail: "support@daytradingbot.net",
   limits: {
     maxOpeningOrderUsd: 5,
@@ -8,7 +10,7 @@ export const siteConfig = {
     maxDailyLossUsd: 10,
   },
   accounts: [
-    { name: "Robinhood", market: "Stocks and ETFs", status: "Bluechip Practice and Real are available in the browser app" },
+    { name: "Robinhood", market: "Stocks and ETFs", status: "Bluechip Practice and Real are available in the Mac app" },
     { name: "Coinbase", market: "Bitcoin and Ethereum", status: "Account connection is ready; trading agent comes next" },
     { name: "Kalshi", market: "Event contracts", status: "Account connection is ready; agents come next" },
     { name: "Polymarket", market: "Prediction markets", status: "Approved U.S. account connection is ready; agents come next" },

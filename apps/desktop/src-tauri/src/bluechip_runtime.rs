@@ -33,6 +33,7 @@ const DIP_THRESHOLD_PERCENT_HUNDREDTHS: i64 = -150;
 const CYCLE_SECONDS: u64 = 15 * 60;
 const MAX_TRADES_PER_CYCLE: usize = 2;
 const START_PREFLIGHT_TIMEOUT_SECONDS: u64 = 25;
+const REAL_AUTHORIZATION_HOURS: i64 = 24;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeTradingMode {
@@ -89,6 +90,7 @@ struct RuntimeInner {
     generation: u64,
     status: BluechipStatus,
     cancel: Option<oneshot::Sender<()>>,
+    real_authorized_until: Option<DateTime<Utc>>,
 }
 
 #[derive(Default)]
@@ -112,6 +114,40 @@ impl BluechipRuntime {
         self.inner
             .lock()
             .is_ok_and(|inner| inner.generation == generation && inner.status.running)
+    }
+
+    fn real_entry_authorized(&self, generation: u64) -> bool {
+        self.inner.lock().is_ok_and(|inner| {
+            inner.generation == generation
+                && inner.status.running
+                && inner.status.mode == "real"
+                && inner
+                    .real_authorized_until
+                    .is_some_and(|expiry| expiry > Utc::now())
+        })
+    }
+
+    fn stop_real_session(&self, generation: u64, message: &str) {
+        let Ok(mut inner) = self.inner.lock() else {
+            return;
+        };
+        if inner.generation != generation || inner.status.mode != "real" {
+            return;
+        }
+        inner.status.running = false;
+        inner.status.message = message.into();
+        inner.status.next_check_at = None;
+        inner.real_authorized_until = None;
+        if let Some(cancel) = inner.cancel.take() {
+            let _ = cancel.send(());
+        }
+    }
+
+    fn expire_real_authorization(&self, generation: u64) {
+        self.stop_real_session(
+            generation,
+            "Your 24-hour Robinhood permission ended. Review your limits to start again.",
+        );
     }
 
     fn update_after_cycle(&self, generation: u64, message: String) {
@@ -194,6 +230,8 @@ impl BluechipRuntime {
             inner.generation = inner.generation.saturating_add(1);
             let generation = inner.generation;
             inner.cancel = Some(cancel_sender);
+            inner.real_authorized_until = (config.mode == NativeTradingMode::Real)
+                .then(|| Utc::now() + ChronoDuration::hours(REAL_AUTHORIZATION_HOURS));
             inner.status = BluechipStatus {
                 running: true,
                 mode: config.mode.as_str(),
@@ -232,6 +270,20 @@ impl BluechipRuntime {
                 if !runtime.is_active(generation) {
                     break;
                 }
+                if config_for_task.mode == NativeTradingMode::Real
+                    && !runtime.real_entry_authorized(generation)
+                {
+                    runtime.expire_real_authorization(generation);
+                    let _ = record_activity(
+                        app_for_task.state::<Ledger>().inner(),
+                        &config_for_task,
+                        AgentActivityKind::Paused,
+                        None,
+                        None,
+                        "Your 24-hour Robinhood permission ended. No new trades will start.",
+                    );
+                    break;
+                }
                 let message = match run_cycle(&app_for_task, generation, &config_for_task).await {
                     Ok(message) => message,
                     Err(error) => {
@@ -244,6 +296,9 @@ impl BluechipRuntime {
                             None,
                             plain,
                         );
+                        if config_for_task.mode == NativeTradingMode::Real {
+                            runtime.stop_real_session(generation, plain);
+                        }
                         plain.to_string()
                     }
                 };
@@ -271,6 +326,7 @@ impl BluechipRuntime {
             if let Some(cancel) = inner.cancel.take() {
                 let _ = cancel.send(());
             }
+            inner.real_authorized_until = None;
             inner.status = BluechipStatus::default();
             (was_running, mode)
         };
@@ -449,7 +505,12 @@ async fn run_cycle(
             )?;
             continue;
         }
-        if !app.state::<BluechipRuntime>().is_active(generation) {
+        if !app
+            .state::<BluechipRuntime>()
+            .real_entry_authorized(generation)
+        {
+            app.state::<BluechipRuntime>()
+                .expire_real_authorization(generation);
             return Ok("Trading was paused before any new order was sent.".into());
         }
         let entries_allowed = license_entries_allowed(
@@ -531,22 +592,38 @@ async fn run_cycle(
             }
             ReservationOutcome::Reserved(_) => {}
         }
-        if !app.state::<BluechipRuntime>().is_active(generation) {
+        if !app
+            .state::<BluechipRuntime>()
+            .real_entry_authorized(generation)
+        {
+            app.state::<BluechipRuntime>()
+                .expire_real_authorization(generation);
             ledger
                 .finalize_open_order(intent_id, OrderState::Rejected)
                 .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")?;
-            return Ok("Trading was paused before any new order was sent.".into());
+            return Ok(
+                "Your 24-hour Robinhood permission ended before any new order was sent.".into(),
+            );
         }
         let fingerprint = request_fingerprint(intent_id, &symbol, amount);
         ledger
             .begin_submission(intent_id, Uuid::new_v4(), &fingerprint)
             .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-        if !app.state::<BluechipRuntime>().is_active(generation)
-            || !license_entries_allowed(
-                app.state::<LicenseGate>().inner(),
-                app.state::<CredentialVault>().inner(),
-            )?
-        {
+        let runtime = app.state::<BluechipRuntime>();
+        let authorization_current = runtime.real_entry_authorized(generation);
+        let license_current = license_entries_allowed(
+            app.state::<LicenseGate>().inner(),
+            app.state::<CredentialVault>().inner(),
+        )?;
+        if !authorization_current || !license_current {
+            if authorization_current {
+                runtime.stop_real_session(
+                    generation,
+                    "Your DayTradingBot access needs to be renewed. No new trade was sent.",
+                );
+            } else {
+                runtime.expire_real_authorization(generation);
+            }
             ledger
                 .reject_submission(intent_id, "paused_before_submission")
                 .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
@@ -949,6 +1026,27 @@ mod tests {
         };
         assert!(quote_is_fresh(&fresh, now));
         assert!(!quote_is_fresh(&stale, now));
+    }
+
+    #[test]
+    fn real_orders_require_a_current_local_authorization_window() {
+        let runtime = BluechipRuntime::default();
+        {
+            let mut inner = runtime.inner.lock().expect("runtime lock");
+            inner.generation = 7;
+            inner.status.running = true;
+            inner.status.mode = "real";
+            inner.real_authorized_until = Some(Utc::now() + ChronoDuration::hours(1));
+        }
+        assert!(runtime.real_entry_authorized(7));
+
+        {
+            let mut inner = runtime.inner.lock().expect("runtime lock");
+            inner.real_authorized_until = Some(Utc::now() - ChronoDuration::seconds(1));
+        }
+        assert!(!runtime.real_entry_authorized(7));
+        runtime.expire_real_authorization(7);
+        assert!(!runtime.status().running);
     }
 
     #[test]

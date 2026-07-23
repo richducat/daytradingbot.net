@@ -13,26 +13,26 @@ const legalPages = {
   },
   "/privacy/": {
     eyebrow: "Privacy notice",
-    title: "Your trading connection stays protected.",
-    intro: "The browser app encrypts the Robinhood connection before storing it on the DayTradingBot server. The Mac app stores account credentials in the operating system's secure credential vault. Credentials are never placed in browser storage.",
+    title: "Your trading information stays on your Mac.",
+    intro: "The DayTradingBot website handles checkout, license delivery, and customer sign-in. Robinhood connects inside the Mac app, where the operating system's secure storage protects the connection.",
     sections: [
       ["Bot-picker answers", "Questionnaire answers and progress are stored only in the visitor's browser. They are not submitted to DayTradingBot, a broker, or an analytics service."],
       ["Payment data", "Stripe processes the payment and receipt. DayTradingBot does not receive or store the customer's full card or bank details."],
       ["Purchase and delivery data", "After payment, the buyer's email, Stripe checkout identifier, and encrypted license-delivery record are stored so the access code and app can be delivered. The purchase flow does not ask for a broker password, account number, or trading credentials."],
-      ["Browser trading data", "The browser app stores an encrypted Robinhood OAuth connection, the limits you choose, bot status, and a plain-English activity and order record. Broker passwords are entered only on Robinhood's website. Encryption keys are stored separately from the database."],
-      ["Mac trading data", "In the Mac app, venue credentials, the local ledger, strategy positions, and order history remain on the customer's device unless the customer deliberately exports and shares them for support."],
-      ["Operational data", "Application health and license events must not include broker passwords, API secrets, full account numbers, or unencrypted credential material."],
+      ["Website account data", "The customer website stores a protected sign-in session and whether the software license is active. It does not connect to Robinhood, run a bot, place orders, or store brokerage credentials, positions, balances, or trading history."],
+      ["Mac trading data", "Robinhood connection details, bot settings, positions, and order history stay on the customer's Mac unless the customer deliberately exports and shares them for support."],
+      ["Operational data", "Website health and license events do not include broker passwords, API secrets, full account numbers, positions, balances, or trading history."],
       ["Control and deletion", "Support and deletion requests can be sent to support@daytradingbot.net."],
     ],
   },
   "/terms/": {
     eyebrow: "Software license terms",
     title: "One personal software license.",
-    intro: "The launch offer is a one-time $98 personal license with browser access and one active Mac installation when the signed Mac download is available.",
+    intro: "The launch offer is a one-time $98 personal license with a customer account page and one active Mac installation.",
     sections: [
       ["Bot picker and risk acknowledgement", "The questionnaire helps configure the software but does not restrict which released bot a customer may choose. A clear risk acknowledgement may be required before checkout and before Real trading. Neither is investment advice or a guarantee of performance."],
-      ["License and delivery", "The license covers the DayTradingBot browser app, the current released bots, guided setup, v1 updates, and one active Mac installation when available. After payment, the access code and browser-app link are delivered on screen and by email. Venue accounts, market data, transaction fees, taxes, and trading capital are separate."],
-      ["Live use", "Live entries remain disabled until the customer connects a supported account and explicitly enables live operation. Customers may lower risk limits but cannot raise the built-in maximums."],
+      ["License and delivery", "The license covers the DayTradingBot Mac app, the current released bots, guided setup, version 1 updates, and one active Mac installation. After payment, the access code and download link are delivered on screen and by email. Venue accounts, market data, transaction fees, taxes, and trading capital are separate."],
+      ["Real trading", "Real trading stays off until the customer connects a supported account inside the Mac app, chooses per-trade and daily dollar limits, and deliberately approves Real. That permission lasts no more than 24 hours before the customer must approve it again."],
       ["Refund", "The launch offer includes a 30-day get-running refund for installation or supported connection problems. Trading losses, fees, and strategy performance are not refundable."],
       ["Acceptable use", "The access code and software may not be resold or shared with another person, used to evade venue eligibility controls, or modified to bypass license, safety, or risk enforcement."],
     ],
@@ -66,7 +66,7 @@ export function LegalPage({ path }: { path: LegalPath }) {
             </section>
           ))}
         </div>
-        <p className="legal-updated">Updated July 14, 2026</p>
+        <p className="legal-updated">Updated July 22, 2026</p>
       </article>
     </main>
   );

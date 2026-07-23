@@ -857,13 +857,13 @@ fn classify_placement_error(error: RobinhoodMcpError) -> RobinhoodPlacementError
         RobinhoodMcpError::AuthenticationFailed
         | RobinhoodMcpError::PermissionDenied
         | RobinhoodMcpError::RateLimited
-        | RobinhoodMcpError::ToolError
         | RobinhoodMcpError::InvalidCredential
         | RobinhoodMcpError::InvalidOrder
         | RobinhoodMcpError::AmbiguousAgenticAccounts => RobinhoodPlacementError::Rejected,
         RobinhoodMcpError::UnexpectedStatus
         | RobinhoodMcpError::ResponseTooLarge
         | RobinhoodMcpError::InvalidResponse
+        | RobinhoodMcpError::ToolError
         | RobinhoodMcpError::Unavailable => RobinhoodPlacementError::Unknown,
     }
 }
@@ -1224,6 +1224,10 @@ data: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"dat
             Ok(_) => panic!("tool error must not become a ready connection"),
         };
         assert!(matches!(error, RobinhoodMcpError::ToolError));
+        assert!(matches!(
+            classify_placement_error(error),
+            RobinhoodPlacementError::Unknown
+        ));
     }
 
     #[test]

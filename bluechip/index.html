@@ -2,125 +2,241 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-        <meta name="eb28-build-id" content="2026-07-10T03-38-23-084Z-bc0c744c8" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-<title>Bluechip by EB28 | Dumb Money Just Got a Desk</title>
-    <meta name="description" content="They call it dumb money. Bluechip is a small, honest equities desk you run yourself: Robinhood’s official Agentic API, a public tape, a kill switch. Live beta." />
-    <meta name="theme-color" content="#020617" />
-    <meta name="color-scheme" content="dark" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <link rel="canonical" href="https://eb28.co/bluechip/" />
-    <meta property="og:locale" content="en_US" />
-    <meta property="og:site_name" content="EB28" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; form-action 'self'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0b0a" />
+    <meta
+      name="description"
+      content="Bluechip watches eight popular stocks and ETFs, explains every decision, and can place small Robinhood trades only inside the limits you choose."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23b9ff58'/%3E%3Cpath d='M15 20h34v8H37v21H27V28H15z' fill='%230a0b0a'/%3E%3C/svg%3E"
+    />
+    <link rel="canonical" href="https://daytradingbot.net/bluechip/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Bluechip by EB28 | Dumb Money Just Got a Desk" />
-    <meta property="og:description" content="They call it dumb money. Bluechip is a small, honest equities desk you run yourself: Robinhood’s official Agentic API, a public tape, a kill switch. Live beta." />
-    <meta property="og:url" content="https://eb28.co/bluechip/" />
-    <meta property="og:image" content="https://eb28.co/assets/agents_grid.png" />
-    <meta property="og:image:alt" content="Bluechip by EB28 | Dumb Money Just Got a Desk" />
+    <meta property="og:site_name" content="DayTradingBot" />
+    <meta property="og:title" content="Bluechip | The DayTradingBot for Robinhood stocks" />
+    <meta
+      property="og:description"
+      content="See what Bluechip watches, how Practice and Real work, and the small dollar limits built into launch."
+    />
+    <meta property="og:url" content="https://daytradingbot.net/bluechip/" />
+    <meta property="og:image" content="https://daytradingbot.net/images/daytradingbot-bluechip-browser.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Bluechip by EB28 | Dumb Money Just Got a Desk" />
-    <meta name="twitter:description" content="They call it dumb money. Bluechip is a small, honest equities desk you run yourself: Robinhood’s official Agentic API, a public tape, a kill switch. Live beta." />
-    <meta name="twitter:image" content="https://eb28.co/assets/agents_grid.png" />
-    <script type="application/ld+json">[{"@context":"https://schema.org","@type":"Organization","@id":"https://eb28.co/#organization","name":"EB28","url":"https://eb28.co","logo":"https://eb28.co/favicon.svg"},{"@context":"https://schema.org","@type":"Product","name":"EB28 Bluechip — Founding Beta License","url":"https://eb28.co/bluechip/","description":"Bluechip is EB28’s flagship US-equities desk in live beta: licensed software the operator runs in an isolated Robinhood Agentic sub-account, behind a kill switch, with a public trade tape.","brand":{"@type":"Brand","name":"EB28"},"offers":{"@type":"Offer","priceCurrency":"USD","price":"98","availability":"https://schema.org/LimitedAvailability","url":"https://eb28.co/bluechip/"}}]</script>
-<link rel="preload" as="image" href="/images/hero_bg_app.png" fetchpriority="high" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <script>
-      window.addEventListener('load', function () {
-        [
-          'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap',
-          'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap',
-        ].forEach(function (href) {
-          var link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = href;
-          document.head.appendChild(link);
-        });
-      });
-    </script>
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@500;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
-      />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
-      />
-    </noscript>
-
-    <style>
-      html,
-      body,
-      #root {
-        min-height: 100%;
-        margin: 0;
-        background: #000b12;
-      }
-
-      body {
-        overflow-x: hidden;
-      }
-
-    </style>
-    <script type="module" crossorigin src="/assets/index-DBCZ1Rhi.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DLZ6AvAh.css">
+    <title>Bluechip | A Robinhood stock trading bot you control</title>
+    <link rel="stylesheet" crossorigin href="/assets/index-CY00N94X.css" />
   </head>
   <body>
-    <div id="root"></div>
-    <script>
-      // Loads GA4 only when a measurement ID is set in /analytics-config.json,
-      // so analytics activates from config without a rebuild.
-      (function () {
-        fetch('/analytics-config.json', { cache: 'no-store' })
-          .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (cfg) {
-            var id = cfg && String(cfg.ga4MeasurementId || '').trim();
-            if (!id) return;
-            var s = document.createElement('script');
-            s.async = true;
-            s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
-            document.head.appendChild(s);
-            window.dataLayer = window.dataLayer || [];
-            function gtag() { window.dataLayer.push(arguments); }
-            window.gtag = gtag;
-            gtag('js', new Date());
-            gtag('config', id);
-          })
-          .catch(function () {});
-      })();
-    </script>
-    <noscript>
-      <main style="padding: 32px; font-family: Arial, sans-serif; background: #ffffff; color: #0f172a;">
-        <h1>EB28 organic growth resources</h1>
-        <p>Lead-focused website, local SEO, and automation guides for Melbourne, Florida businesses.</p>
-        <nav aria-label="EB28 organic growth resources">
-          <ul>
-            <li>
-              <a href="/blog/ai-receptionist-for-local-business-what-to-automate-and-what-to-keep-human/">
-                AI receptionist for local business
-              </a>
-            </li>
-            <li>
-              <a href="/blog/website-audit-checklist-for-melbourne-fl-businesses-losing-leads/">
-                Website audit Melbourne FL
-              </a>
-            </li>
-            <li>
-              <a href="/blog/how-to-rank-in-the-melbourne-fl-map-pack-without-spammy-seo/">
-                How to rank in Melbourne FL map pack
-              </a>
-            </li>
-            <li><a href="/melbournewebstudio/#quiz">Melbourne Web Studio growth quiz</a></li>
-            <li><a href="/blog/">EB28 blog</a></li>
-          </ul>
+    <main>
+      <header class="site-header">
+        <a class="wordmark" href="/" aria-label="DayTradingBot home">DAYTRADINGBOT</a>
+        <nav aria-label="Bluechip navigation">
+          <a href="#watch">What it watches</a>
+          <a href="#connect">Connect</a>
+          <a href="#modes">Practice or Real</a>
+          <a href="/app/">Sign in</a>
         </nav>
-      </main>
-    </noscript>
+        <a class="header-cta" href="/get-started/">Find my setup</a>
+      </header>
+
+      <section class="hero" id="top">
+        <div class="hero-wash" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot"></span> Meet Bluechip</p>
+          <h1>A stock bot that tells you what it is doing.</h1>
+          <p class="hero-deck">
+            Bluechip watches eight popular stocks and ETFs about every 15 minutes. It follows one pullback rule,
+            checks your limits, and either waits or prepares a small buy. You can see every decision in plain
+            English.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="/get-started/">Build my starting setup <span>About 2 minutes</span></a>
+            <a class="text-link" href="#watch">See exactly what it watches <span aria-hidden="true">→</span></a>
+          </div>
+          <p class="hero-note">
+            Bluechip does not promise a profit. A real trade can lose some or all of the money used for that trade.
+          </p>
+        </div>
+
+        <figure class="hero-product">
+          <div class="market-example" aria-label="Example Bluechip Practice decision">
+            <div class="market-example-top"><span>Example</span><strong>Practice</strong><time>10:15 AM</time></div>
+            <div class="market-example-quote">
+              <div><span>QQQ</span><small>Nasdaq 100 ETF</small></div>
+              <strong>Down 1.7%</strong>
+            </div>
+            <div class="market-example-checks">
+              <p><span>✓</span> The price move meets Bluechip's rule</p>
+              <p><span>✓</span> You do not already own QQQ or have an order waiting</p>
+              <p><span>✓</span> A $2 buy fits your trade and daily limits</p>
+            </div>
+            <div class="market-example-result">
+              <span>Bluechip's decision</span>
+              <strong>Would buy $2 of QQQ</strong>
+              <small>Practice shows the decision. It does not send an order.</small>
+            </div>
+          </div>
+          <figcaption>
+            <span>A real rule shown in normal language.</span>
+            This example is not a performance claim.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="product-explainer section-shell" id="watch">
+        <div class="product-statement">
+          <p class="eyebrow">What Bluechip does</p>
+          <h2>It watches. It checks. It waits unless everything lines up.</h2>
+          <p>
+            Bluechip looks for a 1.5% pullback in AAPL, NVDA, TSLA, SPY, QQQ, AMD, MSFT, and GOOGL. A price drop
+            alone is not enough. It also checks the current price, what you already own, orders that are still
+            waiting, and the dollar limits you chose.
+          </p>
+        </div>
+        <div class="product-flow">
+          <article>
+            <span>01</span>
+            <h3>Watches eight familiar names</h3>
+            <p>Bluechip checks the same short list about every 15 minutes while it is running.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Uses one clear rule</h3>
+            <p>It looks for a pullback instead of chasing a stock that is already rising.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Checks before acting</h3>
+            <p>It will wait if you already own the symbol, an order is pending, or the buy would exceed a limit.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>Shows you the reason</h3>
+            <p>Activity explains what Bluechip checked, why it waited, and whether an order was sent.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="bluechip-example" id="connect">
+        <div class="section-shell example-layout">
+          <div class="example-copy">
+            <p class="eyebrow">Connect on your Mac</p>
+            <h2>Your Robinhood sign-in stays with Robinhood.</h2>
+            <p>
+              In the DayTradingBot Mac app, press <strong>Connect Robinhood</strong>. Robinhood opens its own
+              approval screen and asks you to choose a dedicated Agentic account. After you approve it, Bluechip
+              can read that account and place only the trades you allow. DayTradingBot never asks for your
+              Robinhood password and cannot transfer or withdraw your money.
+            </p>
+            <p class="example-honesty">
+              Your trading money stays in the Robinhood Agentic account you control. DayTradingBot is software,
+              not a broker or a place to deposit money.
+            </p>
+            <a class="text-link dark-link" href="/app/">I already have an access code <span aria-hidden="true">→</span></a>
+          </div>
+          <dl class="example-rules">
+            <div><dt>Where you connect</dt><dd>The DayTradingBot Mac app</dd></div>
+            <div><dt>Who handles sign-in</dt><dd>Robinhood</dd></div>
+            <div><dt>Which account it uses</dt><dd>The dedicated Agentic account you approve</dd></div>
+            <div><dt>What Bluechip can do</dt><dd>Read that account and submit allowed stock orders</dd></div>
+            <div><dt>What it cannot do</dt><dd>Transfer or withdraw your money</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="customer-journey" id="modes">
+        <div class="section-shell journey-layout">
+          <div class="section-heading">
+            <p class="eyebrow">Practice first or choose Real</p>
+            <h2>You decide when an order can leave the app.</h2>
+          </div>
+          <ol>
+            <li>
+              <span>01</span>
+              <div>
+                <h3>Practice uses no trading money</h3>
+                <p>Bluechip checks current market information and shows what it would do without sending an order.</p>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <h3>Real can place an order</h3>
+                <p>Real is a separate choice. Review the warning and your limits before you turn it on.</p>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <h3>Launch limits stay small</h3>
+                <p>Choose $1–$25 for the whole day and $1–$5 for any one trade. One trade can never exceed the daily limit.</p>
+              </div>
+            </li>
+            <li>
+              <span>04</span>
+              <div>
+                <h3>Real permission ends after 24 hours</h3>
+                <p>Bluechip returns to waiting when the permission expires. Review everything again if you want another Real session.</p>
+              </div>
+            </li>
+            <li>
+              <span>05</span>
+              <div>
+                <h3>You can stop new trades</h3>
+                <p>Pause Bluechip whenever you want. Pausing stops it from opening another trade.</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="faq section-shell" aria-labelledby="bluechip-faq-heading">
+        <div class="section-heading">
+          <p class="eyebrow">Straight answers</p>
+          <h2 id="bluechip-faq-heading">Know the difference before you use real money.</h2>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>Does Practice predict what I will earn?</summary>
+            <p>No. Practice shows what the rule would do with current information. It cannot predict the price you would receive later or whether a real trade would gain or lose money.</p>
+          </details>
+          <details>
+            <summary>Does a dollar limit prevent every loss?</summary>
+            <p>No. Limits cap how much Bluechip may add to new trades. They cannot prevent a stock from falling or promise that you will get the exact price shown.</p>
+          </details>
+          <details>
+            <summary>Does Bluechip sell stocks?</summary>
+            <p>The launch strategy is focused on small market buys when its checks pass. Do not treat Bluechip as a complete investing plan or assume it manages every position for you.</p>
+          </details>
+          <details>
+            <summary>Can I use the browser app instead?</summary>
+            <p>You can use the browser for onboarding, your access code, Practice, and account information. The Mac app keeps the Robinhood Agentic trading connection on your computer.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <p class="eyebrow">See if Bluechip fits you</p>
+        <h2>Choose your setup before you buy.</h2>
+        <a class="button button-primary" href="/get-started/">Build my starting setup</a>
+        <p>About two minutes. No phone number, broker password, or deposit.</p>
+      </section>
+
+      <footer class="site-footer">
+        <a class="wordmark" href="/">DAYTRADINGBOT</a>
+        <p>Bluechip watches. You set the limits. Trading can lose money.</p>
+        <div>
+          <a href="/risk-disclosure/">Risk</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
+        </div>
+      </footer>
+    </main>
   </body>
 </html>

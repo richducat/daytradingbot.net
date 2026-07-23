@@ -250,19 +250,19 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
           <h2>Your first Practice run takes four steps.</h2>
         </div>
         <ol>
-          <li><span>01</span><div><strong>Get your private access code</strong><p>It appears on screen after Stripe confirms payment and is also sent by email.</p></div></li>
-          <li><span>02</span><div><strong>Open DayTradingBot in your browser</strong><p>Paste the code. Nothing needs to be downloaded.</p></div></li>
-          <li><span>03</span><div><strong>Connect the account your bot uses</strong><p>The company holding the account handles sign-in. Your trading money stays there.</p></div></li>
-          <li><span>04</span><div><strong>Review the limits and start Practice</strong><p>Watch current decisions first. Move to Real only if and when you choose.</p></div></li>
+          <li><span>01</span><div><strong>Get your access code and Mac download</strong><p>Both appear after Stripe confirms payment and are also sent by email.</p></div></li>
+          <li><span>02</span><div><strong>Open the Mac app</strong><p>Install DayTradingBot on the Mac you will use and enter your access code once.</p></div></li>
+          <li><span>03</span><div><strong>Connect Robinhood inside the app</strong><p>Robinhood handles approval. Your connection stays on your Mac, and your trading money stays at Robinhood.</p></div></li>
+          <li><span>04</span><div><strong>Choose limits and start Practice</strong><p>Pick the dollars per trade and per day. Move to Real only if and when you choose.</p></div></li>
         </ol>
       </section>
 
       <section className="match-checkout">
         <div>
           <p className="eyebrow">{available ? "One-time price" : "An honest answer"}</p>
-          <h2>{available ? "One payment. Bluechip is yours to use in the browser." : `${result.agent} is not for sale yet. Bluechip is.`}</h2>
+          <h2>{available ? "One payment. Bluechip is yours to use on one Mac." : `${result.agent} is not for sale yet. Bluechip is.`}</h2>
           <p>{available
-            ? "The $98 license includes Bluechip, Practice, Real trading controls, guided setup, Activity, and version 1 updates. Your trading money stays in Robinhood."
+            ? "The $98 license includes the Mac app, Bluechip, Practice, Real trading controls, guided setup, Activity, and version 1 updates. Your trading money stays in Robinhood."
             : `Based on your answers, ${result.agent} fits better than Bluechip. If you also want a Robinhood stock bot, you may still choose Bluechip. We will not pretend it is the same strategy.`}</p>
           <a className="text-link dark-link" href="/#example">See exactly what Bluechip does <span aria-hidden="true">→</span></a>
         </div>
@@ -275,7 +275,7 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
           >
             {startingCheckout ? "Opening secure checkout…" : available ? "Get Bluechip for $98" : "Choose Bluechip instead for $98"}
           </button>
-          <small>Stripe handles payment. Your access code and Open DayTradingBot button appear after payment is confirmed.</small>
+          <small>Stripe handles payment. Your access code and Mac download appear after payment is confirmed.</small>
           {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
         </div>
       </section>

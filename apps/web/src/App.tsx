@@ -12,10 +12,10 @@ function SectionHeading({ eyebrow, children }: { eyebrow: string; children: Reac
 }
 
 const productFlow = [
-  ["You stop refreshing charts", "Bluechip checks eight popular stocks and ETFs about every 15 minutes while it is running."],
+  ["You stop refreshing charts", "Bluechip checks eight popular stocks and ETFs about every 15 minutes while the Mac app is running."],
   ["The rule stays the same", "It waits for a specific pullback. It does not get impatient, chase a price, or change the plan halfway through the day."],
   ["You choose the maximum dollars", "Set a limit for each trade and another for the whole day. Bluechip cannot open a trade above either one."],
-  ["You can see every decision", "Open Activity to see what Bluechip checked, why it waited, and whether an order was sent."],
+  ["You can see every decision", "Open Activity in the Mac app to see what Bluechip checked, why it waited, and whether an order was sent."],
 ] as const;
 
 const screeningReasons = [
@@ -28,15 +28,15 @@ const screeningReasons = [
 ] as const;
 
 const faqs = [
-  ["So what am I actually buying?", "A personal software license for DayTradingBot. The current release includes the browser app, Bluechip, Practice, Real trading controls, your activity history, guided setup, and version 1 updates."],
+  ["So what am I actually buying?", "A personal license for the DayTradingBot Mac app. It includes Bluechip, Practice, Real trading controls, your activity history, guided setup, and version 1 updates."],
   ["What does Bluechip do while I am at work?", "When it is running, Bluechip checks eight stocks and ETFs about every 15 minutes. If one falls enough to meet its rule, it checks the current price, your open positions, pending orders, and the dollar limits you chose before it does anything."],
   ["Can I watch it before it touches real money?", "Yes. Practice uses current market information and shows what Bluechip would do without sending an order. You decide if and when to switch to Real."],
   ["Do I send my trading money to DayTradingBot?", "No. Your trading money stays in the dedicated Robinhood Agentic account you control. DayTradingBot is software. It is not a bank, broker, exchange, or place to deposit funds."],
-  ["Can Bluechip place real trades?", "Yes, after you connect a supported Robinhood Agentic account, choose your dollar limits, and deliberately turn on Real trading. Real trading turns off after 24 hours unless you start it again."],
+  ["Can Bluechip place real trades?", "Yes. In the Mac app, connect a supported Robinhood Agentic account, choose your per-trade and daily dollar limits, and deliberately turn on Real. That permission lasts no more than 24 hours before you must approve it again."],
   ["Can I lose money?", "Yes. A rule-based bot can still make a losing trade, and software or account connections can fail. Your limits cap how much Bluechip may put into new trades. They cannot prevent a loss or promise a profit."],
-  ["Do I need a Mac or an Apple account?", "No. DayTradingBot works in a modern browser on a phone or computer. The Mac app is optional when the signed public download is available."],
+  ["Do I need a Mac or an Apple account?", "You need a compatible Mac for the current release. You do not need an Apple account to use DayTradingBot. The website handles the questionnaire, checkout, license sign-in, and download."],
   ["Why do you ask eight questions?", "So you can see a suggested bot, account, mode, and dollar limits before you pay. Your answers are not a test, and they never remove access to a released bot."],
-  ["What happens after I pay?", "Stripe confirms the payment, then your private access code and an Open DayTradingBot button appear on screen. We also send them to the email used at checkout."],
+  ["What happens after I pay?", "Stripe confirms the payment, then your private access code and Mac download appear on screen. We also send them to the email used at checkout."],
 ] as const;
 
 export function App() {
@@ -66,7 +66,7 @@ export function App() {
         >
           <p className="eyebrow"><span className="status-dot" /> A stock trading bot you can understand</p>
           <h1>Stop watching stock charts all day.</h1>
-          <p className="hero-deck">Open Bluechip in any modern browser. It watches eight popular stocks and ETFs, follows one clear buying rule, and stays inside the dollar limits you set. Try every decision in Practice before you let it place a real Robinhood trade.</p>
+          <p className="hero-deck">Install Bluechip on your Mac. It watches eight popular stocks and ETFs, follows one clear buying rule, and stays inside the dollar limits you set. Try every decision in Practice before you let it place a real Robinhood trade.</p>
           <div className="hero-actions">
             <a className="button button-primary" href="/get-started/">Build my starting setup <span>About 2 minutes</span></a>
             <a className="text-link" href="#example">See exactly how it works <span aria-hidden="true">→</span></a>
@@ -98,7 +98,7 @@ export function App() {
         <div className="product-statement">
           <p className="eyebrow">What changes for you</p>
           <h2>Let Bluechip do the watching. You make the money decisions.</h2>
-          <p>You don't build an algorithm or run a server. You choose the account, the dollars, and whether Bluechip is practicing or placing real trades. Bluechip keeps checking while you're doing something else.</p>
+          <p>You don't build an algorithm or run a server. In the Mac app, you connect Robinhood, choose the dollars, and decide whether Bluechip is practicing or placing real trades. Bluechip keeps checking while you're doing something else.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -154,9 +154,9 @@ export function App() {
           <ol>
             <li><span>01</span><div><h3>See your setup first</h3><p>Answer eight questions and review the bot, account, mode, and limits we suggest.</p></div></li>
             <li><span>02</span><div><h3>Buy the software</h3><p>Pay $98 once through Stripe. Your access code appears as soon as payment is confirmed.</p></div></li>
-            <li><span>03</span><div><h3>Connect Robinhood</h3><p>Robinhood handles the sign-in and approval. DayTradingBot never asks for your Robinhood password.</p></div></li>
-            <li><span>04</span><div><h3>Start in Practice</h3><p>Watch Bluechip make current decisions without placing an order. Every check appears in Activity.</p></div></li>
-            <li><span>05</span><div><h3>Choose Real only when you are ready</h3><p>Review your per-trade and daily limits, turn on Real, and press Pause whenever you want new trades to stop.</p></div></li>
+            <li><span>03</span><div><h3>Download the Mac app</h3><p>Enter your access code once. Your website account stays available for license and download help.</p></div></li>
+            <li><span>04</span><div><h3>Connect Robinhood in the app</h3><p>Robinhood handles the approval. Your connection and trading history stay on your Mac, and your money stays at Robinhood.</p></div></li>
+            <li><span>05</span><div><h3>Choose your limits and press Start</h3><p>Start with Practice. If you choose Real, review the dollars per trade and per day; permission ends within 24 hours.</p></div></li>
           </ol>
         </div>
       </section>
@@ -166,7 +166,7 @@ export function App() {
           <div>
             <p className="eyebrow">One-time price</p>
             <h2>${siteConfig.founderPrice} once.</h2>
-            <p className="price-qualifier">Use Bluechip in any modern browser. No subscription.</p>
+            <p className="price-qualifier">One active Mac. No subscription.</p>
           </div>
           <div className="offer-copy">
             <ul>
@@ -174,7 +174,7 @@ export function App() {
               <li>Practice with current market information before using real money</li>
               <li>Real trading controls with per-trade and daily dollar limits</li>
               <li>A plain-English history of every check, skip, and order</li>
-              <li>Version 1 updates and the optional signed Mac app when available</li>
+              <li>The Mac app, guided setup, and version 1 updates</li>
             </ul>
             <a className="button offer-button" href="/get-started/">See my setup before I buy</a>
             <small>Trading money, Robinhood fees, taxes, and other account costs are separate. No trading result is promised.</small>
