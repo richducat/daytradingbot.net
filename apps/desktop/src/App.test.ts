@@ -1,15 +1,44 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type ActivityItem,
+  connectionStatusLabel,
+  dataLifecycleCopy,
+  decisionHasFinalOutcome,
+  decisionOutcome,
+  groupActivityByDay,
   limitPlanCopy,
+  licenseStatusPresentation,
+  liveBotState,
   normalizeTradingLimits,
+  polymarketUsAccountReadiness,
+  realTradingAccountReadiness,
+  realTradingAuthorizationSummary,
   setupRiskCopy,
+  tradingActionLabel,
+  tradingControlGate,
+  tradingModeAccountReady,
   tradingViewChartUrl,
   tradingViewSymbolUrl,
   unavailableWatchState,
   watchDisplayMode,
   watchSymbols,
 } from "./App";
+
+function activityItem(overrides: Partial<ActivityItem> = {}): ActivityItem {
+  return {
+    id: "event-1",
+    agent_id: "bluechip",
+    mode: "practice",
+    kind: "market_check",
+    recorded_order_state: null,
+    symbol: "AAPL",
+    amount_usd: null,
+    message: "Bluechip checked AAPL.",
+    occurred_at: "2026-07-23T15:00:00-04:00",
+    ...overrides,
+  };
+}
 
 describe("customer trading limits", () => {
   it("keeps every supported daily and per-trade combination unchanged", () => {
@@ -67,11 +96,13 @@ describe("TradingView chart boundary", () => {
         symbol: string;
         interval: string;
         allow_symbol_change: boolean;
+        hide_top_toolbar: boolean;
         support_host: string;
       };
       expect(config.symbol).toMatch(/^(NASDAQ|AMEX):[A-Z]+$/);
       expect(config.interval).toBe("5");
       expect(config.allow_symbol_change).toBe(false);
+      expect(config.hide_top_toolbar).toBe(true);
       expect(config.support_host).toBe("https://www.tradingview.com");
 
       const attributionUrl = new URL(tradingViewSymbolUrl(symbol)!);
@@ -113,5 +144,211 @@ describe("Watch readback failures", () => {
     expect(state.next_check_at).toBeNull();
     expect(state.budget_state).toBe("unavailable");
     expect(state.remaining_usd).toBeNull();
+  });
+});
+
+describe("consumer status language", () => {
+  it("never turns a failed account readback into a disconnected claim", () => {
+    expect(connectionStatusLabel("checking", false)).toBe("Checking saved connection…");
+    expect(connectionStatusLabel("unavailable", false)).toBe("Connection status unavailable");
+    expect(connectionStatusLabel("available", false)).toBe("Not connected");
+    expect(connectionStatusLabel("available", true)).toBe("Connection verified");
+  });
+
+  it("names the exact mode in every trading action", () => {
+    expect(tradingActionLabel(false, false, "practice")).toBe("Check again");
+    expect(tradingActionLabel(true, false, "practice")).toBe("Start Practice");
+    expect(tradingActionLabel(true, true, "practice")).toBe("Pause Practice");
+    expect(tradingActionLabel(true, false, "real")).toBe("Review Real Trading");
+    expect(tradingActionLabel(true, true, "real")).toBe("Pause new real trades");
+  });
+
+  it("uses only backend-supported live workflow states", () => {
+    expect(liveBotState(unavailableWatchState())).toBe("unavailable");
+    expect(liveBotState({
+      status_available: true,
+      running: false,
+      next_check_at: null,
+    })).toBe("paused");
+    expect(liveBotState({
+      status_available: true,
+      running: true,
+      next_check_at: null,
+    }, activityItem({ kind: "market_check" }))).toBe("checking");
+    expect(liveBotState({
+      status_available: true,
+      running: true,
+      next_check_at: "2026-07-23T15:15:00-04:00",
+    }, activityItem({ kind: "signal" }))).toBe("waiting");
+  });
+});
+
+describe("fail-closed trading controls", () => {
+  it("requires both engine and watch readbacks before Start or Review", () => {
+    expect(tradingControlGate(false, "paused", true)).toEqual({
+      running: false,
+      canPause: false,
+      canStartOrReview: false,
+    });
+    expect(tradingControlGate(true, "paused", false).canStartOrReview).toBe(false);
+    expect(tradingControlGate(true, "paused", true).canStartOrReview).toBe(true);
+    expect(tradingControlGate(true, "paused", true, false).canStartOrReview).toBe(false);
+  });
+
+  it("keeps Pause available from authoritative engine state even when watch readback fails", () => {
+    expect(tradingControlGate(true, "real", false)).toEqual({
+      running: true,
+      canPause: true,
+      canStartOrReview: false,
+    });
+  });
+
+  it("keeps Pause available when only the authoritative watch says running", () => {
+    expect(tradingControlGate(true, "paused", true, true, true)).toEqual({
+      running: true,
+      canPause: true,
+      canStartOrReview: false,
+    });
+    expect(tradingControlGate(false, "unavailable", true, false, true)).toEqual({
+      running: true,
+      canPause: true,
+      canStartOrReview: false,
+    });
+  });
+
+  it("requires both authoritative readbacks to report not running before Start", () => {
+    expect(tradingControlGate(true, "paused", true, true, false).canStartOrReview).toBe(true);
+    expect(tradingControlGate(true, "paused", true, true, null).canStartOrReview).toBe(false);
+    expect(tradingControlGate(true, "practice", true, true, false).canStartOrReview).toBe(false);
+  });
+
+  it("requires connected funded Robinhood for Real but not Practice", () => {
+    expect(realTradingAccountReadiness("available", true, false)).toMatchObject({
+      ready: false,
+      message: expect.stringContaining("buying power"),
+    });
+    expect(realTradingAccountReadiness("available", true, true).ready).toBe(true);
+    expect(realTradingAccountReadiness("unavailable", true, true).ready).toBe(false);
+    expect(tradingModeAccountReady("real", false)).toBe(false);
+    expect(tradingModeAccountReady("practice", false)).toBe(true);
+  });
+});
+
+describe("provider and lifecycle truth", () => {
+  it("derives Polymarket readiness only from Polymarket US fields", () => {
+    expect(polymarketUsAccountReadiness({
+      authenticated: false,
+      has_buying_power: false,
+    })).toEqual({ connected: false, funded: false });
+    expect(polymarketUsAccountReadiness({
+      authenticated: true,
+      has_buying_power: true,
+    })).toEqual({ connected: true, funded: true });
+  });
+
+  it("never presents an unavailable license readback as definitively unactivated", () => {
+    expect(licenseStatusPresentation("checking", { real_trading_ready: false })).toMatchObject({
+      state: "checking",
+      realTradingReady: false,
+    });
+    expect(licenseStatusPresentation("unavailable", { real_trading_ready: false })).toEqual({
+      state: "unavailable",
+      label: "Activation status unavailable",
+      realTradingReady: false,
+    });
+    expect(licenseStatusPresentation("available", { real_trading_ready: false }).state).toBe("not-activated");
+    expect(licenseStatusPresentation("available", { real_trading_ready: true }).realTradingReady).toBe(true);
+  });
+
+  it("distinguishes unavailable data from a ready empty result", () => {
+    expect(dataLifecycleCopy("activity", "unavailable", false)).toMatchObject({
+      title: "Recorded activity is unavailable",
+      detail: expect.stringContaining("Do not treat this as an empty history"),
+    });
+    expect(dataLifecycleCopy("catalog", "unavailable", false)).toMatchObject({
+      title: "Agent catalog is unavailable",
+      detail: expect.stringContaining("Do not treat this as an empty catalog"),
+    });
+    expect(dataLifecycleCopy("activity", "ready", false).title).toBe("No recorded activity yet");
+  });
+});
+
+describe("recorded decision truth", () => {
+  it.each([
+    ["practice_review", "Practice result", true],
+    ["submitted", "Real order submitted", false],
+    ["pending", "Real order pending", false],
+    ["partially_filled", "Partial fill recorded", false],
+    ["filled", "Fill recorded", true],
+    ["canceled", "Order canceled", true],
+    ["rejected", "Order rejected", true],
+    ["unknown", "Order status unknown", false],
+  ] as const)("maps authoritative %s state before the event kind", (recordedState, title, final) => {
+    const item = activityItem({
+      kind: "order_submitted",
+      recorded_order_state: recordedState,
+    });
+    expect(decisionOutcome(item)?.title).toContain(title);
+    expect(decisionHasFinalOutcome(item)).toBe(final);
+  });
+
+  it("does not mark a bare signal or unauthoritative submission event complete", () => {
+    const signal = activityItem({ kind: "signal", recorded_order_state: null });
+    expect(decisionOutcome(signal)).toBeNull();
+    expect(decisionHasFinalOutcome(signal)).toBe(false);
+
+    const submission = activityItem({ kind: "order_submitted", recorded_order_state: null });
+    expect(decisionOutcome(submission)).toMatchObject({
+      title: "Order submission event recorded",
+      final: false,
+    });
+  });
+});
+
+describe("real-trading authorization copy", () => {
+  it("states both the calendar-day cap and maximum possible 24-hour total", () => {
+    expect(realTradingAuthorizationSummary(15, 3)).toEqual({
+      dailyCap: "$15 per calendar day",
+      maximumPossibleTotal: "$30 across the 24-hour window if it spans two calendar days",
+      perTradeCap: "$3",
+    });
+  });
+});
+
+describe("grouped Practice and Real history", () => {
+  const items = [
+    activityItem({ id: "practice-today", mode: "practice" }),
+    activityItem({
+      id: "real-today",
+      mode: "real",
+      kind: "order_submitted",
+      recorded_order_state: "submitted",
+      occurred_at: "2026-07-23T14:00:00-04:00",
+    }),
+    activityItem({
+      id: "practice-yesterday",
+      mode: "practice",
+      occurred_at: "2026-07-22T12:00:00-04:00",
+    }),
+  ];
+  const now = new Date("2026-07-23T16:00:00-04:00");
+
+  it("groups loaded events by day without merging Practice and Real counts", () => {
+    const groups = groupActivityByDay(items, "all", now);
+    expect(groups.map((group) => group.label)).toEqual(["Today", "Yesterday"]);
+    expect(groups[0]).toMatchObject({
+      practiceCount: 1,
+      realCount: 1,
+      realOrderCount: 1,
+    });
+  });
+
+  it("filters history without changing the original records", () => {
+    const groups = groupActivityByDay(items, "practice", now);
+    expect(groups.flatMap((group) => group.items).map((item) => item.id)).toEqual([
+      "practice-today",
+      "practice-yesterday",
+    ]);
+    expect(items).toHaveLength(3);
   });
 });
