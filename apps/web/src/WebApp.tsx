@@ -17,6 +17,10 @@ type Activity = {
 type Dashboard = {
   app: "daytradingbot-web";
   realTradingEnabled: boolean;
+  runtime: {
+    ready: boolean;
+    lastSuccessfulCheckAt: string | null;
+  };
   connection: {
     provider: "robinhood";
     connected: boolean;
@@ -277,6 +281,10 @@ export function WebApp() {
   };
 
   const start = async (acceptedRealRisk = false) => {
+    if (!dashboard?.runtime.ready) {
+      setError("Bluechip is temporarily offline. No Practice decision or real order can start until it is back online.");
+      return;
+    }
     if (!dashboard?.connection.connected) {
       setSetupStep(1);
       setSetupOpen(true);
@@ -353,7 +361,7 @@ export function WebApp() {
           <button className={view === "activity" ? "active" : ""} type="button" onClick={() => setView("activity")}><span>03</span>Activity</button>
         </nav>
         <div className="sidebar-bottom">
-          <p><span className={dashboard.settings.running ? "live-dot on" : "live-dot"} />{dashboard.settings.running ? `${dashboard.settings.mode === "real" ? "Real trading" : "Practice"} is running` : "Bluechip is off"}</p>
+          <p><span className={dashboard.settings.running && dashboard.runtime.ready ? "live-dot on" : "live-dot"} />{!dashboard.runtime.ready ? "Bluechip needs attention" : dashboard.settings.running ? `${dashboard.settings.mode === "real" ? "Real trading" : "Practice"} is running` : "Bluechip is off"}</p>
           <button type="button" onClick={() => void logout()}>Sign out</button>
         </div>
       </aside>
@@ -363,9 +371,10 @@ export function WebApp() {
           <div><p className="browser-eyebrow">Your Bluechip bot</p><h1>{view === "home" ? "Home" : view === "account" ? "Connected account" : "Activity"}</h1></div>
           {dashboard.settings.running
             ? <button className="pause-trading" type="button" onClick={() => void pause()} disabled={busy}>Pause</button>
-            : <button className="start-trading" type="button" onClick={() => void start()} disabled={busy}>Start</button>}
+            : <button className="start-trading" type="button" onClick={() => void start()} disabled={busy || !dashboard.runtime.ready}>Start</button>}
         </header>
 
+        {!dashboard.runtime.ready && <div className="browser-error wide" role="alert">Bluechip is temporarily offline. Your connected account is untouched, and no new order can start.</div>}
         {notice && <div className="browser-notice" role="status"><span />{notice}<button type="button" aria-label="Dismiss" onClick={() => setNotice("")}>×</button></div>}
         {error && <div className="browser-error wide" role="alert">{error}<button type="button" aria-label="Dismiss" onClick={() => setError("")}>×</button></div>}
 
@@ -373,8 +382,8 @@ export function WebApp() {
           <>
             <section className="browser-hero">
               <div>
-                <p className="browser-eyebrow">{dashboard.settings.running ? "Watching the market now" : "Your bot is off"}</p>
-                <h2>{dashboard.settings.running ? dashboard.settings.statusMessage : "Start with a no-money Practice run."}</h2>
+                <p className="browser-eyebrow">{!dashboard.runtime.ready ? "Temporarily offline" : dashboard.settings.running ? "Watching the market now" : "Your bot is off"}</p>
+                <h2>{!dashboard.runtime.ready ? "No new order can start until Bluechip is back online." : dashboard.settings.running ? dashboard.settings.statusMessage : "Start with a no-money Practice run."}</h2>
                 <p>Bluechip checks eight stocks and ETFs about every 15 minutes. It waits unless a price move, its trading rule, and your dollar limits all line up.</p>
               </div>
               <div className="hero-control">
@@ -382,7 +391,7 @@ export function WebApp() {
                 <strong>{money(dashboard.settings.dailyBudgetUsd)}<small>maximum for new trades today</small></strong>
                 {dashboard.settings.running
                   ? <button className="pause-trading wide" type="button" onClick={() => void pause()} disabled={busy}>Pause trading</button>
-                  : <button className="start-trading wide" type="button" onClick={() => { setSetupStep(dashboard.connection.connected ? 2 : 1); setSetupOpen(true); }}>Choose settings and start</button>}
+                  : <button className="start-trading wide" type="button" disabled={!dashboard.runtime.ready} onClick={() => { setSetupStep(dashboard.connection.connected ? 2 : 1); setSetupOpen(true); }}>Choose settings and start</button>}
               </div>
             </section>
 
@@ -405,7 +414,7 @@ export function WebApp() {
               <article className="browser-panel">
                 <div className="panel-heading"><div><p className="browser-eyebrow">Latest update</p><h3>Activity</h3></div><button type="button" onClick={() => setView("activity")}>See all</button></div>
                 <div className="latest-row">
-                  <span className={dashboard.settings.running ? "pulse active" : "pulse"} />
+                  <span className={dashboard.settings.running && dashboard.runtime.ready ? "pulse active" : "pulse"} />
                   <div><strong>{dashboard.activity[0]?.message ?? dashboard.settings.statusMessage}</strong><small>{dashboard.activity[0] ? activityTime(dashboard.activity[0].occurredAt) : "Start Practice to see Bluechip make current decisions without placing an order."}</small></div>
                 </div>
               </article>
@@ -481,12 +490,12 @@ export function WebApp() {
               {setupStep === 4 && (
                 <div className="mode-step">
                   <button className={mode === "practice" ? "selected" : ""} type="button" onClick={() => setMode("practice")}><span>Practice</span><strong>See current Bluechip decisions without sending an order.</strong><small>Best choice for your first run</small></button>
-                  <button className={mode === "real" ? "selected" : ""} type="button" disabled={!dashboard.realTradingEnabled} onClick={() => setMode("real")}><span>Real trading</span><strong>Let Bluechip send allowed trades to your Agentic account.</strong><small>{dashboard.realTradingEnabled ? "A real trade can lose money" : "Temporarily unavailable"}</small></button>
+                  <button className={mode === "real" ? "selected" : ""} type="button" disabled={!dashboard.realTradingEnabled || !dashboard.runtime.ready} onClick={() => setMode("real")}><span>Real trading</span><strong>Let Bluechip send allowed trades to your Agentic account.</strong><small>{dashboard.realTradingEnabled && dashboard.runtime.ready ? "A real trade can lose money" : "Temporarily unavailable"}</small></button>
                   <div className="setup-summary"><span>Bluechip · {mode === "practice" ? "Practice" : "Real trading"}</span><strong>{selectedSummary}</strong></div>
                 </div>
               )}
             </div>
-            <footer><button type="button" onClick={() => setupStep === 1 ? setSetupOpen(false) : setSetupStep((step) => step - 1)}>{setupStep === 1 ? "Close" : "Back"}</button>{setupStep < 4 ? <button className="continue" type="button" disabled={setupStep === 1 && dashboard.connection.state !== "connected"} onClick={() => setSetupStep((step) => step + 1)}>Continue</button> : <button className="continue" type="button" disabled={busy} onClick={() => void start()}>{mode === "practice" ? "Start Practice" : "Review real trading"}</button>}</footer>
+            <footer><button type="button" onClick={() => setupStep === 1 ? setSetupOpen(false) : setSetupStep((step) => step - 1)}>{setupStep === 1 ? "Close" : "Back"}</button>{setupStep < 4 ? <button className="continue" type="button" disabled={setupStep === 1 && dashboard.connection.state !== "connected"} onClick={() => setSetupStep((step) => step + 1)}>Continue</button> : <button className="continue" type="button" disabled={busy || !dashboard.runtime.ready} onClick={() => void start()}>{mode === "practice" ? "Start Practice" : "Review real trading"}</button>}</footer>
           </section>
         </div>
       )}
@@ -498,7 +507,7 @@ export function WebApp() {
             <p>It will use the Robinhood Agentic account you connected and stay inside the dollar limits below. A trade can lose money, including the full amount used in that trade.</p>
             <p className="real-window">This permission ends after 24 hours. You must review and start Real trading again if you want it to continue.</p>
             <dl><div><dt>Bot</dt><dd>Bluechip</dd></div><div><dt>Most today</dt><dd>{money(dailyBudget)}</dd></div><div><dt>Most in one trade</dt><dd>{money(perTrade)}</dd></div></dl>
-            <div><button type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="real-start" type="button" disabled={busy} onClick={() => void start(true)}>{busy ? "Starting…" : "Start real trading"}</button></div>
+            <div><button type="button" onClick={() => setRealReviewOpen(false)}>Go back</button><button className="real-start" type="button" disabled={busy || !dashboard.runtime.ready} onClick={() => void start(true)}>{busy ? "Starting…" : "Start real trading"}</button></div>
           </section>
         </div>
       )}

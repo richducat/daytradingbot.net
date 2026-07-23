@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -20,6 +20,11 @@ await cp(
   path.join(root, "deploy", "namecheap", "api", "README.md"),
   path.join(output, "README.md"),
 );
+await cp(
+  path.join(root, "deploy", "namecheap", "api", "run-web-worker-with-recovery.sh"),
+  path.join(output, "run-web-worker-with-recovery.sh"),
+);
+await chmod(path.join(output, "run-web-worker-with-recovery.sh"), 0o755);
 
 const productionPackage = {
   name: apiPackage.name,

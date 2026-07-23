@@ -179,7 +179,7 @@ const errorCopy: Record<string, string> = {
   ENGINE_ACTION_FAILED: "The trading engine could not start that agent. Nothing was turned on.",
   AGENT_NOT_AVAILABLE_IN_THIS_BUILD: "That agent is coming next and is not available in this app yet.",
   OWNER_ENGINE_NOT_INSTALLED: "The trading engine is not installed on this computer yet.",
-  PURCHASE_CODE_NOT_RECOGNIZED: "That purchase code was not recognized. Check the code and try again.",
+  PURCHASE_CODE_NOT_RECOGNIZED: "That access code was not recognized. Check the code and try again.",
   PURCHASE_CODE_ACTIVE_ELSEWHERE: "That purchase is already active on another computer.",
   LICENSE_ACTIVATION_UNAVAILABLE: "App activation is temporarily unavailable. Practice still works.",
   LICENSE_ACTIVATION_INVALID: "The activation response could not be verified. Real trading stayed off.",
@@ -490,7 +490,7 @@ export function App() {
 
   const activate = async () => {
     if (!purchaseCode.trim()) {
-      setNotice("Enter the purchase code from your DayTradingBot receipt.");
+      setNotice("Enter your DayTradingBot access code.");
       return;
     }
     setBusy(true);
@@ -732,7 +732,7 @@ export function App() {
             {setupStep === 4 ? (
               <div className="setup-body mode-body">
                 <button className={mode === "practice" ? "mode-choice selected" : "mode-choice"} type="button" onClick={() => setMode("practice")}><span>Practice</span><strong>See the agents work without using real money.</strong><small>Recommended for your first run</small></button>
-                <button className={mode === "real" ? "mode-choice selected" : "mode-choice"} type="button" onClick={() => setMode("real")}><span>Real trading</span><strong>Use money in your connected accounts.</strong><small>{license.real_trading_ready ? "App activated · every trade can lose money" : "Enter your purchase code once before starting"}</small></button>
+                <button className={mode === "real" ? "mode-choice selected" : "mode-choice"} type="button" onClick={() => setMode("real")}><span>Real trading</span><strong>Use money in your connected accounts.</strong><small>{license.real_trading_ready ? "App activated · every trade can lose money" : "Enter your access code once before starting"}</small></button>
                 <div className="start-summary"><span>{selectedAgents.map((agent) => agent.name).join(" + ") || "Choose an agent"}</span><strong>{money(dailyBudget)} today · {money(perTrade)} per trade</strong></div>
               </div>
             ) : null}
@@ -790,7 +790,7 @@ export function App() {
               <p>This app is activated for real trading on this computer. Practice and real trading are both available.</p>
             ) : (
               <>
-                <p>Enter the purchase code from your receipt. One purchase can be active on one computer at a time.</p>
+                <p>Enter your access code. One code can be active on one computer at a time.</p>
                 <label>
                   <span>Purchase code</span>
                   <input type="text" autoComplete="off" spellCheck={false} placeholder="DTB-…" value={purchaseCode} onChange={(event) => setPurchaseCode(event.target.value.toUpperCase())} />

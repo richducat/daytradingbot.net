@@ -205,6 +205,10 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
     if (config.NODE_ENV === "production" && config.WEBAPP_ENABLED && !webAppService) {
       throw new Error("browser app services are not configured");
     }
+    if (config.NODE_ENV === "production" && config.WEBAPP_ENABLED) {
+      if (!config.WORKER_SECRET) throw new Error("browser trading worker is not configured");
+      if (!await webAppService?.workerReady()) throw new Error("browser trading worker is stale");
+    }
   });
 
   app.register(helmet, {
@@ -683,6 +687,7 @@ export function buildServer(config: ApiConfig, dependencies: ServerDependencies 
         pause_before_changing: "Pause trading before changing these settings.",
         real_trading_unavailable: "Real trading is temporarily unavailable. Practice still works.",
         real_risk_acknowledgement_required: "Review the real-trading warning before starting.",
+        trading_unavailable: "Bluechip's market checker has not checked in. No trading can start until it is back online.",
       };
       return reply.code(status).send({
         error: error.code,

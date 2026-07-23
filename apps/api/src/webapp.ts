@@ -32,8 +32,11 @@ import {
 
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
 const REAL_AUTHORIZATION_SECONDS = 24 * 60 * 60;
+const REAL_DISCLOSURE_VERSION = "2026-07-22-v1";
 const OAUTH_STATE_SECONDS = 10 * 60;
 const AGENT_CADENCE_MINUTES = 15;
+const WORKER_STALE_MINUTES = 12;
+const CYCLE_LOCK_MINUTES = 8;
 const WATCHLIST = ["AAPL", "NVDA", "TSLA", "SPY", "QQQ", "AMD", "MSFT", "GOOGL"];
 const DIP_THRESHOLD_PERCENT = -1.5;
 const MAX_TRADES_PER_CYCLE = 2;
@@ -84,6 +87,10 @@ export type WebActivity = {
 export type WebDashboard = {
   app: "daytradingbot-web";
   realTradingEnabled: boolean;
+  runtime: {
+    ready: boolean;
+    lastSuccessfulCheckAt: string | null;
+  };
   connection: WebConnectionSummary;
   settings: WebSettings;
   activity: WebActivity[];
@@ -178,6 +185,11 @@ interface IntentRow extends RowDataPacket {
   venue_order_id: string | null;
   symbol: string;
   amount_cents: number;
+}
+
+interface WorkerStatusRow extends RowDataPacket {
+  last_success_at: Date | null;
+  ready: number;
 }
 
 type ClaimedCycle = {
@@ -562,6 +574,51 @@ export class MySqlWebAppRepository {
     );
   }
 
+  async workerStatus(): Promise<{ ready: boolean; lastSuccessfulCheckAt: Date | null }> {
+    const [rows] = await this.pool.execute<WorkerStatusRow[]>(
+      `SELECT last_success_at,
+              CASE WHEN last_success_at IS NOT NULL
+                         AND last_success_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL ? MINUTE)
+                    THEN 1 ELSE 0 END AS ready
+         FROM web_worker_status
+        WHERE worker_name = 'primary'
+        LIMIT 1`,
+      [WORKER_STALE_MINUTES],
+    );
+    const row = rows[0];
+    return {
+      ready: Boolean(row?.ready),
+      lastSuccessfulCheckAt: row?.last_success_at ?? null,
+    };
+  }
+
+  async recordWorkerStarted(): Promise<void> {
+    await this.pool.execute(
+      `INSERT INTO web_worker_status
+         (worker_name, last_started_at, last_result)
+       VALUES ('primary', UTC_TIMESTAMP(6), 'running')
+       ON DUPLICATE KEY UPDATE
+         last_started_at = UTC_TIMESTAMP(6), last_result = 'running',
+         updated_at = UTC_TIMESTAMP(6)`,
+    );
+  }
+
+  async recordWorkerFinished(
+    success: boolean,
+    counts: { claimed: number; completed: number; failed: number },
+  ): Promise<void> {
+    await this.pool.execute(
+      `UPDATE web_worker_status
+          SET last_finished_at = UTC_TIMESTAMP(6),
+              last_success_at = CASE WHEN ? THEN UTC_TIMESTAMP(6) ELSE last_success_at END,
+              last_result = CASE WHEN ? THEN 'success' ELSE 'error' END,
+              claimed_cycles = ?, completed_cycles = ?, failed_cycles = ?,
+              updated_at = UTC_TIMESTAMP(6)
+        WHERE worker_name = 'primary'`,
+      [success, success, counts.claimed, counts.completed, counts.failed],
+    );
+  }
+
   async saveSettings(licenseId: string, mode: TradingMode, daily: number, perTrade: number): Promise<void> {
     await this.ensureSettings(licenseId);
     const [result] = await this.pool.execute<ResultSetHeader>(
@@ -579,22 +636,48 @@ export class MySqlWebAppRepository {
     const authorizedUntil = mode === "real"
       ? new Date(Date.now() + REAL_AUTHORIZATION_SECONDS * 1_000)
       : null;
-    const [result] = await this.pool.execute<ResultSetHeader>(
-      `UPDATE web_trading_settings s
-       JOIN licenses l ON l.license_id = s.license_id
-       JOIN web_trading_connections c
-         ON c.license_id = s.license_id AND c.provider = 'robinhood'
-          SET s.mode = ?, s.running = TRUE, s.real_authorized_until = ?,
-              s.next_check_at = UTC_TIMESTAMP(6), s.cycle_locked_until = NULL,
-              s.status_message = 'Bluechip is ready for its first market check.',
-              s.updated_at = UTC_TIMESTAMP(6)
-        WHERE s.license_id = ? AND l.status = 'active'
-          AND c.connection_state = 'connected' AND s.running = FALSE`,
-      [mode, authorizedUntil, licenseId],
-    );
-    if (result.affectedRows !== 1) {
-      if ((await this.getSettings(licenseId)).running) throw new WebAppError("pause_before_changing");
-      throw new WebAppError("connection_required");
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE web_trading_settings s
+         JOIN licenses l ON l.license_id = s.license_id
+         JOIN web_trading_connections c
+           ON c.license_id = s.license_id AND c.provider = 'robinhood'
+            SET s.mode = ?, s.running = TRUE, s.real_authorized_until = ?,
+                s.next_check_at = UTC_TIMESTAMP(6), s.cycle_locked_until = NULL,
+                s.status_message = 'Bluechip is ready for its first market check.',
+                s.updated_at = UTC_TIMESTAMP(6)
+          WHERE s.license_id = ? AND l.status = 'active'
+            AND c.connection_state = 'connected' AND s.running = FALSE`,
+        [mode, authorizedUntil, licenseId],
+      );
+      if (result.affectedRows !== 1) {
+        const [settings] = await connection.execute<(RowDataPacket & { running: number })[]>(
+          "SELECT running FROM web_trading_settings WHERE license_id = ?",
+          [licenseId],
+        );
+        await connection.rollback();
+        if (settings[0]?.running) throw new WebAppError("pause_before_changing");
+        throw new WebAppError("connection_required");
+      }
+      if (mode === "real" && authorizedUntil) {
+        await connection.execute(
+          `INSERT INTO web_real_authorizations
+             (authorization_id, license_id, disclosure_version, daily_budget_cents,
+              max_per_trade_cents, authorized_at, expires_at)
+           SELECT ?, license_id, ?, daily_budget_cents, max_per_trade_cents,
+                  UTC_TIMESTAMP(6), ?
+             FROM web_trading_settings WHERE license_id = ?`,
+          [randomUUID(), REAL_DISCLOSURE_VERSION, authorizedUntil, licenseId],
+        );
+      }
+      await connection.commit();
+    } catch (error) {
+      await rollbackQuietly(connection);
+      throw error;
+    } finally {
+      connection.release();
     }
   }
 
@@ -608,7 +691,7 @@ export class MySqlWebAppRepository {
     );
   }
 
-  async claimDueCycles(limit = 10): Promise<ClaimedCycle[]> {
+  async claimDueCycles(limit = 1): Promise<ClaimedCycle[]> {
     const safeLimit = Math.max(1, Math.min(25, Math.trunc(limit)));
     const connection = await this.pool.getConnection();
     try {
@@ -634,9 +717,9 @@ export class MySqlWebAppRepository {
       for (const row of rows) {
         await connection.execute(
           `UPDATE web_trading_settings
-              SET cycle_locked_until = DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 4 MINUTE)
+              SET cycle_locked_until = DATE_ADD(UTC_TIMESTAMP(6), INTERVAL ? MINUTE)
             WHERE license_id = ?`,
-          [row.license_id],
+          [CYCLE_LOCK_MINUTES, row.license_id],
         );
       }
       await connection.commit();
@@ -653,6 +736,23 @@ export class MySqlWebAppRepository {
     } finally {
       connection.release();
     }
+  }
+
+  async reconciliationLicenses(limit = 25): Promise<string[]> {
+    const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)));
+    const [rows] = await this.pool.query<(RowDataPacket & { license_id: string })[]>(
+      `SELECT i.license_id
+         FROM web_trade_intents i
+         JOIN licenses l ON l.license_id = i.license_id AND l.status = 'active'
+         JOIN web_trading_connections c
+           ON c.license_id = i.license_id AND c.provider = 'robinhood'
+          AND c.connection_state = 'connected'
+        WHERE i.state IN ('submitting','submitted','unknown')
+        GROUP BY i.license_id
+        ORDER BY MIN(i.created_at) ASC
+        LIMIT ${safeLimit}`,
+    );
+    return rows.map((row) => row.license_id);
   }
 
   async finishCycle(licenseId: string, message: string): Promise<void> {
@@ -728,7 +828,7 @@ export class MySqlWebAppRepository {
       const [riskRows] = await connection.execute<(RowDataPacket & { used_cents: string | number; resting: number })[]>(
         `SELECT
            COALESCE(SUM(CASE WHEN created_at >= ? AND state IN
-             ('reserved','submitting','submitted','unknown','filled') THEN amount_cents ELSE 0 END), 0) AS used_cents,
+             ('reserved','submitting','submitted','unknown','filled','canceled') THEN amount_cents ELSE 0 END), 0) AS used_cents,
            COALESCE(SUM(CASE WHEN state IN ('submitting','submitted','unknown') THEN 1 ELSE 0 END), 0) AS resting
          FROM web_trade_intents
         WHERE license_id = ?`,
@@ -778,6 +878,26 @@ export class MySqlWebAppRepository {
       [fingerprint, intentId],
     );
     return result.affectedRows === 1;
+  }
+
+  async submissionStillAuthorized(intentId: string): Promise<boolean> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT 1
+         FROM web_trade_intents i
+         JOIN web_trading_settings s ON s.license_id = i.license_id
+         JOIN licenses l ON l.license_id = i.license_id
+         JOIN web_trading_connections c
+           ON c.license_id = i.license_id AND c.provider = 'robinhood'
+        WHERE i.intent_id = ? AND i.state = 'submitting'
+          AND s.running = TRUE AND s.mode = 'real'
+          AND s.real_authorized_until > UTC_TIMESTAMP(6)
+          AND i.amount_cents <= s.max_per_trade_cents
+          AND l.status = 'active'
+          AND c.connection_state = 'connected'
+        LIMIT 1`,
+      [intentId],
+    );
+    return rows.length === 1;
   }
 
   async markIntent(
@@ -884,9 +1004,73 @@ function connectionWire(connection: StoredConnection | null): WebConnectionSumma
   };
 }
 
-function marketIsOpen(now = new Date()): boolean {
+function dateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function observedFixedHoliday(year: number, month: number, day: number): string {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay();
+  if (weekday === 6) date.setUTCDate(date.getUTCDate() - 1);
+  if (weekday === 0) date.setUTCDate(date.getUTCDate() + 1);
+  return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function nthWeekday(year: number, month: number, weekday: number, nth: number): string {
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const day = 1 + ((weekday - first.getUTCDay() + 7) % 7) + (nth - 1) * 7;
+  return dateKey(year, month, day);
+}
+
+function lastWeekday(year: number, month: number, weekday: number): string {
+  const last = new Date(Date.UTC(year, month, 0));
+  const day = last.getUTCDate() - ((last.getUTCDay() - weekday + 7) % 7);
+  return dateKey(year, month, day);
+}
+
+function goodFriday(year: number): string {
+  // Gregorian Easter (Meeus/Jones/Butcher), then two days back.
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  const date = new Date(Date.UTC(year, month - 1, day - 2));
+  return dateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+}
+
+function regularMarketHolidays(year: number): Set<string> {
+  const holidays = new Set<string>();
+  for (const fixedYear of [year - 1, year, year + 1]) {
+    holidays.add(observedFixedHoliday(fixedYear, 1, 1));
+    holidays.add(observedFixedHoliday(fixedYear, 7, 4));
+    holidays.add(observedFixedHoliday(fixedYear, 12, 25));
+    if (fixedYear >= 2022) holidays.add(observedFixedHoliday(fixedYear, 6, 19));
+  }
+  holidays.add(nthWeekday(year, 1, 1, 3));
+  holidays.add(nthWeekday(year, 2, 1, 3));
+  holidays.add(goodFriday(year));
+  holidays.add(lastWeekday(year, 5, 1));
+  holidays.add(nthWeekday(year, 9, 1, 1));
+  holidays.add(nthWeekday(year, 11, 4, 4));
+  return holidays;
+}
+
+export function marketIsOpen(now = new Date()): boolean {
   const pieces = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
@@ -894,11 +1078,21 @@ function marketIsOpen(now = new Date()): boolean {
   }).formatToParts(now);
   const part = (type: Intl.DateTimeFormatPartTypes) => pieces.find((piece) => piece.type === type)?.value;
   const weekday = part("weekday");
+  const year = Number(part("year"));
+  const month = Number(part("month"));
+  const day = Number(part("day"));
   const hour = Number(part("hour"));
   const minute = Number(part("minute"));
-  if (weekday === "Sat" || weekday === "Sun" || !Number.isInteger(hour) || !Number.isInteger(minute)) return false;
+  if (
+    weekday === "Sat"
+    || weekday === "Sun"
+    || ![year, month, day, hour, minute].every(Number.isInteger)
+    || regularMarketHolidays(year).has(dateKey(year, month, day))
+  ) return false;
   const current = hour * 60 + minute;
-  return current >= 9 * 60 + 30 && current < 16 * 60;
+  // Bluechip intentionally uses a narrower window than the exchange session.
+  // It avoids the open and is already stopped before any standard 1 p.m. early close.
+  return current >= 10 * 60 && current < 12 * 60 + 45;
 }
 
 function easternDayStart(now = new Date()): Date {
@@ -916,6 +1110,9 @@ function easternDayStart(now = new Date()): Date {
 }
 
 function plainTradingError(error: unknown): { message: string; pause: boolean } {
+  if (error instanceof WebAppError && ["connection_required", "connection_unavailable"].includes(error.code)) {
+    return { message: "Robinhood needs to be reconnected before Bluechip can continue.", pause: true };
+  }
   if (error instanceof RobinhoodError) {
     if (error.code === "authentication_failed") {
       return { message: "Robinhood needs to be reconnected before Bluechip can continue.", pause: true };
@@ -925,6 +1122,9 @@ function plainTradingError(error: unknown): { message: string; pause: boolean } 
     }
     if (error.code === "placement_unknown") {
       return { message: "Robinhood's order response was unclear. Trading is paused so the order can be checked before anything else happens.", pause: true };
+    }
+    if (error.code === "invalid_response") {
+      return { message: "Robinhood did not return complete market data. No new order was sent.", pause: false };
     }
   }
   return { message: "Bluechip could not finish this market check. No new order was sent.", pause: false };
@@ -944,7 +1144,18 @@ export interface WebAppOperations {
   start(licenseId: string, input: { mode: TradingMode; acceptedRealRisk: boolean }): Promise<WebDashboard>;
   pause(licenseId: string): Promise<WebDashboard>;
   runDueCycles(): Promise<{ claimed: number; completed: number; failed: number }>;
+  workerReady(): Promise<boolean>;
 }
+
+type RobinhoodSession = Pick<
+  Awaited<ReturnType<RobinhoodMcpClient["tradingSession"]>>,
+  "buyingPowerCents" | "positions" | "orders" | "quotes" | "reviewMarketBuy" | "placeReviewedMarketBuy"
+>;
+type RobinhoodClient = {
+  snapshot(): Promise<RobinhoodSnapshot>;
+  tradingSession(): Promise<RobinhoodSession>;
+};
+type RobinhoodClientFactory = (accessToken: string) => RobinhoodClient;
 
 export class WebAppService implements WebAppOperations {
   private readonly callbackUrl: string;
@@ -955,6 +1166,7 @@ export class WebAppService implements WebAppOperations {
     publicApiUrl: string,
     publicSiteUrl: string,
     private readonly realTradingEnabled: boolean,
+    private readonly robinhoodClientFactory: RobinhoodClientFactory = (accessToken) => new RobinhoodMcpClient(accessToken),
   ) {
     this.callbackUrl = new URL("/v1/web/connections/robinhood/callback", publicApiUrl).toString();
     this.webAppUrl = new URL("/app/", publicSiteUrl).toString();
@@ -977,14 +1189,19 @@ export class WebAppService implements WebAppOperations {
   }
 
   async dashboard(licenseId: string): Promise<WebDashboard> {
-    const [settings, connection, activity] = await Promise.all([
+    const [settings, connection, activity, runtime] = await Promise.all([
       this.repository.getSettings(licenseId),
       this.repository.getConnection(licenseId),
       this.repository.listActivity(licenseId),
+      this.repository.workerStatus(),
     ]);
     return {
       app: "daytradingbot-web",
       realTradingEnabled: this.realTradingEnabled,
+      runtime: {
+        ready: runtime.ready,
+        lastSuccessfulCheckAt: dateIso(runtime.lastSuccessfulCheckAt),
+      },
       connection: connectionWire(connection),
       settings: settingsWire(settings),
       activity,
@@ -1052,7 +1269,7 @@ export class WebAppService implements WebAppOperations {
     }
   }
 
-  private async currentRobinhood(licenseId: string): Promise<{ bundle: RobinhoodTokenBundle; client: RobinhoodMcpClient }> {
+  private async currentRobinhood(licenseId: string): Promise<{ bundle: RobinhoodTokenBundle; client: RobinhoodClient }> {
     const connection = await this.repository.getConnection(licenseId);
     if (!connection) throw new WebAppError("connection_required");
     let bundle = connection.credentials;
@@ -1065,7 +1282,7 @@ export class WebAppService implements WebAppOperations {
         throw new WebAppError("connection_required");
       }
     }
-    return { bundle, client: new RobinhoodMcpClient(bundle.accessToken) };
+    return { bundle, client: this.robinhoodClientFactory(bundle.accessToken) };
   }
 
   async checkRobinhoodConnection(licenseId: string): Promise<WebConnectionSummary> {
@@ -1105,6 +1322,7 @@ export class WebAppService implements WebAppOperations {
     licenseId: string,
     input: { mode: TradingMode; acceptedRealRisk: boolean },
   ): Promise<WebDashboard> {
+    if (!(await this.workerReady())) throw new WebAppError("trading_unavailable");
     if (input.mode === "real") {
       if (!this.realTradingEnabled) throw new WebAppError("real_trading_unavailable");
       if (!input.acceptedRealRisk) throw new WebAppError("real_risk_acknowledgement_required");
@@ -1129,31 +1347,57 @@ export class WebAppService implements WebAppOperations {
   }
 
   async runDueCycles(): Promise<{ claimed: number; completed: number; failed: number }> {
-    const cycles = await this.repository.claimDueCycles();
-    let completed = 0;
-    let failed = 0;
-    for (const cycle of cycles) {
-      try {
-        await this.runBluechipCycle(cycle);
-        completed += 1;
-      } catch (error) {
-        failed += 1;
-        const plain = plainTradingError(error);
-        await this.repository.recordActivity(cycle.licenseId, cycle.mode, "error", plain.message);
-        await this.repository.failCycle(cycle.licenseId, plain.message, plain.pause);
+    await this.repository.recordWorkerStarted();
+    const counts = { claimed: 0, completed: 0, failed: 0 };
+    try {
+      const reconciliationLicenses = await this.repository.reconciliationLicenses();
+      for (const licenseId of reconciliationLicenses) {
+        try {
+          const { client } = await this.currentRobinhood(licenseId);
+          await this.reconcile(licenseId, await client.tradingSession());
+        } catch (error) {
+          counts.failed += 1;
+          const plain = plainTradingError(error);
+          await this.repository.recordActivity(licenseId, "real", "error", plain.message);
+          if (plain.pause) await this.repository.pauseTrading(licenseId, plain.message);
+        }
       }
+      const cycles = await this.repository.claimDueCycles();
+      counts.claimed = cycles.length;
+      for (const cycle of cycles) {
+        try {
+          await this.runBluechipCycle(cycle);
+          counts.completed += 1;
+        } catch (error) {
+          counts.failed += 1;
+          const plain = plainTradingError(error);
+          await this.repository.recordActivity(cycle.licenseId, cycle.mode, "error", plain.message);
+          await this.repository.failCycle(cycle.licenseId, plain.message, plain.pause);
+        }
+      }
+      await this.repository.recordWorkerFinished(true, counts);
+      return counts;
+    } catch (error) {
+      await this.repository.recordWorkerFinished(false, counts).catch(() => undefined);
+      throw error;
     }
-    return { claimed: cycles.length, completed, failed };
   }
 
-  private async reconcile(licenseId: string, session: Awaited<ReturnType<RobinhoodMcpClient["tradingSession"]>>): Promise<void> {
+  async workerReady(): Promise<boolean> {
+    return (await this.repository.workerStatus()).ready;
+  }
+
+  private async reconcile(licenseId: string, session: RobinhoodSession): Promise<void> {
     const unresolved = await this.repository.unresolvedIntents(licenseId);
+    const recentOrders = unresolved.some((intent) => !intent.venue_order_id)
+      ? await session.orders({ since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1_000) })
+      : [];
     for (const intent of unresolved) {
-      if (!intent.venue_order_id) {
-        throw new RobinhoodError("placement_unknown");
-      }
-      const order = (await session.orders({ orderId: intent.venue_order_id }))[0];
+      const order = intent.venue_order_id
+        ? (await session.orders({ orderId: intent.venue_order_id }))[0]
+        : recentOrders.find((candidate) => candidate.refId === intent.intent_id);
       if (!order) throw new RobinhoodError("placement_unknown");
+      if (!intent.venue_order_id) await this.repository.markIntent(intent.intent_id, "submitted", order.orderId);
       await this.settleOrder(licenseId, "real", intent.intent_id, intent.symbol, order);
     }
   }
@@ -1182,12 +1426,26 @@ export class WebAppService implements WebAppOperations {
       }
     }
     if (order.state === "filled") await this.repository.markIntent(intentId, "filled", order.orderId);
-    else if (order.state === "canceled") await this.repository.markIntent(intentId, "canceled", order.orderId);
-    else if (order.state === "rejected") await this.repository.markIntent(intentId, "rejected", order.orderId, "robinhood_rejected");
-    else if (order.state === "unknown") await this.repository.markIntent(intentId, "unknown", order.orderId, "unknown_order_state");
+    else if (order.state === "canceled") {
+      await this.repository.markIntent(intentId, "canceled", order.orderId);
+      await this.repository.recordActivity(licenseId, mode, "skipped", `${order.symbol} order was canceled.`, order.symbol);
+    } else if (order.state === "rejected") {
+      await this.repository.markIntent(intentId, "rejected", order.orderId, "robinhood_rejected");
+      await this.repository.recordActivity(licenseId, mode, "skipped", `${order.symbol} order was rejected by Robinhood.`, order.symbol);
+    }
+    else if (order.state === "unknown") {
+      await this.repository.markIntent(intentId, "unknown", order.orderId, "unknown_order_state");
+      throw new RobinhoodError("placement_unknown");
+    }
   }
 
   private async runBluechipCycle(cycle: ClaimedCycle): Promise<void> {
+    if (cycle.mode === "real" && !this.realTradingEnabled) {
+      const message = "Real trading is unavailable, so Bluechip stopped before sending another order.";
+      await this.repository.pauseTrading(cycle.licenseId, message);
+      await this.repository.recordActivity(cycle.licenseId, cycle.mode, "paused", message);
+      return;
+    }
     if (
       cycle.mode === "real"
       && (!cycle.realAuthorizedUntil || cycle.realAuthorizedUntil.getTime() <= Date.now())
@@ -1213,6 +1471,10 @@ export class WebAppService implements WebAppOperations {
     const positions = await session.positions();
     const orders = await session.orders({ since: new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000) });
     const quotes = await session.quotes(WATCHLIST);
+    const receivedSymbols = new Set(quotes.map((quote) => quote.symbol));
+    if (quotes.length !== WATCHLIST.length || WATCHLIST.some((symbol) => !receivedSymbols.has(symbol))) {
+      throw new RobinhoodError("invalid_response");
+    }
     const held = new Set(positions.filter((position) => position.quantity > 0).map((position) => position.symbol));
     const pending = new Set(orders.filter((order) => ["pending", "partially_filled", "unknown"].includes(order.state)).map((order) => order.symbol));
     const candidates = quotes
@@ -1259,6 +1521,13 @@ export class WebAppService implements WebAppOperations {
         );
         continue;
       }
+      if (reviewed.quote.changePercent > DIP_THRESHOLD_PERCENT) {
+        await this.repository.recordActivity(
+          cycle.licenseId, cycle.mode, "skipped",
+          `${candidate.symbol} moved before the order review and no longer matched Bluechip's rule.`, candidate.symbol,
+        );
+        continue;
+      }
       await this.repository.recordActivity(
         cycle.licenseId,
         cycle.mode,
@@ -1302,6 +1571,10 @@ export class WebAppService implements WebAppOperations {
         .update(`${reservation.intentId}|${candidate.symbol}|buy|market|${(amountCents / 100).toFixed(2)}|gfd|regular`, "utf8")
         .digest();
       if (!await this.repository.beginSubmission(reservation.intentId, fingerprint)) {
+        await this.repository.markIntent(reservation.intentId, "rejected", null, "paused_before_submission");
+        break;
+      }
+      if (!await this.repository.submissionStillAuthorized(reservation.intentId)) {
         await this.repository.markIntent(reservation.intentId, "rejected", null, "paused_before_submission");
         break;
       }

@@ -51,16 +51,17 @@ export type RobinhoodExecution = {
   executedAt: Date;
 };
 export type RobinhoodOrder = {
-  orderId: string;
-  symbol: string;
-  state: RobinhoodOrderState;
-  executions: RobinhoodExecution[];
+  readonly orderId: string;
+  readonly refId: string | null;
+  readonly symbol: string;
+  readonly state: RobinhoodOrderState;
+  readonly executions: readonly RobinhoodExecution[];
 };
 export type ReviewedRobinhoodBuy = {
-  accountNumber: string;
-  symbol: string;
-  amountCents: number;
-  quote: RobinhoodQuote;
+  readonly accountNumber: string;
+  readonly symbol: string;
+  readonly amountCents: number;
+  readonly quote: Readonly<RobinhoodQuote>;
 };
 export type RobinhoodPlacement = { orderId: string; state: RobinhoodOrderState };
 
@@ -333,7 +334,11 @@ const executionSchema = z.object({
   id: z.string().min(1).max(255), quantity: z.unknown(), price: z.unknown(), fees: z.unknown().optional(), timestamp: z.string(),
 });
 const orderPayloadSchema = z.object({ data: z.object({ orders: z.array(z.object({
-  id: z.string(), symbol: z.string(), state: z.string(), executions: z.array(executionSchema).optional().default([]),
+  id: z.string(),
+  ref_id: z.string().nullish(),
+  symbol: z.string(),
+  state: z.string(),
+  executions: z.array(executionSchema).optional().default([]),
 })) }) });
 const reviewPayloadSchema = z.object({ data: z.object({
   symbol: z.string(), side: z.string(), type: z.string(), dollar_amount: z.unknown(), quote_data: quoteWireSchema,
@@ -363,6 +368,21 @@ function orderState(value: string): RobinhoodOrderState {
   if (["rejected", "failed"].includes(value)) return "rejected";
   if (["new", "queued", "confirmed", "unconfirmed"].includes(value)) return "pending";
   return "unknown";
+}
+
+function hasPreTradeWarning(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some(hasPreTradeWarning);
+  for (const [key, nested] of Object.entries(value)) {
+    if (/warning|alert/i.test(key)) {
+      if (Array.isArray(nested) && nested.length > 0) return true;
+      if (typeof nested === "string" && nested.trim()) return true;
+      if (typeof nested === "boolean" && nested) return true;
+      if (nested && typeof nested === "object" && Object.keys(nested).length > 0) return true;
+    }
+    if (hasPreTradeWarning(nested)) return true;
+  }
+  return false;
 }
 
 export class RobinhoodTradingSession {
@@ -417,6 +437,7 @@ export class RobinhoodTradingSession {
     const payload = orderPayloadSchema.parse(await this.call("get_equity_orders", arguments_));
     return payload.data.orders.map((wire) => ({
       orderId: cleanUuid(wire.id),
+      refId: wire.ref_id ? cleanUuid(wire.ref_id) : null,
       symbol: cleanSymbol(wire.symbol),
       state: orderState(wire.state),
       executions: wire.executions.map((execution) => {
@@ -438,7 +459,7 @@ export class RobinhoodTradingSession {
       throw new RobinhoodError("invalid_input");
     }
     const amount = (amountCents / 100).toFixed(2);
-    const payload = reviewPayloadSchema.parse(await this.call("review_equity_order", {
+    const rawPayload = await this.call("review_equity_order", {
       account_number: this.accountNumber,
       symbol,
       side: "buy",
@@ -446,7 +467,9 @@ export class RobinhoodTradingSession {
       dollar_amount: amount,
       time_in_force: "gfd",
       market_hours: "regular_hours",
-    }));
+    });
+    if (hasPreTradeWarning(rawPayload)) throw new RobinhoodError("placement_rejected");
+    const payload = reviewPayloadSchema.parse(rawPayload);
     if (
       cleanSymbol(payload.data.symbol) !== symbol
       || payload.data.side !== "buy"
@@ -457,7 +480,12 @@ export class RobinhoodTradingSession {
     }
     const quote = quoteFromWire(payload.data.quote_data);
     if (quote.symbol !== symbol) throw new RobinhoodError("invalid_response");
-    return { accountNumber: this.accountNumber, symbol, amountCents, quote };
+    return Object.freeze({
+      accountNumber: this.accountNumber,
+      symbol,
+      amountCents,
+      quote: Object.freeze(quote),
+    });
   }
 
   async placeReviewedMarketBuy(reviewed: ReviewedRobinhoodBuy, refIdValue: string): Promise<RobinhoodPlacement> {

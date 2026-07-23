@@ -209,6 +209,7 @@ describe("control-plane API", () => {
     const dashboard: WebDashboard = {
       app: "daytradingbot-web",
       realTradingEnabled: true,
+      runtime: { ready: true, lastSuccessfulCheckAt: "2026-07-21T11:59:00.000Z" },
       connection: {
         provider: "robinhood",
         connected: false,
@@ -257,6 +258,7 @@ describe("control-plane API", () => {
       start: async () => dashboard,
       pause: async () => dashboard,
       runDueCycles: async () => ({ claimed: 0, completed: 0, failed: 0 }),
+      workerReady: async () => true,
     };
     const app = buildServer(config, {
       readinessCheck: async () => undefined,

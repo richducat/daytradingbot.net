@@ -2,7 +2,7 @@
 
 DayTradingBot's initial commercial release uses the already-paid Namecheap **Stellar Business** account. This adds no server purchase and does not use Vercel.
 
-The trading app runs on each customer's computer. Namecheap only handles the website support work: starting checkout, sending activation codes, activating the app, and serving installers. That workload fits the included Node.js, MariaDB, email, SSL, and backup features without moving customer brokerage credentials or orders to shared hosting.
+Customers can use the browser app or the Mac app. The browser app runs its bounded Bluechip checks on Namecheap; Robinhood credentials are encrypted before database storage and real orders are sent only through Robinhood's official Agentic Trading connection. The Mac app keeps its connected-account execution on the customer's computer. This fits the included Node.js, MariaDB, email, SSL, and backup features without buying another server.
 
 ## Isolated layout
 

@@ -130,6 +130,8 @@ describe("Robinhood browser connection", () => {
     const reviewed = await session.reviewMarketBuy("AAPL", 200);
     const placement = await session.placeReviewedMarketBuy(reviewed, intentId);
 
+    expect(Object.isFrozen(reviewed)).toBe(true);
+    expect(Object.isFrozen(reviewed.quote)).toBe(true);
     expect(placement).toEqual({ orderId, state: "pending" });
     expect(requests.at(-1)).toMatchObject({
       method: "tools/call",
@@ -147,5 +149,84 @@ describe("Robinhood browser connection", () => {
         },
       },
     });
+  });
+
+  it("fails closed when Robinhood returns a pre-trade warning", async () => {
+    const responses = [
+      new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { protocolVersion: "2025-03-26" },
+      }), { status: 200, headers: { "mcp-session-id": "session-123" } }),
+      new Response("", { status: 202 }),
+      rpc(2, {
+        structuredContent: { data: { accounts: [{ account_number: "agentic", agentic_allowed: true }] } },
+        isError: false,
+      }),
+      rpc(3, {
+        structuredContent: {
+          data: {
+            symbol: "AAPL",
+            side: "buy",
+            type: "market",
+            dollar_amount: "2.00",
+            warnings: [{ message: "review required" }],
+            quote_data: {
+              symbol: "AAPL",
+              last_trade_price: "100.00",
+              previous_close: "103.00",
+              venue_last_trade_time: "2026-07-14T17:00:00.000Z",
+            },
+          },
+        },
+        isError: false,
+      }),
+    ];
+    const fetcher = vi.fn(async () => {
+      const response = responses.shift();
+      if (!response) throw new Error("unexpected request");
+      return response;
+    }) as unknown as typeof fetch;
+
+    const session = await new RobinhoodMcpClient("a".repeat(32), fetcher).tradingSession();
+    await expect(session.reviewMarketBuy("AAPL", 200))
+      .rejects.toMatchObject({ code: "placement_rejected" });
+  });
+
+  it("keeps the intent reference when reading orders for crash recovery", async () => {
+    const intentId = "b3aa5c84-206c-4ce7-873a-97a61b99f70c";
+    const orderId = "ed602d6c-8d86-4e18-9bd5-cda8850473f3";
+    const responses = [
+      new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { protocolVersion: "2025-03-26" },
+      }), { status: 200, headers: { "mcp-session-id": "session-123" } }),
+      new Response("", { status: 202 }),
+      rpc(2, {
+        structuredContent: { data: { accounts: [{ account_number: "agentic", agentic_allowed: true }] } },
+        isError: false,
+      }),
+      rpc(3, {
+        structuredContent: {
+          data: { orders: [{ id: orderId, ref_id: intentId, symbol: "AAPL", state: "queued", executions: [] }] },
+        },
+        isError: false,
+      }),
+    ];
+    const fetcher = vi.fn(async () => {
+      const response = responses.shift();
+      if (!response) throw new Error("unexpected request");
+      return response;
+    }) as unknown as typeof fetch;
+
+    const session = await new RobinhoodMcpClient("a".repeat(32), fetcher).tradingSession();
+    expect(await session.orders({ since: new Date("2026-07-14T00:00:00.000Z") })).toEqual([{
+      orderId,
+      refId: intentId,
+      symbol: "AAPL",
+      state: "pending",
+      executions: [],
+    }]);
   });
 });
