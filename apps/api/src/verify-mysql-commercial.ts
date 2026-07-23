@@ -3,6 +3,7 @@ import {
   randomBytes,
 } from "node:crypto";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createPool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { MySqlCommerceRepository } from "./commerce-mysql.js";
@@ -29,7 +30,10 @@ const forbiddenSharedHostTables = [
   "web_worker_status",
 ] as const;
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL
+  ?? (process.env.DATABASE_URL_FILE
+    ? readFileSync(process.env.DATABASE_URL_FILE, "utf8").trim()
+    : undefined);
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const parsed = new URL(databaseUrl);
