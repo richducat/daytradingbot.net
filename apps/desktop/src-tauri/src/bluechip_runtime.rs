@@ -197,23 +197,13 @@ impl BluechipRuntime {
                     if buying_power < config.max_per_trade_usd {
                         return Err("ADD_FUNDS_TO_ROBINHOOD");
                     }
-                    reconcile_orders(app.state::<Ledger>().inner(), &mut session, &config).await?;
-                    if app
-                        .state::<Ledger>()
-                        .unresolved_submissions()
-                        .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")?
-                        .iter()
-                        .any(|attempt| {
-                            matches!(
-                                attempt.state,
-                                SubmissionAttemptState::Submitting
-                                    | SubmissionAttemptState::Unknown
-                                    | SubmissionAttemptState::Quarantined
-                            )
-                        })
-                    {
-                        return Err("ORDER_RECONCILIATION_REQUIRED");
-                    }
+                    let _ = reconcile_orders(
+                        app.state::<Ledger>().inner(),
+                        &mut session,
+                        &config,
+                        ReconcileMode::ReadOnly,
+                    )
+                    .await?;
                 }
                 Ok::<(), &'static str>(())
             },
@@ -371,7 +361,19 @@ async fn run_cycle(
         .await
         .map_err(|_| "ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED")?;
     if config.mode == NativeTradingMode::Real {
-        reconcile_orders(ledger.inner(), &mut session, config).await?;
+        let recovered_order = reconcile_orders(
+            ledger.inner(),
+            &mut session,
+            config,
+            ReconcileMode::Running { app, generation },
+        )
+        .await?;
+        if recovered_order {
+            return Ok(
+                "Robinhood confirmed an earlier order. Bluechip will wait until the next market check before considering another trade."
+                    .into(),
+            );
+        }
     }
 
     let buying_power = session
@@ -709,10 +711,12 @@ async fn reconcile_orders(
     ledger: &Ledger,
     session: &mut RobinhoodTradingSession<'_>,
     config: &BluechipConfig,
-) -> Result<(), &'static str> {
+    mode: ReconcileMode<'_>,
+) -> Result<bool, &'static str> {
     let attempts = ledger
         .unresolved_submissions()
         .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+    let mut recovered_order = false;
     for attempt in attempts {
         match attempt.state {
             SubmissionAttemptState::Acknowledged => {
@@ -730,10 +734,20 @@ async fn reconcile_orders(
                 ledger
                     .mark_submission_unknown(attempt.intent_id, "recovered_after_restart")
                     .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                recover_unknown_order(ledger, session, config, &attempt).await?;
+                if let ReconcileMode::Running { app, generation } = mode {
+                    recovered_order |=
+                        recover_unknown_order(ledger, session, config, &attempt, app, generation)
+                            .await?
+                            == RecoveryOutcome::Acknowledged;
+                }
             }
             SubmissionAttemptState::Unknown => {
-                recover_unknown_order(ledger, session, config, &attempt).await?;
+                if let ReconcileMode::Running { app, generation } = mode {
+                    recovered_order |=
+                        recover_unknown_order(ledger, session, config, &attempt, app, generation)
+                            .await?
+                            == RecoveryOutcome::Acknowledged;
+                }
             }
             SubmissionAttemptState::Quarantined => {
                 return Err("ORDER_RECONCILIATION_REQUIRED");
@@ -741,7 +755,19 @@ async fn reconcile_orders(
             SubmissionAttemptState::Reconciled => {}
         }
     }
-    Ok(())
+    Ok(recovered_order)
+}
+
+#[derive(Clone, Copy)]
+enum ReconcileMode<'a> {
+    ReadOnly,
+    Running { app: &'a AppHandle, generation: u64 },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecoveryOutcome {
+    Acknowledged,
+    Rejected,
 }
 
 /// Robinhood documents `ref_id` as an upstream idempotency key: sending the
@@ -753,12 +779,26 @@ async fn recover_unknown_order(
     session: &mut RobinhoodTradingSession<'_>,
     config: &BluechipConfig,
     attempt: &daytradingbot_ledger::SubmissionAttemptRecord,
-) -> Result<(), &'static str> {
+    app: &AppHandle,
+    generation: u64,
+) -> Result<RecoveryOutcome, &'static str> {
     let ref_id = validate_recovery_attempt(attempt, config)?;
+    require_recovery_authorization(app, generation, config)?;
+    let buying_power = session
+        .buying_power()
+        .await
+        .map_err(|_| "ROBINHOOD_ACCOUNT_CHECK_FAILED")?;
+    if buying_power < attempt.notional_usd {
+        return Err("ADD_FUNDS_TO_ROBINHOOD");
+    }
     let reviewed = session
         .review_market_buy(&attempt.instrument, attempt.notional_usd)
         .await
         .map_err(|_| "ROBINHOOD_ORDER_RECOVERY_FAILED")?;
+    if !quote_is_fresh(&reviewed.quote, Utc::now()) {
+        return Err("ROBINHOOD_ORDER_RECOVERY_QUOTE_STALE");
+    }
+    require_recovery_authorization(app, generation, config)?;
     match session.place_reviewed_market_buy(reviewed, ref_id).await {
         Ok(placement) => {
             ledger
@@ -769,13 +809,37 @@ async fn recover_unknown_order(
                 .await
                 .map_err(|_| "ROBINHOOD_ORDER_CHECK_FAILED")?
                 .ok_or("ORDER_RECONCILIATION_REQUIRED")?;
-            settle_order(ledger, config, attempt.intent_id, &order)
+            settle_order(ledger, config, attempt.intent_id, &order)?;
+            Ok(RecoveryOutcome::Acknowledged)
         }
-        Err(RobinhoodPlacementError::Rejected) => ledger
-            .reject_unknown_open_submission(attempt.intent_id, "idempotent_recovery_rejected")
-            .map_err(|_| "ORDER_HISTORY_UNAVAILABLE"),
+        Err(RobinhoodPlacementError::Rejected) => {
+            ledger
+                .reject_unknown_open_submission(attempt.intent_id, "idempotent_recovery_rejected")
+                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+            Ok(RecoveryOutcome::Rejected)
+        }
         Err(RobinhoodPlacementError::Unknown) => Err("ORDER_RECONCILIATION_REQUIRED"),
     }
+}
+
+fn require_recovery_authorization(
+    app: &AppHandle,
+    generation: u64,
+    config: &BluechipConfig,
+) -> Result<(), &'static str> {
+    if config.mode != NativeTradingMode::Real
+        || !market_is_open(Utc::now())
+        || !app
+            .state::<BluechipRuntime>()
+            .real_entry_authorized(generation)
+        || !license_entries_allowed(
+            app.state::<LicenseGate>().inner(),
+            app.state::<CredentialVault>().inner(),
+        )?
+    {
+        return Err("ORDER_RECOVERY_NOT_AUTHORIZED");
+    }
+    Ok(())
 }
 
 fn validate_recovery_attempt(
