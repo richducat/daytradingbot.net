@@ -31,7 +31,7 @@ const STRATEGY_ID: &str = "bluechip-pullback-v1";
 const WATCHLIST: [&str; 8] = ["AAPL", "NVDA", "TSLA", "SPY", "QQQ", "AMD", "MSFT", "GOOGL"];
 const DIP_THRESHOLD_PERCENT_HUNDREDTHS: i64 = -150;
 const CYCLE_SECONDS: u64 = 15 * 60;
-const MAX_TRADES_PER_CYCLE: usize = 2;
+const MAX_TRADES_PER_CYCLE: usize = 1;
 const START_PREFLIGHT_TIMEOUT_SECONDS: u64 = 25;
 const REAL_AUTHORIZATION_HOURS: i64 = 24;
 
@@ -633,6 +633,15 @@ async fn run_cycle(
             return Ok("Trading was paused before any new order was sent.".into());
         }
 
+        if !placement_call_allowed(config.mode, submitted) {
+            ledger
+                .reject_submission(intent_id, "placement_mode_blocked")
+                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+            ledger
+                .finalize_open_order(intent_id, OrderState::Rejected)
+                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+            return Err("ORDER_SUBMISSION_BLOCKED");
+        }
         match session.place_reviewed_market_buy(reviewed, intent_id).await {
             Ok(placement) => {
                 ledger
@@ -721,15 +730,72 @@ async fn reconcile_orders(
                 ledger
                     .mark_submission_unknown(attempt.intent_id, "recovered_after_restart")
                     .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                return Err("ORDER_RECONCILIATION_REQUIRED");
+                recover_unknown_order(ledger, session, config, &attempt).await?;
             }
-            SubmissionAttemptState::Unknown | SubmissionAttemptState::Quarantined => {
+            SubmissionAttemptState::Unknown => {
+                recover_unknown_order(ledger, session, config, &attempt).await?;
+            }
+            SubmissionAttemptState::Quarantined => {
                 return Err("ORDER_RECONCILIATION_REQUIRED");
             }
             SubmissionAttemptState::Reconciled => {}
         }
     }
     Ok(())
+}
+
+/// Robinhood documents `ref_id` as an upstream idempotency key: sending the
+/// same logical order with the same UUID returns the original order instead of
+/// creating a second one. That is the only retry permitted here, and every
+/// immutable field is reconstructed from the durable local reservation.
+async fn recover_unknown_order(
+    ledger: &Ledger,
+    session: &mut RobinhoodTradingSession<'_>,
+    config: &BluechipConfig,
+    attempt: &daytradingbot_ledger::SubmissionAttemptRecord,
+) -> Result<(), &'static str> {
+    let ref_id = validate_recovery_attempt(attempt, config)?;
+    let reviewed = session
+        .review_market_buy(&attempt.instrument, attempt.notional_usd)
+        .await
+        .map_err(|_| "ROBINHOOD_ORDER_RECOVERY_FAILED")?;
+    match session.place_reviewed_market_buy(reviewed, ref_id).await {
+        Ok(placement) => {
+            ledger
+                .acknowledge_unknown_submission(attempt.intent_id, &placement.order_id)
+                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+            let order = session
+                .equity_order(&placement.order_id)
+                .await
+                .map_err(|_| "ROBINHOOD_ORDER_CHECK_FAILED")?
+                .ok_or("ORDER_RECONCILIATION_REQUIRED")?;
+            settle_order(ledger, config, attempt.intent_id, &order)
+        }
+        Err(RobinhoodPlacementError::Rejected) => ledger
+            .reject_unknown_open_submission(attempt.intent_id, "idempotent_recovery_rejected")
+            .map_err(|_| "ORDER_HISTORY_UNAVAILABLE"),
+        Err(RobinhoodPlacementError::Unknown) => Err("ORDER_RECONCILIATION_REQUIRED"),
+    }
+}
+
+fn validate_recovery_attempt(
+    attempt: &daytradingbot_ledger::SubmissionAttemptRecord,
+    config: &BluechipConfig,
+) -> Result<Uuid, &'static str> {
+    let ref_id =
+        Uuid::parse_str(&attempt.client_order_id).map_err(|_| "ORDER_RECONCILIATION_REQUIRED")?;
+    if config.mode != NativeTradingMode::Real
+        || ref_id != attempt.intent_id
+        || !WATCHLIST.contains(&attempt.instrument.as_str())
+        || attempt.notional_usd < Decimal::ONE
+        || attempt.notional_usd > config.max_per_trade_usd
+        || attempt.notional_usd > config.daily_budget_usd
+        || request_fingerprint(attempt.intent_id, &attempt.instrument, attempt.notional_usd)
+            != attempt.request_fingerprint
+    {
+        return Err("ORDER_RECONCILIATION_REQUIRED");
+    }
+    Ok(ref_id)
 }
 
 fn settle_order(
@@ -838,6 +904,10 @@ fn request_fingerprint(intent_id: Uuid, symbol: &str, amount: Decimal) -> String
         money(amount)
     );
     format!("{:x}", Sha256::digest(canonical.as_bytes()))
+}
+
+fn placement_call_allowed(mode: NativeTradingMode, submitted: usize) -> bool {
+    mode == NativeTradingMode::Real && submitted < MAX_TRADES_PER_CYCLE
 }
 
 fn risk_scopes(app: &AppHandle) -> Result<(Uuid, Uuid), &'static str> {
@@ -1009,6 +1079,48 @@ mod tests {
             Decimal::new(2_500, 2)
         );
         assert_eq!(policy.max_opening_order_usd, Decimal::new(500, 2));
+    }
+
+    #[test]
+    fn practice_cannot_reach_placement_and_real_is_one_per_cycle() {
+        assert!(!placement_call_allowed(NativeTradingMode::Practice, 0));
+        assert!(placement_call_allowed(NativeTradingMode::Real, 0));
+        assert!(!placement_call_allowed(NativeTradingMode::Real, 1));
+    }
+
+    #[test]
+    fn unknown_recovery_reuses_only_the_exact_bounded_order() {
+        let intent_id = Uuid::new_v4();
+        let amount = Decimal::new(500, 2);
+        let mut attempt = daytradingbot_ledger::SubmissionAttemptRecord {
+            attempt_id: Uuid::new_v4(),
+            intent_id,
+            client_order_id: intent_id.to_string(),
+            request_fingerprint: request_fingerprint(intent_id, "AAPL", amount),
+            state: SubmissionAttemptState::Unknown,
+            reconciled_state: None,
+            venue_order_id: None,
+            detail_code: Some("response_timeout".into()),
+            started_at: Utc::now(),
+            updated_at: Utc::now(),
+            instrument: "AAPL".into(),
+            notional_usd: amount,
+        };
+        let config = BluechipConfig {
+            mode: NativeTradingMode::Real,
+            daily_budget_usd: Decimal::new(2_500, 2),
+            max_per_trade_usd: amount,
+        };
+        assert_eq!(
+            validate_recovery_attempt(&attempt, &config).expect("exact recovery"),
+            intent_id
+        );
+
+        attempt.notional_usd = Decimal::new(600, 2);
+        assert!(validate_recovery_attempt(&attempt, &config).is_err());
+        attempt.notional_usd = amount;
+        attempt.request_fingerprint = "0".repeat(64);
+        assert!(validate_recovery_attempt(&attempt, &config).is_err());
     }
 
     #[test]

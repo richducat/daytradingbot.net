@@ -449,7 +449,7 @@ impl RobinhoodTradingSession<'_> {
                 json!({"account_number": account_number, "order_id": order_id}),
             )
             .await?;
-        Ok(orders_from_tool_response(&response)?.into_iter().next())
+        order_for_requested_id(&response, order_id)
     }
 
     pub async fn review_market_buy(
@@ -767,6 +767,19 @@ fn orders_from_tool_response(
         .into_iter()
         .map(order_from_wire)
         .collect()
+}
+
+fn order_for_requested_id(
+    response: &Value,
+    requested_order_id: &str,
+) -> Result<Option<RobinhoodEquityOrder>, RobinhoodMcpError> {
+    validate_order_id(requested_order_id)?;
+    let mut orders = orders_from_tool_response(response)?;
+    match orders.len() {
+        0 => Ok(None),
+        1 if orders[0].order_id == requested_order_id => Ok(orders.pop()),
+        _ => Err(RobinhoodMcpError::InvalidResponse),
+    }
 }
 
 fn order_from_wire(wire: OrderWire) -> Result<RobinhoodEquityOrder, RobinhoodMcpError> {
@@ -1182,6 +1195,45 @@ data: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"dat
         assert_eq!(orders[0].state, RobinhoodEquityOrderState::Filled);
         assert_eq!(orders[0].executions.len(), 1);
         assert_eq!(orders[0].executions[0].quantity, Decimal::new(25, 3));
+    }
+
+    #[test]
+    fn single_order_lookup_rejects_a_mismatched_provider_result() {
+        let requested = "7d9cb833-f8df-4ec0-92c7-11999db88673";
+        let matching = json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": "{\"data\":{\"orders\":[{\"id\":\"7d9cb833-f8df-4ec0-92c7-11999db88673\",\"symbol\":\"AAPL\",\"state\":\"queued\",\"executions\":[]}]}}"
+                }],
+                "isError": false
+            }
+        });
+        assert_eq!(
+            order_for_requested_id(&matching, requested)
+                .expect("matching lookup")
+                .expect("order present")
+                .order_id,
+            requested
+        );
+
+        let mismatched = json!({
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+                "content": [{
+                    "type": "text",
+                    "text": "{\"data\":{\"orders\":[{\"id\":\"1da19e4e-c529-4e28-99e0-0e5dad546ace\",\"symbol\":\"MSFT\",\"state\":\"filled\",\"executions\":[]}]}}"
+                }],
+                "isError": false
+            }
+        });
+        assert!(matches!(
+            order_for_requested_id(&mismatched, requested),
+            Err(RobinhoodMcpError::InvalidResponse)
+        ));
     }
 
     #[test]

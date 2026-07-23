@@ -60,6 +60,8 @@ pub struct SubmissionAttemptRecord {
     pub detail_code: Option<String>,
     pub started_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub instrument: String,
+    pub notional_usd: Decimal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -474,17 +476,15 @@ impl Ledger {
 
         let reserved = tx
             .query_row(
-                "SELECT 1
+                "SELECT i.instrument, i.notional_micros
                  FROM intents i
                  JOIN risk_reservations r ON r.intent_id = i.intent_id
                  WHERE i.intent_id = ?1 AND i.state = 'reserved' AND r.active = 1",
                 [&intent_id_text],
-                |_| Ok(()),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
             )
             .optional()?;
-        if reserved.is_none() {
-            return Err(LedgerError::IntentNotReserved);
-        }
+        let (instrument, notional_micros) = reserved.ok_or(LedgerError::IntentNotReserved)?;
 
         let now = Utc::now();
         let now_text = now.to_rfc3339();
@@ -524,6 +524,8 @@ impl Ledger {
             detail_code: None,
             started_at: now,
             updated_at: now,
+            instrument,
+            notional_usd: micros_to_decimal(notional_micros),
         })
     }
 
@@ -675,6 +677,91 @@ impl Ledger {
         )
     }
 
+    /// Moves an unknown submission back into the acknowledged reconciliation
+    /// path after the venue returns an order for the exact same idempotency key.
+    pub fn acknowledge_unknown_submission(
+        &self,
+        intent_id: Uuid,
+        venue_order_id: &str,
+    ) -> Result<(), LedgerError> {
+        if venue_order_id.trim().is_empty() {
+            return Err(LedgerError::InvalidVenueOrderId);
+        }
+        self.transition_submission(
+            intent_id,
+            SubmissionTransition {
+                expected_state: "unknown",
+                attempt_state: "acknowledged",
+                order_state: OrderState::Acknowledged,
+                venue_order_id: Some(venue_order_id),
+                detail_code: Some("idempotent_recovery_acknowledged"),
+                audit_event: "unknown_submission_acknowledged",
+            },
+        )
+    }
+
+    /// Atomically resolves an unknown opening submission after an authoritative
+    /// rejection for the same idempotency key. No fill may exist and the
+    /// original reservation is released in the same transaction.
+    pub fn reject_unknown_open_submission(
+        &self,
+        intent_id: Uuid,
+        detail_code: &'static str,
+    ) -> Result<(), LedgerError> {
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let intent_id = intent_id.to_string();
+        let (fill_count, active_count): (i64, i64) = tx.query_row(
+            "SELECT COUNT(f.fill_id), COUNT(DISTINCT r.intent_id)
+               FROM intents i
+               JOIN submission_attempts s ON s.intent_id = i.intent_id AND s.state = 'unknown'
+               JOIN risk_reservations r ON r.intent_id = i.intent_id AND r.active = 1
+               LEFT JOIN fills f ON f.intent_id = i.intent_id
+              WHERE i.intent_id = ?1 AND i.purpose = 'open'",
+            [&intent_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if active_count != 1 {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        }
+        if fill_count != 0 {
+            return Err(LedgerError::InvalidTerminalOutcome);
+        }
+        let now = Utc::now().to_rfc3339();
+        let changed = tx.execute(
+            "UPDATE submission_attempts
+                SET state = 'reconciled', reconciled_state = 'rejected',
+                    detail_code = ?2, updated_at = ?3
+              WHERE intent_id = ?1 AND state = 'unknown'",
+            params![intent_id, detail_code, now],
+        )?;
+        if changed != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        tx.execute(
+            "UPDATE risk_reservations
+                SET active = 0, released_at = datetime('now')
+              WHERE intent_id = ?1 AND active = 1",
+            [&intent_id],
+        )?;
+        tx.execute(
+            "UPDATE intents SET state = 'rejected' WHERE intent_id = ?1",
+            [&intent_id],
+        )?;
+        tx.execute(
+            "UPDATE orders SET state = 'rejected', updated_at = ?2 WHERE intent_id = ?1",
+            params![intent_id, now],
+        )?;
+        insert_audit(
+            &tx,
+            Some(&intent_id),
+            "unknown_open_submission_rejected",
+            Some(detail_code),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     /// Records an authoritative pre-acceptance rejection (for example HTTP
     /// 400/401/403). Ambiguous transport and server failures must use
     /// `mark_submission_unknown` instead.
@@ -715,80 +802,16 @@ impl Ledger {
         Ok(())
     }
 
-    pub fn reconcile_unknown_submission(
-        &self,
-        intent_id: Uuid,
-        venue_order_id: Option<&str>,
-        resolved_state: OrderState,
-    ) -> Result<(), LedgerError> {
-        let resolved_key = match resolved_state {
-            OrderState::Acknowledged => "acknowledged",
-            OrderState::PartiallyFilled => "partially_filled",
-            OrderState::Filled => "filled",
-            OrderState::Canceled => "canceled",
-            OrderState::Rejected => "rejected",
-            _ => return Err(LedgerError::InvalidSubmissionTransition),
-        };
-        if matches!(
-            resolved_state,
-            OrderState::Acknowledged | OrderState::PartiallyFilled | OrderState::Filled
-        ) && venue_order_id.is_none_or(|value| value.trim().is_empty())
-        {
-            return Err(LedgerError::InvalidVenueOrderId);
-        }
-
-        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let intent_id = intent_id.to_string();
-        let changed = tx.execute(
-            "UPDATE submission_attempts
-             SET state = 'reconciled', reconciled_state = ?2,
-                 venue_order_id = COALESCE(?3, venue_order_id), updated_at = ?4
-             WHERE intent_id = ?1 AND state = 'unknown'",
-            params![
-                intent_id,
-                resolved_key,
-                venue_order_id,
-                Utc::now().to_rfc3339()
-            ],
-        )?;
-        if changed != 1 {
-            return Err(LedgerError::InvalidSubmissionTransition);
-        }
-        tx.execute(
-            "UPDATE orders
-             SET venue_order_id = COALESCE(?2, venue_order_id), state = ?3,
-                 updated_at = ?4
-             WHERE intent_id = ?1",
-            params![
-                intent_id,
-                venue_order_id,
-                resolved_key,
-                Utc::now().to_rfc3339(),
-            ],
-        )?;
-        tx.execute(
-            "UPDATE intents SET state = ?2 WHERE intent_id = ?1",
-            params![intent_id, resolved_key],
-        )?;
-        insert_audit(
-            &tx,
-            Some(&intent_id),
-            "submission_reconciled",
-            Some(resolved_key),
-        )?;
-        tx.commit()?;
-        Ok(())
-    }
-
     pub fn unresolved_submissions(&self) -> Result<Vec<SubmissionAttemptRecord>, LedgerError> {
         let connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
         let mut statement = connection.prepare(
-            "SELECT attempt_id, intent_id, client_order_id, request_fingerprint, state,
-                    reconciled_state, venue_order_id, detail_code, started_at, updated_at
-             FROM submission_attempts
-             WHERE state IN ('submitting', 'acknowledged', 'unknown', 'quarantined')
-             ORDER BY started_at",
+            "SELECT s.attempt_id, s.intent_id, s.client_order_id, s.request_fingerprint, s.state,
+                    s.reconciled_state, s.venue_order_id, s.detail_code, s.started_at, s.updated_at,
+                    i.instrument, i.notional_micros
+               FROM submission_attempts s
+               JOIN intents i ON i.intent_id = s.intent_id
+              WHERE s.state IN ('submitting', 'acknowledged', 'unknown', 'quarantined')
+              ORDER BY s.started_at",
         )?;
         let rows = statement.query_map([], submission_record_from_row)?;
         let records: rusqlite::Result<Vec<_>> = rows.collect();
@@ -1586,6 +1609,31 @@ fn submission_record_from_row(
     let intent_id = Uuid::parse_str(&intent_id_text).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(1, Type::Text, Box::new(error))
     })?;
+    let client_order_id: String = row.get(2)?;
+    let client_order_uuid = Uuid::parse_str(&client_order_id).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(2, Type::Text, Box::new(error))
+    })?;
+    if client_order_uuid != intent_id {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            2,
+            Type::Text,
+            Box::new(std::io::Error::other(
+                "client order ID does not match intent",
+            )),
+        ));
+    }
+    let request_fingerprint: String = row.get(3)?;
+    if request_fingerprint.len() != 64
+        || !request_fingerprint
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            3,
+            Type::Text,
+            Box::new(std::io::Error::other("invalid request fingerprint")),
+        ));
+    }
     let state = match state_text.as_str() {
         "submitting" => SubmissionAttemptState::Submitting,
         "acknowledged" => SubmissionAttemptState::Acknowledged,
@@ -1622,18 +1670,36 @@ fn submission_record_from_row(
         .map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(9, Type::Text, Box::new(error))
         })?;
+    let instrument: String = row.get(10)?;
+    if instrument.is_empty() || instrument.len() > 32 {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            10,
+            Type::Text,
+            Box::new(std::io::Error::other("invalid stored instrument")),
+        ));
+    }
+    let notional_micros: i64 = row.get(11)?;
+    if notional_micros <= 0 {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            11,
+            Type::Integer,
+            Box::new(std::io::Error::other("invalid stored notional")),
+        ));
+    }
 
     Ok(SubmissionAttemptRecord {
         attempt_id,
         intent_id,
-        client_order_id: row.get(2)?,
-        request_fingerprint: row.get(3)?,
+        client_order_id,
+        request_fingerprint,
         state,
         reconciled_state,
         venue_order_id: row.get(6)?,
         detail_code: row.get(7)?,
         started_at,
         updated_at,
+        instrument,
+        notional_usd: micros_to_decimal(notional_micros),
     })
 }
 
@@ -2233,6 +2299,8 @@ mod tests {
         let unresolved = ledger.unresolved_submissions().unwrap();
         assert_eq!(unresolved.len(), 1);
         assert_eq!(unresolved[0].state, SubmissionAttemptState::Unknown);
+        assert_eq!(unresolved[0].instrument, "BTC-USD");
+        assert_eq!(unresolved[0].notional_usd, Decimal::new(500, 2));
         assert_eq!(
             unresolved[0].detail_code.as_deref(),
             Some("response_timeout")
@@ -2243,11 +2311,38 @@ mod tests {
         ));
 
         ledger
-            .reconcile_unknown_submission(intent_id, None, OrderState::Rejected)
+            .reject_unknown_open_submission(intent_id, "idempotent_retry_rejected")
             .unwrap();
         assert!(ledger.unresolved_submissions().unwrap().is_empty());
+        assert!(matches!(
+            ledger.finalize_open_order(intent_id, OrderState::Rejected),
+            Err(LedgerError::MissingActiveOpeningReservation)
+        ));
+    }
+
+    #[test]
+    fn unknown_submission_can_rejoin_acknowledged_reconciliation() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account_scope = Uuid::new_v4();
+        let intent = trade_intent(account_scope, "unknown-idempotent-ack");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
         ledger
-            .finalize_open_order(intent_id, OrderState::Rejected)
+            .begin_submission(intent_id, Uuid::new_v4(), &"d".repeat(64))
             .unwrap();
+        ledger
+            .mark_submission_unknown(intent_id, "response_timeout")
+            .unwrap();
+        ledger
+            .acknowledge_unknown_submission(intent_id, "7d9cb833-f8df-4ec0-92c7-11999db88673")
+            .unwrap();
+
+        let unresolved = ledger.unresolved_submissions().unwrap();
+        assert_eq!(unresolved.len(), 1);
+        assert_eq!(unresolved[0].state, SubmissionAttemptState::Acknowledged);
+        ledger
+            .finalize_acknowledged_open_order(intent_id, OrderState::Rejected)
+            .unwrap();
+        assert!(ledger.unresolved_submissions().unwrap().is_empty());
     }
 }
