@@ -361,16 +361,16 @@ async fn run_cycle(
         .await
         .map_err(|_| "ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED")?;
     if config.mode == NativeTradingMode::Real {
-        let recovered_order = reconcile_orders(
+        let recovery_consumed_cycle = reconcile_orders(
             ledger.inner(),
             &mut session,
             config,
             ReconcileMode::Running { app, generation },
         )
         .await?;
-        if recovered_order {
+        if recovery_consumed_cycle {
             return Ok(
-                "Robinhood confirmed an earlier order. Bluechip will wait until the next market check before considering another trade."
+                "Bluechip finished checking one earlier Robinhood order. It will wait until the next market check before considering another trade."
                     .into(),
             );
         }
@@ -716,8 +716,7 @@ async fn reconcile_orders(
     let attempts = ledger
         .unresolved_submissions()
         .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-    let mut recovered_order = false;
-    for attempt in attempts {
+    for attempt in &attempts {
         match attempt.state {
             SubmissionAttemptState::Acknowledged => {
                 let Some(order_id) = attempt.venue_order_id.as_deref() else {
@@ -734,28 +733,39 @@ async fn reconcile_orders(
                 ledger
                     .mark_submission_unknown(attempt.intent_id, "recovered_after_restart")
                     .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                if let ReconcileMode::Running { app, generation } = mode {
-                    recovered_order |=
-                        recover_unknown_order(ledger, session, config, &attempt, app, generation)
-                            .await?
-                            == RecoveryOutcome::Acknowledged;
-                }
             }
-            SubmissionAttemptState::Unknown => {
-                if let ReconcileMode::Running { app, generation } = mode {
-                    recovered_order |=
-                        recover_unknown_order(ledger, session, config, &attempt, app, generation)
-                            .await?
-                            == RecoveryOutcome::Acknowledged;
-                }
-            }
+            SubmissionAttemptState::Unknown => {}
             SubmissionAttemptState::Quarantined => {
                 return Err("ORDER_RECONCILIATION_REQUIRED");
             }
             SubmissionAttemptState::Reconciled => {}
         }
     }
-    Ok(recovered_order)
+
+    let ReconcileMode::Running { app, generation } = mode else {
+        return Ok(false);
+    };
+    let Some(attempt) = first_recovery_candidate(&attempts) else {
+        return Ok(false);
+    };
+
+    // A recovery uses Robinhood's real placement endpoint, even though the
+    // persisted ref_id makes it idempotent. End this cycle after exactly one
+    // such call so multiple unresolved records can never fan out into multiple
+    // placement calls.
+    recover_unknown_order(ledger, session, config, attempt, app, generation).await?;
+    Ok(true)
+}
+
+fn first_recovery_candidate(
+    attempts: &[daytradingbot_ledger::SubmissionAttemptRecord],
+) -> Option<&daytradingbot_ledger::SubmissionAttemptRecord> {
+    attempts.iter().find(|attempt| {
+        matches!(
+            attempt.state,
+            SubmissionAttemptState::Submitting | SubmissionAttemptState::Unknown
+        )
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -1185,6 +1195,46 @@ mod tests {
         attempt.notional_usd = amount;
         attempt.request_fingerprint = "0".repeat(64);
         assert!(validate_recovery_attempt(&attempt, &config).is_err());
+    }
+
+    #[test]
+    fn multiple_unresolved_orders_yield_one_recovery_candidate() {
+        let amount = Decimal::new(500, 2);
+        let first_intent_id = Uuid::new_v4();
+        let first = daytradingbot_ledger::SubmissionAttemptRecord {
+            attempt_id: Uuid::new_v4(),
+            intent_id: first_intent_id,
+            client_order_id: first_intent_id.to_string(),
+            request_fingerprint: request_fingerprint(first_intent_id, "AAPL", amount),
+            state: SubmissionAttemptState::Unknown,
+            reconciled_state: None,
+            venue_order_id: None,
+            detail_code: Some("response_timeout".into()),
+            started_at: Utc::now(),
+            updated_at: Utc::now(),
+            instrument: "AAPL".into(),
+            notional_usd: amount,
+        };
+        let second_intent_id = Uuid::new_v4();
+        let second = daytradingbot_ledger::SubmissionAttemptRecord {
+            attempt_id: Uuid::new_v4(),
+            intent_id: second_intent_id,
+            client_order_id: second_intent_id.to_string(),
+            request_fingerprint: request_fingerprint(second_intent_id, "MSFT", amount),
+            state: SubmissionAttemptState::Submitting,
+            reconciled_state: None,
+            venue_order_id: None,
+            detail_code: None,
+            started_at: Utc::now(),
+            updated_at: Utc::now(),
+            instrument: "MSFT".into(),
+            notional_usd: amount,
+        };
+
+        let attempts = vec![first, second];
+        let selected = first_recovery_candidate(&attempts).expect("one recovery candidate");
+        assert_eq!(selected.intent_id, first_intent_id);
+        assert_ne!(selected.intent_id, second_intent_id);
     }
 
     #[test]
