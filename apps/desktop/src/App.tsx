@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type View = "home" | "agents" | "accounts" | "activity";
+type View = "watch" | "agents" | "accounts" | "activity";
 type TradingMode = "practice" | "real";
 type AccountName = "Robinhood" | "Coinbase" | "Kalshi" | "Polymarket";
 type CredentialAccount = Exclude<AccountName, "Robinhood">;
@@ -78,10 +78,37 @@ type ActivityItem = {
   agent_id: string;
   mode: TradingMode;
   kind: "started" | "paused" | "market_check" | "signal" | "skipped" | "reviewed" | "order_submitted" | "filled" | "error";
+  recorded_order_state: "practice_review" | "submitted" | "pending" | "partially_filled" | "filled" | "canceled" | "rejected" | "unknown" | null;
   symbol: string | null;
   amount_usd: string | null;
   message: string;
   occurred_at: string;
+};
+
+type BluechipWatchState = {
+  status_available: boolean;
+  running: boolean | null;
+  mode: "unavailable" | "paused" | TradingMode;
+  message: string;
+  last_checked_at: string | null;
+  next_check_at: string | null;
+  budget_state: "paused" | "practice" | "available" | "unavailable";
+  daily_limit_usd: string | null;
+  per_trade_limit_usd: string | null;
+  used_or_held_usd: string | null;
+  pending_usd: string | null;
+  committed_usd: string | null;
+  remaining_usd: string | null;
+  has_unresolved_real_order: boolean | null;
+};
+
+type NativeBluechipWatchState = Omit<
+  BluechipWatchState,
+  "status_available" | "running" | "mode" | "has_unresolved_real_order"
+> & {
+  running: boolean;
+  mode: "paused" | TradingMode;
+  has_unresolved_real_order: boolean;
 };
 
 type LicenseStatus = {
@@ -136,6 +163,38 @@ const emptyEngine: OwnerEngineStatus = {
   message: "Checking the trading engine…",
 };
 
+export function unavailableWatchState(previous?: BluechipWatchState): BluechipWatchState {
+  return {
+    status_available: false,
+    running: null,
+    mode: "unavailable",
+    message: "Bot status is unavailable. Do not assume trading is paused.",
+    last_checked_at: previous?.last_checked_at ?? null,
+    next_check_at: null,
+    budget_state: "unavailable",
+    daily_limit_usd: null,
+    per_trade_limit_usd: null,
+    used_or_held_usd: null,
+    pending_usd: null,
+    committed_usd: null,
+    remaining_usd: null,
+    has_unresolved_real_order: null,
+  };
+}
+
+export function watchDisplayMode(
+  watch: Pick<BluechipWatchState, "status_available" | "running" | "mode">,
+) {
+  if (!watch.status_available) return "unavailable" as const;
+  return watch.running ? watch.mode : "paused" as const;
+}
+
+function availableWatchState(snapshot: NativeBluechipWatchState): BluechipWatchState {
+  return { ...snapshot, status_available: true };
+}
+
+const emptyWatch = unavailableWatchState();
+
 const emptyLicense: LicenseStatus = {
   activated: false,
   real_trading_ready: false,
@@ -149,6 +208,55 @@ const dailyLimitMinimum = 1;
 const dailyLimitMaximum = 25;
 const perTradeMinimum = 1;
 const perTradeMaximum = 5;
+export const watchSymbols = ["AAPL", "NVDA", "TSLA", "SPY", "QQQ", "AMD", "MSFT", "GOOGL"] as const;
+export type WatchSymbol = (typeof watchSymbols)[number];
+const tradingViewSymbols: Record<WatchSymbol, string> = {
+  AAPL: "NASDAQ:AAPL",
+  NVDA: "NASDAQ:NVDA",
+  TSLA: "NASDAQ:TSLA",
+  SPY: "AMEX:SPY",
+  QQQ: "NASDAQ:QQQ",
+  AMD: "NASDAQ:AMD",
+  MSFT: "NASDAQ:MSFT",
+  GOOGL: "NASDAQ:GOOGL",
+};
+const tradingViewWidgetOrigin = "https://www.tradingview-widget.com";
+
+function isWatchSymbol(value: string | null): value is WatchSymbol {
+  return value !== null && (watchSymbols as readonly string[]).includes(value);
+}
+
+export function tradingViewChartUrl(symbol: string): string | null {
+  if (!isWatchSymbol(symbol)) return null;
+  const url = new URL("/embed-widget/advanced-chart/", tradingViewWidgetOrigin);
+  url.searchParams.set("locale", "en");
+  url.hash = encodeURIComponent(JSON.stringify({
+    autosize: true,
+    symbol: tradingViewSymbols[symbol],
+    interval: "5",
+    timezone: "exchange",
+    theme: "dark",
+    style: "1",
+    locale: "en",
+    backgroundColor: "rgba(13, 15, 13, 1)",
+    gridColor: "rgba(43, 48, 40, 0.45)",
+    hide_side_toolbar: true,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    hide_volume: false,
+    allow_symbol_change: false,
+    save_image: false,
+    calendar: false,
+    withdateranges: true,
+    support_host: "https://www.tradingview.com",
+  }));
+  return url.toString();
+}
+
+export function tradingViewSymbolUrl(symbol: string): string | null {
+  if (!isWatchSymbol(symbol)) return null;
+  return `https://www.tradingview.com/symbols/${tradingViewSymbols[symbol].replace(":", "-")}/`;
+}
 
 export type TradingLimits = {
   dailyBudget: number;
@@ -256,7 +364,8 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -281,10 +390,86 @@ function activityTime(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+function watchTime(value: string | null, fallback: string) {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return fallback;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function eventLabel(item: ActivityItem) {
+  if (item.kind === "signal") return "Signal recorded";
+  if (item.recorded_order_state === "practice_review") return "Practice review";
+  if (item.recorded_order_state === "partially_filled") return "Partially filled · recorded";
+  if (item.recorded_order_state === "filled") return "Fill · recorded";
+  if (item.recorded_order_state === "canceled") return "Canceled · recorded";
+  if (item.recorded_order_state === "rejected") return "Rejected · recorded";
+  if (item.recorded_order_state === "unknown") return "Status unknown · recorded";
+  if (item.recorded_order_state === "pending") return "Pending · recorded";
+  if (item.recorded_order_state === "submitted") return "Submitted · recorded";
+  if (item.kind === "skipped") return "No trade";
+  if (item.kind === "error") return "Needs attention";
+  if (item.kind === "market_check") return "Market check";
+  if (item.kind === "started") return "Started";
+  if (item.kind === "paused") return "Paused";
+  return "Decision";
+}
+
+function TradingViewChart({ symbol }: { symbol: WatchSymbol }) {
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const source = tradingViewChartUrl(symbol);
+  const attribution = tradingViewSymbolUrl(symbol);
+
+  useEffect(() => {
+    setLoadState("loading");
+    const timer = window.setTimeout(() => {
+      setLoadState((current) => current === "loading" ? "unavailable" : current);
+    }, 12_000);
+    return () => window.clearTimeout(timer);
+  }, [attempt, symbol]);
+
+  if (!source || !attribution) {
+    return <div className="chart-unavailable" role="status"><strong>Market chart unavailable</strong><p>This symbol is outside Bluechip’s fixed watchlist.</p></div>;
+  }
+
+  return (
+    <div className="market-chart-frame" data-state={loadState}>
+      {loadState === "loading" ? <div className="chart-loading" role="status"><span /><strong>Loading the market chart…</strong></div> : null}
+      {loadState === "unavailable" ? (
+        <div className="chart-unavailable" role="status">
+          <strong>Market chart unavailable</strong>
+          <p>TradingView could not load. Bluechip’s recorded decisions and timing remain available beside the chart.</p>
+          <button type="button" onClick={() => setAttempt((value) => value + 1)}>Try chart again</button>
+        </div>
+      ) : null}
+      <iframe
+        key={`${symbol}-${attempt}`}
+        className="tradingview-chart"
+        src={source}
+        title={`${symbol} market chart by TradingView`}
+        sandbox="allow-scripts allow-same-origin"
+        referrerPolicy="strict-origin-when-cross-origin"
+        onLoad={() => setLoadState("ready")}
+        onError={() => setLoadState("unavailable")}
+      />
+      <div className="chart-attribution">
+        <a href={attribution} rel="noopener nofollow" target="_blank">{symbol} chart by TradingView</a>
+        <span>Market chart by TradingView · exchange data may be delayed.</span>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>("watch");
   const [catalog, setCatalog] = useState<Agent[]>([]);
   const [engine, setEngine] = useState<OwnerEngineStatus>(emptyEngine);
+  const [engineReadbackAvailable, setEngineReadbackAvailable] = useState(false);
   const [robinhood, setRobinhood] = useState<RobinhoodStatus>(emptyRobinhood);
   const [simmer, setSimmer] = useState<SimmerStatus>(emptySimmer);
   const [coinbase, setCoinbase] = useState<CoinbaseStatus>(emptyCoinbase);
@@ -308,6 +493,9 @@ export function App() {
   const [pendingTradingAction, setPendingTradingAction] = useState<"start" | "pause" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [watch, setWatch] = useState<BluechipWatchState>(emptyWatch);
+  const [selectedSymbol, setSelectedSymbol] = useState<WatchSymbol>("AAPL");
+  const [followLatest, setFollowLatest] = useState(true);
   const [license, setLicense] = useState<LicenseStatus>(emptyLicense);
   const [activationOpen, setActivationOpen] = useState(false);
   const [purchaseCode, setPurchaseCode] = useState("");
@@ -319,21 +507,35 @@ export function App() {
   const realReviewDialog = useRef<HTMLElement>(null);
   const realReviewCancel = useRef<HTMLButtonElement>(null);
 
+  const receiveEngineStatus = (result: OwnerEngineStatus) => {
+    setEngine(result);
+    setEngineReadbackAvailable(true);
+    if (result.selected_agent_ids.length) setSelectedIds(result.selected_agent_ids);
+    if (result.mode === "practice" || result.mode === "real") setMode(result.mode);
+  };
+
   const refresh = async () => {
     const catalogRequest = invoke<AgentCatalog>("trading_agent_catalog").then((result) => {
       setCatalog(result.agents);
       const ready = new Set(result.agents.filter((agent) => agent.customer_ready).map((agent) => agent.id));
       setSelectedIds((current) => current.filter((id) => ready.has(id)));
     });
-    const engineRequest = invoke<OwnerEngineStatus>("owner_engine_status").then((result) => {
-      setEngine(result);
-      if (result.selected_agent_ids.length) setSelectedIds(result.selected_agent_ids);
-      if (result.mode === "practice" || result.mode === "real") setMode(result.mode);
-    });
+    const engineRequest = invoke<OwnerEngineStatus>("owner_engine_status")
+      .then(receiveEngineStatus)
+      .catch((error: unknown) => {
+        setEngineReadbackAvailable(false);
+        throw error;
+      });
     void invoke<ActivityItem[]>("recent_trading_activity").then(setActivity).catch(() => undefined);
+    const watchRequest = invoke<NativeBluechipWatchState>("bluechip_watch_state")
+      .then((snapshot) => setWatch(availableWatchState(snapshot)))
+      .catch((error: unknown) => {
+        setWatch((current) => unavailableWatchState(current));
+        throw error;
+      });
     const licenseRequest = invoke<LicenseStatus>("entry_license_status").then(setLicense);
 
-    await Promise.allSettled([catalogRequest, engineRequest, licenseRequest]);
+    await Promise.allSettled([catalogRequest, engineRequest, watchRequest, licenseRequest]);
   };
 
   const refreshAccount = async (account: AccountName) => {
@@ -371,11 +573,22 @@ export function App() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      void invoke<OwnerEngineStatus>("owner_engine_status").then(setEngine).catch(() => undefined);
+      void invoke<OwnerEngineStatus>("owner_engine_status")
+        .then(receiveEngineStatus)
+        .catch(() => setEngineReadbackAvailable(false));
       void invoke<ActivityItem[]>("recent_trading_activity").then(setActivity).catch(() => undefined);
+      void invoke<NativeBluechipWatchState>("bluechip_watch_state")
+        .then((snapshot) => setWatch(availableWatchState(snapshot)))
+        .catch(() => setWatch((current) => unavailableWatchState(current)));
     }, 5_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!followLatest) return;
+    const latestSymbol = activity.find((item) => isWatchSymbol(item.symbol))?.symbol ?? null;
+    if (isWatchSymbol(latestSymbol)) setSelectedSymbol(latestSymbol);
+  }, [activity, followLatest]);
 
   useEffect(() => {
     localStorage.setItem("dtb.selectedAgents", JSON.stringify(selectedIds));
@@ -521,7 +734,8 @@ export function App() {
 
   const connectedNames = useMemo(() => new Set<string>(accounts.filter((account) => account.connected).map((account) => account.name)), [accounts]);
   const selectedAgents = catalog.filter((agent) => selectedIds.includes(agent.id));
-  const running = engine.mode === "practice" || engine.mode === "real";
+  const running = engineReadbackAvailable
+    && (engine.mode === "practice" || engine.mode === "real");
 
   const toggleAgent = (id: string) => {
     setNotice(null);
@@ -616,6 +830,10 @@ export function App() {
   };
 
   const start = async (confirmed = false) => {
+    if (!engineReadbackAvailable) {
+      setNotice("Trading engine status is unavailable. Check status before starting.");
+      return;
+    }
     const normalizedLimits = normalizeTradingLimits(dailyBudget, perTrade);
     if (
       normalizedLimits.dailyBudget !== dailyBudget
@@ -656,7 +874,7 @@ export function App() {
       localStorage.setItem("dtb.setupComplete", "yes");
       setNotice(result.message);
       await refresh();
-      setView("home");
+      setView("watch");
     } catch (error) {
       setRealReviewOpen(false);
       setNotice(messageFromError(error));
@@ -715,86 +933,185 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button className="brand" type="button" onClick={() => setView("home")} aria-label="DayTradingBot home">
+        <button className="brand" type="button" onClick={() => setView("watch")} aria-label="Watch DayTradingBot">
           <span>DTB</span>
           <strong>DayTradingBot</strong>
         </button>
         <nav aria-label="Main navigation">
-          {(["home", "agents", "accounts", "activity"] as View[]).map((item) => (
+          {(["watch", "agents", "accounts", "activity"] as View[]).map((item) => (
             <button className={view === item ? "nav-item active" : "nav-item"} type="button" key={item} onClick={() => setView(item)}>
-              {item === "home" ? "Home" : item === "agents" ? "Trading agents" : item === "accounts" ? "Accounts" : "Activity"}
+              {item === "watch" ? "Watch bot" : item === "agents" ? "Trading agents" : item === "accounts" ? "Accounts" : "Activity"}
             </button>
           ))}
         </nav>
         <button className="setup-link" type="button" onClick={() => setSetupOpen(true)}>Setup</button>
         <button className={license.real_trading_ready ? "activation-link ready" : "activation-link"} type="button" onClick={() => setActivationOpen(true)}>{license.real_trading_ready ? "App activated" : "Activate app"}</button>
-        <div className="engine-note"><span className={engine.available ? "online" : ""} />{engine.available ? "Trading engine ready" : "Installer needed"}</div>
+        <div className="engine-note">
+          <span className={engineReadbackAvailable && engine.available ? "online" : ""} />
+          {!engineReadbackAvailable ? "Engine status unavailable" : engine.available ? "Trading engine ready" : "Installer needed"}
+        </div>
       </aside>
 
-      <main className="main-area">
+      <main className={view === "watch" ? "main-area watch-main" : "main-area"}>
         <header className="topbar">
           <div>
-            <p>{view === "home" ? "Your trading team" : view === "agents" ? "Choose who trades" : view === "accounts" ? "Your money stays in your accounts" : "Every move, in one place"}</p>
-            <h1>{view === "home" ? "Home" : view === "agents" ? "Trading agents" : view === "accounts" ? "Accounts" : "Activity"}</h1>
+            <p>{view === "watch" ? "Bluechip · eight-symbol watch" : view === "agents" ? "Choose who trades" : view === "accounts" ? "Your money stays in your accounts" : "Every move, in one place"}</p>
+            <h1>{view === "watch" ? "Watch bot" : view === "agents" ? "Trading agents" : view === "accounts" ? "Accounts" : "Activity"}</h1>
           </div>
-          {running ? (
+          {view !== "watch" && !engineReadbackAvailable ? (
+            <button className="pause-button" type="button" disabled>Check status first</button>
+          ) : view !== "watch" && running ? (
             <button className="pause-button" type="button" onClick={pause} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : "Pause trading"}</button>
-          ) : (
+          ) : view !== "watch" ? (
             <button className="start-button compact" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : pendingTradingAction === "start" ? "Starting…" : "Start trading"}</button>
-          )}
+          ) : null}
         </header>
 
         {notice ? <div className="notice" role="status"><span />{notice}<button type="button" onClick={() => setNotice(null)} aria-label="Dismiss">×</button></div> : null}
 
-        {view === "home" ? (
-          <div className="home-view">
-            <section className="session-hero">
-              <div>
-                <p className="eyebrow">{running ? `${engine.mode === "real" ? "Real trading" : "Practice"} is running` : "Ready when you are"}</p>
-                <h2>{running ? "Your agents are watching the markets." : "Set your limits. Then put your agents to work."}</h2>
-              </div>
-              <div className="session-action">
-                <span>{selectedAgents.length ? selectedAgents.map((agent) => agent.name).join(" + ") : "No agent selected"}</span>
-                <strong>{money(dailyBudget)} <small>at risk today</small></strong>
-                {running ? (
-                  <button className="pause-button wide" type="button" onClick={pause} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : "Pause trading"}</button>
+        {view === "watch" ? (() => {
+          const currentDecision = activity.find((item) => (
+            item.symbol === selectedSymbol
+            && ["signal", "skipped", "reviewed", "order_submitted", "filled", "error"].includes(item.kind)
+          ));
+          const selectedEvents = activity
+            .filter((item) => item.symbol === selectedSymbol)
+            .slice(0, 5);
+          const activeMode = watchDisplayMode(watch);
+          const dailyLimit = watch.daily_limit_usd ? money(Number(watch.daily_limit_usd)) : "Unavailable";
+          const perTradeLimit = watch.per_trade_limit_usd ? money(Number(watch.per_trade_limit_usd)) : "Unavailable";
+          return (
+            <div className="watch-view">
+              <section className={`watch-state ${activeMode}`} aria-labelledby="watch-state-title">
+                <div className="watch-state-copy">
+                  <div className="mode-line">
+                    <span className={`mode-badge ${activeMode}`}>
+                      {activeMode === "practice"
+                        ? "Practice · No real order or money"
+                        : activeMode === "real"
+                          ? "Real money"
+                          : activeMode === "unavailable"
+                            ? "Status unavailable · Do not assume paused"
+                            : "Paused · No new trades"}
+                    </span>
+                    <span>Bluechip · checks every 15 minutes</span>
+                  </div>
+                  <h2 id="watch-state-title">{watch.message}</h2>
+                  <div className="check-times">
+                    <span><small>Last known check</small><strong>{watchTime(watch.last_checked_at, watch.status_available ? watch.running ? "Starting now" : "Not running" : "Unavailable")}</strong></span>
+                    <span><small>Next check</small><strong>{watchTime(watch.next_check_at, watch.status_available ? watch.running ? "After this check" : "Starts when you do" : "Unavailable")}</strong></span>
+                  </div>
+                </div>
+                <div className="watch-action">
+                  {!engineReadbackAvailable ? (
+                    <button className="pause-button wide" type="button" disabled>Check status first</button>
+                  ) : running ? (
+                    <button className="pause-button wide" type="button" onClick={pause} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : "Pause new trades"}</button>
+                  ) : (
+                    <button className="start-button wide" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : mode === "practice" ? "Start Practice" : "Review Real"}</button>
+                  )}
+                  <button className="watch-settings" type="button" onClick={() => setSetupOpen(true)}>Review setup</button>
+                </div>
+              </section>
+
+              {!watch.status_available ? (
+                <div className="order-warning" role="alert">Bot status and daily money readback are unavailable. Do not assume trading is paused or treat a missing amount as zero. An existing order may still fill.</div>
+              ) : watch.has_unresolved_real_order ? (
+                <div className="order-warning" role="status">An earlier real order still needs an authoritative status check. Pausing blocks new trades; an existing order may still fill.</div>
+              ) : null}
+
+              <section className={`budget-strip ${watch.budget_state}`} aria-label={watch.budget_state === "practice" ? "Practice decision limits" : "Daily new-buy budget"}>
+                {watch.budget_state === "practice" ? (
+                  <>
+                    <div><span>Practice daily limit setting</span><strong>{dailyLimit}</strong><small>No cumulative money is tracked</small></div>
+                    <div><span>Most in one practice decision</span><strong>{perTradeLimit}</strong><small>No order is sent</small></div>
+                    <p>Practice does not create cumulative money used, pending, or remaining.</p>
+                  </>
+                ) : watch.budget_state === "paused" ? (
+                  <>
+                    <div><span>Next-run daily limit</span><strong>{money(dailyBudget)}</strong><small>Setup value · not active</small></div>
+                    <div><span>Next-run per trade</span><strong>{money(perTrade)}</strong><small>Setup value · not active</small></div>
+                    <p>Start Practice or Real to see the active backend limits here.</p>
+                  </>
                 ) : (
-                  <button className="start-button wide" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "pause" ? "Pausing…" : pendingTradingAction === "start" ? "Starting…" : "Start trading"}</button>
+                  <>
+                    <div><span>Daily new-buy limit</span><strong>{dailyLimit}</strong><small>Opening-notional cap</small></div>
+                    <div><span>Used or held</span><strong>{watch.used_or_held_usd ? money(Number(watch.used_or_held_usd)) : "Unavailable"}</strong><small>Committed + pending</small></div>
+                    <div><span>Pending</span><strong>{watch.pending_usd ? money(Number(watch.pending_usd)) : "Unavailable"}</strong><small>Included in Used</small></div>
+                    <div><span>Committed</span><strong>{watch.committed_usd ? money(Number(watch.committed_usd)) : "Unavailable"}</strong><small>Durable today</small></div>
+                    <div><span>Remaining</span><strong>{watch.remaining_usd ? money(Number(watch.remaining_usd)) : "Unavailable"}</strong><small>For new buys</small></div>
+                    <div><span>Per trade</span><strong>{perTradeLimit}</strong><small>Maximum</small></div>
+                  </>
                 )}
-              </div>
-            </section>
+              </section>
 
-            <section className="quick-settings" aria-label="Trading settings">
-              <button type="button" onClick={() => setSetupOpen(true)}><span>Trading with</span><strong>{selectedAgents.length ? selectedAgents.map((agent) => agent.name).join(", ") : "Choose an agent"}</strong></button>
-              <button type="button" onClick={() => setSetupOpen(true)}><span>Mode</span><strong>{mode === "practice" ? "Practice" : "Real trading"}</strong></button>
-              <button type="button" onClick={() => setSetupOpen(true)}><span>Daily limit</span><strong>{money(dailyBudget)}</strong></button>
-              <button type="button" onClick={() => setSetupOpen(true)}><span>Each trade</span><strong>Up to {money(perTrade)}</strong></button>
-            </section>
-
-            <section className="home-grid">
-              <div className="plain-section account-summary">
-                <div className="section-heading"><div><p className="eyebrow">Connected money</p><h3>Your accounts</h3></div><button type="button" onClick={() => setView("accounts")}>Manage</button></div>
-                <div className="account-lines">
-                  {accounts.filter((account) => account.connected).length ? accounts.filter((account) => account.connected).map((account) => (
-                    <div className="account-line" key={account.name}>
-                      <span className="account-logo">{accountInitial(account.name)}</span>
-                      <div><strong>{account.name}</strong><small>{account.detail}</small></div>
-                      <span className="connected-copy">Connected</span>
-                    </div>
-                  )) : <button className="empty-action" type="button" onClick={() => setSetupOpen(true)}>Connect your first account</button>}
+              <section className="watch-workspace">
+                <div className="chart-column">
+                  <header className="chart-heading">
+                    <div><p className="eyebrow">Market context</p><h3>{selectedSymbol} · 5-minute candles</h3></div>
+                    <button className={followLatest ? "follow-button active" : "follow-button"} type="button" onClick={() => setFollowLatest(true)}>{followLatest ? "Following bot" : "Follow bot"}</button>
+                  </header>
+                  <div className="symbol-watchlist" aria-label="Bluechip watchlist">
+                    {watchSymbols.map((symbol) => (
+                      <button
+                        type="button"
+                        key={symbol}
+                        className={selectedSymbol === symbol ? "active" : ""}
+                        aria-pressed={selectedSymbol === symbol}
+                        onClick={() => { setSelectedSymbol(symbol); setFollowLatest(false); }}
+                      >{symbol}</button>
+                    ))}
+                  </div>
+                  <TradingViewChart symbol={selectedSymbol} />
+                  <p className="chart-separation">Chart is for you to follow the market. Bluechip makes decisions from your connected account, not from this chart.</p>
                 </div>
-              </div>
 
-              <div className="plain-section recent-summary">
-                <div className="section-heading"><div><p className="eyebrow">Latest update</p><h3>What your agents are doing</h3></div><button type="button" onClick={() => setView("activity")}>See all</button></div>
-                <div className="activity-line">
-                  <span className={running ? "pulse-dot active" : "pulse-dot"} />
-                  <div><strong>{activity[0]?.message ?? engine.message}</strong><small>{activity[0] ? `${activity[0].mode === "practice" ? "Practice" : "Real trading"} · ${activityTime(activity[0].occurred_at)}` : running ? "The next market check runs on each agent’s schedule." : "Start Practice to see what the agents would do before using real money."}</small></div>
+                <aside className="decision-column" aria-label={`${selectedSymbol} bot decisions`}>
+                  <div className={`decision-card ${currentDecision?.kind ?? "waiting"}`}>
+                    <p className="eyebrow">Current decision · {selectedSymbol}</p>
+                    <h3>{currentDecision ? eventLabel(currentDecision) : !watch.status_available ? "Bot status unavailable" : watch.running ? "Waiting for this symbol" : "Bot is paused"}</h3>
+                    <p>{currentDecision?.message ?? (!watch.status_available ? "Recorded activity remains visible, but the app cannot confirm whether Bluechip is running or paused." : watch.running ? `No recorded ${selectedSymbol} decision in the current activity window. Bluechip will keep checking its fixed watchlist.` : "Start Practice to watch Bluechip decide without sending a real order.")}</p>
+                    <dl>
+                      <div><dt>Recorded mode</dt><dd>{currentDecision ? currentDecision.mode === "practice" ? "Practice · no order" : "Real" : "—"}</dd></div>
+                      <div><dt>Recorded at</dt><dd>{currentDecision ? activityTime(currentDecision.occurred_at) : "—"}</dd></div>
+                      <div><dt>{currentDecision?.mode === "practice" ? "Practice decision amount" : "Recorded amount"}</dt><dd>{currentDecision?.amount_usd ? money(Number(currentDecision.amount_usd)) : "Not recorded"}</dd></div>
+                    </dl>
+                  </div>
+                  <div className="event-rail">
+                    <div className="rail-heading"><strong>Recorded events</strong><button type="button" onClick={() => setView("activity")}>All activity</button></div>
+                    {selectedEvents.length ? selectedEvents.map((item) => (
+                      <div className={`rail-event ${item.kind}`} key={item.id}>
+                        <span aria-hidden="true" />
+                        <div><strong>{eventLabel(item)}</strong><small>{activityTime(item.occurred_at)} · {item.mode === "practice" ? "Practice" : "Real"}</small></div>
+                      </div>
+                    )) : <p className="empty-events">No {selectedSymbol} events recorded yet.</p>}
+                  </div>
+                </aside>
+              </section>
+
+              <details className="watch-text-alternative">
+                <summary>Text and table view of chart context and activity</summary>
+                <p>{selectedSymbol} market candles are shown in the TradingView frame above. Bluechip’s separate recorded events are listed below; they are not markers on the TradingView chart.</p>
+                <div className="activity-table-wrap">
+                  <table>
+                    <thead><tr><th>Time</th><th>Symbol</th><th>Recorded event</th><th>Mode</th><th>Details</th></tr></thead>
+                    <tbody>
+                      {activity.slice(0, 12).map((item) => (
+                        <tr key={item.id}>
+                          <td>{activityTime(item.occurred_at)}</td>
+                          <td>{item.symbol ?? "All"}</td>
+                          <td>{eventLabel(item)}</td>
+                          <td>{item.mode === "practice" ? "Practice · no real order" : "Real"}</td>
+                          <td>{item.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </section>
-          </div>
-        ) : null}
+              </details>
+            </div>
+          );
+        })() : null}
 
         {view === "agents" ? (
           <section className="agents-view">
@@ -804,7 +1121,7 @@ export function App() {
                 const selected = selectedIds.includes(agent.id);
                 const connected = connectedNames.has(agent.account);
                 return (
-                  <button className={selected ? "agent-row selected" : "agent-row"} type="button" key={agent.id} onClick={() => toggleAgent(agent.id)} disabled={running || !agent.customer_ready}>
+                  <button className={selected ? "agent-row selected" : "agent-row"} type="button" key={agent.id} onClick={() => toggleAgent(agent.id)} disabled={!engineReadbackAvailable || running || !agent.customer_ready}>
                     <span className="agent-avatar">{agent.name.slice(0, 1)}</span>
                     <div className="agent-main"><span><strong>{agent.name}</strong><small>{agent.account} · every {agent.cadence_minutes} minutes</small></span><p>{agent.summary}</p></div>
                     <span className={`risk-tag ${agent.risk_level}`}>{agent.risk_level === "steady" ? "Steady" : agent.risk_level === "balanced" ? "Balanced" : "Active"}</span>
@@ -853,7 +1170,7 @@ export function App() {
                   <div><strong>{item.message}</strong><p>{item.agent_id === "bluechip" ? "Bluechip" : item.agent_id} · {item.mode === "practice" ? "Practice" : "Real trading"}{item.amount_usd ? ` · $${Number(item.amount_usd).toFixed(2)}` : ""}</p></div>
                 </div>
               ))}
-              {!activity.length && !running ? <div className="timeline-row muted"><span className="pulse-dot" /><time>Next</time><div><strong>Your first market check</strong><p>Start Practice to watch the agents work without using real money.</p></div></div> : null}
+              {!activity.length && engineReadbackAvailable && !running ? <div className="timeline-row muted"><span className="pulse-dot" /><time>Next</time><div><strong>Your first market check</strong><p>Start Practice to watch the agents work without using real money.</p></div></div> : null}
             </div>
           </section>
         ) : null}
@@ -953,7 +1270,7 @@ export function App() {
 
             <footer>
               <button className="back-button" type="button" onClick={() => setupStep === 1 ? setSetupOpen(false) : setSetupStep((step) => step - 1)}>{setupStep === 1 ? "Close" : "Back"}</button>
-              {setupStep < 4 ? <button className="continue-button" type="button" onClick={finishSetupStep}>Continue</button> : <button className="continue-button" type="button" onClick={() => void start()} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : mode === "practice" ? "Start Practice" : "Review real trading"}</button>}
+              {setupStep < 4 ? <button className="continue-button" type="button" onClick={finishSetupStep}>Continue</button> : <button className="continue-button" type="button" onClick={() => void start()} disabled={busy || !engineReadbackAvailable}>{pendingTradingAction === "start" ? "Starting…" : mode === "practice" ? "Start Practice" : "Review real trading"}</button>}
             </footer>
           </section>
         </div>
@@ -973,7 +1290,7 @@ export function App() {
               <div><dt>Maximum per trade</dt><dd>{money(perTrade)}</dd></div>
               <div><dt>Permission</dt><dd>Recurring for up to 24 hours, or until you pause it</dd></div>
             </dl>
-            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)} ref={realReviewCancel}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy}>{pendingTradingAction === "start" ? "Starting…" : "Allow these trades for 24 hours"}</button></div>
+            <div className="review-actions"><button className="back-button" type="button" onClick={() => setRealReviewOpen(false)} ref={realReviewCancel}>Go back</button><button className="danger-start" type="button" onClick={() => void start(true)} disabled={busy || !engineReadbackAvailable}>{pendingTradingAction === "start" ? "Starting…" : "Allow these trades for 24 hours"}</button></div>
           </section>
         </div>
       ) : null}

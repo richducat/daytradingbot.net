@@ -2,7 +2,11 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use reqwest::{Client, StatusCode, redirect::Policy};
+use reqwest::{
+    Client, StatusCode, Url,
+    header::{CONTENT_TYPE, HeaderMap},
+    redirect::Policy,
+};
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -13,6 +17,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 const ROBINHOOD_MCP_URL: &str = "https://agent.robinhood.com/mcp/trading";
 const MAX_RESPONSE_BYTES: usize = 512 * 1024;
+const RESPONSE_DEADLINE: Duration = Duration::from_secs(15);
 
 /// Privacy-safe proof of the owner's official Robinhood Agentic connection.
 /// Account numbers, balances, positions, orders, and credential material never
@@ -135,6 +140,7 @@ pub enum RobinhoodMcpError {
 pub struct RobinhoodAgenticClient {
     http: Client,
     access_token: Zeroizing<String>,
+    endpoint: Url,
 }
 
 /// One initialized official MCP session bound to exactly one dedicated
@@ -149,6 +155,14 @@ pub struct RobinhoodTradingSession<'a> {
 
 impl RobinhoodAgenticClient {
     pub fn new(access_token: Zeroizing<String>) -> Result<Self, RobinhoodMcpError> {
+        let endpoint = Url::parse(ROBINHOOD_MCP_URL).map_err(|_| RobinhoodMcpError::Unavailable)?;
+        Self::new_for_endpoint(access_token, endpoint)
+    }
+
+    fn new_for_endpoint(
+        access_token: Zeroizing<String>,
+        endpoint: Url,
+    ) -> Result<Self, RobinhoodMcpError> {
         let token = access_token.trim();
         if token.len() < 24 || token.chars().any(char::is_whitespace) {
             return Err(RobinhoodMcpError::InvalidCredential);
@@ -156,13 +170,17 @@ impl RobinhoodAgenticClient {
 
         let http = Client::builder()
             .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(15))
+            .timeout(RESPONSE_DEADLINE)
             .redirect(Policy::none())
             .user_agent("DayTradingBot/0.1 robinhood-owner-proof")
             .build()
             .map_err(|_| RobinhoodMcpError::Unavailable)?;
 
-        Ok(Self { http, access_token })
+        Ok(Self {
+            http,
+            access_token,
+            endpoint,
+        })
     }
 
     pub async fn read_owner_snapshot(&self) -> Result<RobinhoodOwnerSnapshot, RobinhoodMcpError> {
@@ -310,7 +328,7 @@ impl RobinhoodAgenticClient {
     ) -> Result<(Value, Option<String>), RobinhoodMcpError> {
         let mut request = self
             .http
-            .post(ROBINHOOD_MCP_URL)
+            .post(self.endpoint.clone())
             .bearer_auth(self.access_token.as_str())
             .header("Accept", "application/json, text/event-stream")
             .json(payload);
@@ -331,12 +349,20 @@ impl RobinhoodAgenticClient {
                     .map(str::to_owned)
             })
             .flatten();
-        let body = read_bounded_body(&mut response).await?;
         let expected_id = payload
             .get("id")
             .and_then(Value::as_u64)
             .ok_or(RobinhoodMcpError::InvalidResponse)?;
-        let value = parse_mcp_payload(&body, expected_id)?;
+        let is_event_stream = response_is_event_stream(response.headers());
+        let value = if is_event_stream {
+            // Reqwest's request deadline remains active while the streaming
+            // body is read, so a server that never sends the matching event
+            // still fails closed after `RESPONSE_DEADLINE`.
+            read_sse_rpc_response(&mut response, expected_id).await?
+        } else {
+            let body = read_bounded_body(&mut response).await?;
+            parse_mcp_payload(&body, expected_id)?
+        };
         validate_rpc_response(&value, expected_id)?;
         Ok((value, returned_session))
     }
@@ -348,7 +374,7 @@ impl RobinhoodAgenticClient {
     ) -> Result<(), RobinhoodMcpError> {
         let mut request = self
             .http
-            .post(ROBINHOOD_MCP_URL)
+            .post(self.endpoint.clone())
             .bearer_auth(self.access_token.as_str())
             .header("Accept", "application/json, text/event-stream")
             .json(payload);
@@ -1017,6 +1043,17 @@ fn validate_rpc_response(response: &Value, expected_id: u64) -> Result<(), Robin
     Ok(())
 }
 
+fn response_is_event_stream(headers: &HeaderMap) -> bool {
+    headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value.split(';').next().is_some_and(|media_type| {
+                media_type.trim().eq_ignore_ascii_case("text/event-stream")
+            })
+        })
+}
+
 async fn read_bounded_body(
     response: &mut reqwest::Response,
 ) -> Result<Zeroizing<Vec<u8>>, RobinhoodMcpError> {
@@ -1038,6 +1075,76 @@ async fn read_bounded_body(
         body.extend_from_slice(&chunk);
     }
     Ok(body)
+}
+
+async fn read_sse_rpc_response(
+    response: &mut reqwest::Response,
+    expected_id: u64,
+) -> Result<Value, RobinhoodMcpError> {
+    let mut total_bytes = 0_usize;
+    let mut buffer = Zeroizing::new(Vec::new());
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| RobinhoodMcpError::Unavailable)?
+    {
+        total_bytes = total_bytes.saturating_add(chunk.len());
+        if total_bytes > MAX_RESPONSE_BYTES {
+            return Err(RobinhoodMcpError::ResponseTooLarge);
+        }
+        buffer.extend_from_slice(&chunk);
+        while let Some(event) = take_sse_event(&mut buffer) {
+            if let Some(value) = parse_sse_event(&event, expected_id)? {
+                return Ok(value);
+            }
+        }
+    }
+    Err(RobinhoodMcpError::InvalidResponse)
+}
+
+fn take_sse_event(buffer: &mut Vec<u8>) -> Option<Zeroizing<Vec<u8>>> {
+    let lf = buffer
+        .windows(2)
+        .position(|window| window == b"\n\n")
+        .map(|index| (index, 2));
+    let crlf = buffer
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|index| (index, 4));
+    let (event_end, separator_len) = match (lf, crlf) {
+        (Some(lf), Some(crlf)) => {
+            if lf.0 <= crlf.0 {
+                lf
+            } else {
+                crlf
+            }
+        }
+        (Some(found), None) | (None, Some(found)) => found,
+        (None, None) => return None,
+    };
+    Some(Zeroizing::new(
+        buffer.drain(..event_end + separator_len).collect(),
+    ))
+}
+
+fn parse_sse_event(event: &[u8], expected_id: u64) -> Result<Option<Value>, RobinhoodMcpError> {
+    let text = std::str::from_utf8(event).map_err(|_| RobinhoodMcpError::InvalidResponse)?;
+    let mut data = Zeroizing::new(String::new());
+    for line in text.lines() {
+        let Some(value) = line.strip_prefix("data:") else {
+            continue;
+        };
+        if !data.is_empty() {
+            data.push('\n');
+        }
+        data.push_str(value.strip_prefix(' ').unwrap_or(value));
+    }
+    if data.is_empty() || data.as_str() == "[DONE]" {
+        return Ok(None);
+    }
+    let value =
+        serde_json::from_str::<Value>(&data).map_err(|_| RobinhoodMcpError::InvalidResponse)?;
+    Ok((value.get("id").and_then(Value::as_u64) == Some(expected_id)).then_some(value))
 }
 
 fn parse_mcp_payload(body: &[u8], expected_id: u64) -> Result<Value, RobinhoodMcpError> {
@@ -1066,6 +1173,10 @@ fn parse_mcp_payload(body: &[u8], expected_id: u64) -> Result<Value, RobinhoodMc
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+    use std::thread;
+    use std::time::Instant;
 
     #[test]
     fn malformed_oauth_token_is_rejected_before_any_request() {
@@ -1073,6 +1184,85 @@ mod tests {
             .err()
             .expect("invalid token must fail");
         assert!(matches!(error, RobinhoodMcpError::InvalidCredential));
+    }
+
+    #[tokio::test]
+    async fn streamable_http_returns_matching_sse_response_without_waiting_for_eof() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind local MCP fixture");
+        let address = listener.local_addr().expect("local fixture address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept local request");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .expect("set read timeout");
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let read = stream.read(&mut chunk).expect("read request headers");
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..read]);
+            }
+
+            let event = b"data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-03-26\"}}\n\n";
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nMcp-Session-Id: local-test-session\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n{:X}\r\n",
+                event.len()
+            )
+            .expect("write response headers");
+            stream.write_all(event).expect("write SSE event");
+            stream.write_all(b"\r\n").expect("finish response chunk");
+            stream.flush().expect("flush SSE event");
+
+            thread::sleep(Duration::from_secs(2));
+            let _ = stream.write_all(b"0\r\n\r\n");
+        });
+
+        let endpoint = Url::parse(&format!("http://{address}/mcp")).expect("local fixture URL");
+        let client = RobinhoodAgenticClient::new_for_endpoint(
+            Zeroizing::new("local-test-token-long-enough-to-pass".to_owned()),
+            endpoint,
+        )
+        .expect("test client");
+        let started = Instant::now();
+        let (response, session_id) = client
+            .post_rpc(
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {}
+                }),
+                None,
+                true,
+            )
+            .await
+            .expect("matching event should return");
+
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(
+            response
+                .pointer("/result/protocolVersion")
+                .and_then(Value::as_str),
+            Some("2025-03-26")
+        );
+        assert_eq!(session_id.as_deref(), Some("local-test-session"));
+        server.join().expect("local fixture server");
+    }
+
+    #[test]
+    fn sse_parser_joins_multiline_data_and_ignores_other_rpc_ids() {
+        let mut buffer = b"event: message\r\ndata: {\"jsonrpc\":\"2.0\",\r\ndata: \"id\":7,\"result\":{}}\r\n\r\n"
+            .to_vec();
+        let event = take_sse_event(&mut buffer).expect("complete event");
+        assert!(parse_sse_event(&event, 1).expect("valid event").is_none());
+        let value = parse_sse_event(&event, 7)
+            .expect("valid event")
+            .expect("matching response");
+        validate_rpc_response(&value, 7).expect("valid JSON-RPC response");
+        assert!(buffer.is_empty());
     }
 
     #[test]

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { limitPlanCopy, normalizeTradingLimits, setupRiskCopy } from "./App";
+import {
+  limitPlanCopy,
+  normalizeTradingLimits,
+  setupRiskCopy,
+  tradingViewChartUrl,
+  tradingViewSymbolUrl,
+  unavailableWatchState,
+  watchDisplayMode,
+  watchSymbols,
+} from "./App";
 
 describe("customer trading limits", () => {
   it("keeps every supported daily and per-trade combination unchanged", () => {
@@ -41,5 +50,68 @@ describe("customer trading limits", () => {
     expect(setupRiskCopy).toContain("remaining limit");
     expect(setupRiskCopy).toContain("Every trade can lose its full value");
     expect(setupRiskCopy.toLowerCase()).not.toContain("loss protection");
+  });
+});
+
+describe("TradingView chart boundary", () => {
+  it("creates only exact hosted-widget URLs for the fixed watchlist", () => {
+    for (const symbol of watchSymbols) {
+      const chartUrl = tradingViewChartUrl(symbol);
+      expect(chartUrl).not.toBeNull();
+      const parsed = new URL(chartUrl!);
+      expect(parsed.origin).toBe("https://www.tradingview-widget.com");
+      expect(parsed.pathname).toBe("/embed-widget/advanced-chart/");
+      expect(parsed.searchParams.get("locale")).toBe("en");
+
+      const config = JSON.parse(decodeURIComponent(parsed.hash.slice(1))) as {
+        symbol: string;
+        interval: string;
+        allow_symbol_change: boolean;
+        support_host: string;
+      };
+      expect(config.symbol).toMatch(/^(NASDAQ|AMEX):[A-Z]+$/);
+      expect(config.interval).toBe("5");
+      expect(config.allow_symbol_change).toBe(false);
+      expect(config.support_host).toBe("https://www.tradingview.com");
+
+      const attributionUrl = new URL(tradingViewSymbolUrl(symbol)!);
+      expect(attributionUrl.origin).toBe("https://www.tradingview.com");
+      expect(attributionUrl.pathname).toMatch(/^\/symbols\/(NASDAQ|AMEX)-[A-Z]+\/$/);
+    }
+  });
+
+  it("rejects injected, traversing, and unsupported symbols", () => {
+    for (const symbol of ["AAPL&symbol=TSLA", "../AAPL", "META", "", "AAPL%0A"]) {
+      expect(tradingViewChartUrl(symbol)).toBeNull();
+      expect(tradingViewSymbolUrl(symbol)).toBeNull();
+    }
+  });
+});
+
+describe("Watch readback failures", () => {
+  it("never turns an unavailable snapshot into a paused or no-order claim", () => {
+    const state = unavailableWatchState();
+    expect(state.status_available).toBe(false);
+    expect(state.running).toBeNull();
+    expect(state.mode).toBe("unavailable");
+    expect(state.has_unresolved_real_order).toBeNull();
+    expect(state.message).toContain("Do not assume trading is paused");
+    expect(watchDisplayMode(state)).toBe("unavailable");
+  });
+
+  it("retains only the last known check time when a later poll fails", () => {
+    const state = unavailableWatchState({
+      ...unavailableWatchState(),
+      status_available: true,
+      running: true,
+      mode: "real",
+      last_checked_at: "2026-07-23T16:00:00Z",
+      next_check_at: "2026-07-23T16:15:00Z",
+      has_unresolved_real_order: false,
+    });
+    expect(state.last_checked_at).toBe("2026-07-23T16:00:00Z");
+    expect(state.next_check_at).toBeNull();
+    expect(state.budget_state).toBe("unavailable");
+    expect(state.remaining_usd).toBeNull();
   });
 });

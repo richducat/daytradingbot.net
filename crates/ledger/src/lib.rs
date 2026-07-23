@@ -64,6 +64,15 @@ pub struct SubmissionAttemptRecord {
     pub notional_usd: Decimal,
 }
 
+/// Aggregated opening-notional accounting for one account, venue, and
+/// canonical venue day. It cannot expose an account, order, intent, or fill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DailyOpeningNotionalBreakdown {
+    pub used_or_held_usd: Decimal,
+    pub pending_usd: Decimal,
+    pub committed_usd: Decimal,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentActivityMode {
     Practice,
@@ -288,6 +297,53 @@ impl Ledger {
             .unwrap_or(0);
         tx.commit()?;
         Ok(micros_to_decimal(opening_notional_micros))
+    }
+
+    /// Splits today's authoritative opening-notional usage into still-active
+    /// reservation exposure and committed usage. Pending is already included in
+    /// `used_or_held_usd`; callers must never subtract it twice.
+    pub fn daily_opening_notional_breakdown(
+        &self,
+        account_scope: Uuid,
+        venue: Venue,
+        observed_at: DateTime<Utc>,
+    ) -> Result<DailyOpeningNotionalBreakdown, LedgerError> {
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;
+        let account_scope = account_scope.to_string();
+        let venue = venue_key(venue);
+        let venue_day = canonical_venue_day(
+            &tx,
+            &account_scope,
+            venue,
+            &observed_at.date_naive().to_string(),
+        )?;
+        let used_or_held_micros = tx
+            .query_row(
+                "SELECT opening_notional_micros FROM daily_usage
+                 WHERE account_scope = ?1 AND venue = ?2 AND venue_day = ?3",
+                params![account_scope, venue, venue_day],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .unwrap_or(0);
+        let pending_micros = tx.query_row(
+            "SELECT COALESCE(SUM(exposure_micros), 0)
+               FROM risk_reservations
+              WHERE account_scope = ?1 AND venue = ?2 AND venue_day = ?3
+                AND active = 1 AND opening_notional_micros > 0",
+            params![account_scope, venue, venue_day],
+            |row| row.get::<_, i64>(0),
+        )?;
+        if used_or_held_micros < 0 || pending_micros < 0 || pending_micros > used_or_held_micros {
+            return Err(LedgerError::InvalidStoredSubmission);
+        }
+        tx.commit()?;
+        Ok(DailyOpeningNotionalBreakdown {
+            used_or_held_usd: micros_to_decimal(used_or_held_micros),
+            pending_usd: micros_to_decimal(pending_micros),
+            committed_usd: micros_to_decimal(used_or_held_micros - pending_micros),
+        })
     }
 
     /// Stores the connector's latest reconciled venue-day P&L so the next
@@ -1031,6 +1087,32 @@ impl Ledger {
         let rows = statement.query_map([], submission_record_from_row)?;
         let records: rusqlite::Result<Vec<_>> = rows.collect();
         Ok(records?)
+    }
+
+    /// Reports only whether this account and venue have an unresolved opening
+    /// submission. The aggregate intentionally cannot expose order identifiers
+    /// or activity from another connected account.
+    pub fn has_unresolved_opening_submission(
+        &self,
+        account_scope: Uuid,
+        venue: Venue,
+    ) -> Result<bool, LedgerError> {
+        let connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        connection
+            .query_row(
+                "SELECT EXISTS(
+                    SELECT 1
+                      FROM submission_attempts s
+                      JOIN intents i ON i.intent_id = s.intent_id
+                     WHERE i.account_scope = ?1
+                       AND i.venue = ?2
+                       AND i.purpose = 'open'
+                       AND s.state IN ('submitting', 'acknowledged', 'unknown', 'quarantined')
+                )",
+                params![account_scope.to_string(), venue_key(venue)],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(LedgerError::from)
     }
 
     fn transition_submission(
@@ -2157,6 +2239,131 @@ mod tests {
                 .daily_opening_notional_usd(account, Venue::Coinbase, now)
                 .unwrap(),
             Decimal::new(500, 2)
+        );
+    }
+
+    #[test]
+    fn daily_breakdown_never_understates_used_or_held_opening_notional() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let now = Utc::now();
+        let intent = trade_intent(account, "budget-breakdown");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+
+        let reserved = ledger
+            .daily_opening_notional_breakdown(account, Venue::Coinbase, now)
+            .unwrap();
+        assert_eq!(reserved.used_or_held_usd, Decimal::new(500, 2));
+        assert_eq!(reserved.pending_usd, Decimal::new(500, 2));
+        assert_eq!(reserved.committed_usd, Decimal::ZERO);
+        assert_eq!(
+            reserved.used_or_held_usd,
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap()
+        );
+
+        ledger
+            .begin_submission(intent_id, Uuid::new_v4(), &"a".repeat(64))
+            .unwrap();
+        ledger
+            .acknowledge_submission(intent_id, "provider-order")
+            .unwrap();
+        ledger
+            .record_open_fill(intent_id, &fill("partial-fill", Decimal::new(200, 2)))
+            .unwrap();
+        let partial = ledger
+            .daily_opening_notional_breakdown(account, Venue::Coinbase, now)
+            .unwrap();
+        assert_eq!(partial.used_or_held_usd, Decimal::new(500, 2));
+        assert_eq!(partial.pending_usd, Decimal::new(300, 2));
+        assert_eq!(partial.committed_usd, Decimal::new(200, 2));
+        assert_eq!(
+            partial.committed_usd + partial.pending_usd,
+            partial.used_or_held_usd
+        );
+
+        ledger
+            .finalize_acknowledged_open_order(intent_id, OrderState::Canceled)
+            .unwrap();
+        let terminal = ledger
+            .daily_opening_notional_breakdown(account, Venue::Coinbase, now)
+            .unwrap();
+        assert_eq!(terminal.used_or_held_usd, Decimal::new(500, 2));
+        assert_eq!(terminal.pending_usd, Decimal::ZERO);
+        assert_eq!(terminal.committed_usd, Decimal::new(500, 2));
+    }
+
+    #[test]
+    fn daily_breakdown_excludes_prior_day_active_reservations() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let intent = trade_intent(account, "prior-day-reservation");
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+        let yesterday = (Utc::now() - ChronoDuration::days(1))
+            .date_naive()
+            .to_string();
+        {
+            let connection = ledger.connection.lock().unwrap();
+            connection
+                .execute("UPDATE risk_reservations SET venue_day = ?1", [&yesterday])
+                .unwrap();
+            connection
+                .execute("UPDATE daily_usage SET venue_day = ?1", [&yesterday])
+                .unwrap();
+        }
+
+        let today = ledger
+            .daily_opening_notional_breakdown(account, Venue::Coinbase, Utc::now())
+            .unwrap();
+        assert_eq!(today.used_or_held_usd, Decimal::ZERO);
+        assert_eq!(today.pending_usd, Decimal::ZERO);
+        assert_eq!(today.committed_usd, Decimal::ZERO);
+    }
+
+    #[test]
+    fn unresolved_opening_submission_is_scoped_to_account_and_venue() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let intent = trade_intent(account, "scoped-unresolved-order");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+        ledger
+            .begin_submission(intent_id, Uuid::new_v4(), &"a".repeat(64))
+            .unwrap();
+
+        assert!(
+            ledger
+                .has_unresolved_opening_submission(account, Venue::Coinbase)
+                .unwrap()
+        );
+        assert!(
+            !ledger
+                .has_unresolved_opening_submission(Uuid::new_v4(), Venue::Coinbase)
+                .unwrap()
+        );
+        assert!(
+            !ledger
+                .has_unresolved_opening_submission(account, Venue::Robinhood)
+                .unwrap()
+        );
+
+        ledger
+            .acknowledge_submission(intent_id, "provider-order")
+            .unwrap();
+        assert!(
+            ledger
+                .has_unresolved_opening_submission(account, Venue::Coinbase)
+                .unwrap()
+        );
+        ledger
+            .finalize_acknowledged_open_order(intent_id, OrderState::Canceled)
+            .unwrap();
+        assert!(
+            !ledger
+                .has_unresolved_opening_submission(account, Venue::Coinbase)
+                .unwrap()
         );
     }
 

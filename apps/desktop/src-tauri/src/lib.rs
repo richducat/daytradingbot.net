@@ -691,6 +691,7 @@ pub fn run() {
             customer_connections::connect_polymarket_us_account,
             customer_connections::connect_kalshi_account,
             bluechip_runtime::recent_trading_activity,
+            bluechip_runtime::bluechip_watch_state,
             owner_engine::owner_engine_status,
             owner_engine::start_owner_engine_session,
             owner_engine::pause_owner_engine_session,

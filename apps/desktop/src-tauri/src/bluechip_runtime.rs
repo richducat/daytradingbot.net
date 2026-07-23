@@ -106,6 +106,7 @@ impl Default for BluechipStatus {
 struct RuntimeInner {
     generation: u64,
     status: BluechipStatus,
+    active_config: Option<BluechipConfig>,
     cancel: Option<oneshot::Sender<()>>,
     real_authorized_until: Option<DateTime<Utc>>,
 }
@@ -124,6 +125,21 @@ impl BluechipRuntime {
             .unwrap_or_else(|_| BluechipStatus {
                 message: "The trading agent needs to be restarted.".into(),
                 ..BluechipStatus::default()
+            })
+    }
+
+    fn watch_context(&self) -> (BluechipStatus, Option<BluechipConfig>) {
+        self.inner
+            .lock()
+            .map(|inner| (inner.status.clone(), inner.active_config.clone()))
+            .unwrap_or_else(|_| {
+                (
+                    BluechipStatus {
+                        message: "The trading agent needs to be restarted.".into(),
+                        ..BluechipStatus::default()
+                    },
+                    None,
+                )
             })
     }
 
@@ -154,6 +170,7 @@ impl BluechipRuntime {
         inner.status.running = false;
         inner.status.message = message.into();
         inner.status.next_check_at = None;
+        inner.active_config = None;
         inner.real_authorized_until = None;
         if let Some(cancel) = inner.cancel.take() {
             let _ = cancel.send(());
@@ -239,6 +256,7 @@ impl BluechipRuntime {
             inner.cancel = Some(cancel_sender);
             inner.real_authorized_until = (config.mode == NativeTradingMode::Real)
                 .then(|| Utc::now() + ChronoDuration::hours(REAL_AUTHORIZATION_HOURS));
+            inner.active_config = Some(config.clone());
             inner.status = BluechipStatus {
                 running: true,
                 mode: config.mode.as_str(),
@@ -334,6 +352,7 @@ impl BluechipRuntime {
                 let _ = cancel.send(());
             }
             inner.real_authorized_until = None;
+            inner.active_config = None;
             inner.status = BluechipStatus::default();
             (was_running, mode)
         };
@@ -1453,6 +1472,7 @@ pub struct ActivityItem {
     agent_id: String,
     mode: &'static str,
     kind: &'static str,
+    recorded_order_state: Option<&'static str>,
     symbol: Option<String>,
     amount_usd: Option<String>,
     message: String,
@@ -1460,6 +1480,7 @@ pub struct ActivityItem {
 }
 
 fn activity_item(record: AgentActivityRecord) -> ActivityItem {
+    let recorded_order_state = activity_order_state(&record);
     ActivityItem {
         id: record.event_id.to_string(),
         agent_id: record.agent_id,
@@ -1478,10 +1499,48 @@ fn activity_item(record: AgentActivityRecord) -> ActivityItem {
             AgentActivityKind::Filled => "filled",
             AgentActivityKind::Error => "error",
         },
+        recorded_order_state,
         symbol: record.symbol,
         amount_usd: record.amount_usd.map(|amount| format!("{amount:.2}")),
         message: record.message,
         occurred_at: record.occurred_at.to_rfc3339(),
+    }
+}
+
+fn activity_order_state(record: &AgentActivityRecord) -> Option<&'static str> {
+    match record.kind {
+        AgentActivityKind::Reviewed if record.mode == AgentActivityMode::Practice => {
+            Some("practice_review")
+        }
+        AgentActivityKind::OrderSubmitted => match record.message.as_str() {
+            "Robinhood found the earlier order. It is waiting to be filled." => Some("pending"),
+            "Robinhood found the earlier order. It is partially filled and remains open." => {
+                Some("partially_filled")
+            }
+            "Robinhood found the earlier order and reports it as filled." => Some("filled"),
+            "Robinhood found the earlier order, but its current status is still updating." => {
+                Some("unknown")
+            }
+            _ => Some("submitted"),
+        },
+        AgentActivityKind::Filled => Some("filled"),
+        AgentActivityKind::Skipped => match record.message.as_str() {
+            "Robinhood found the earlier order and reports it as canceled." => Some("canceled"),
+            "Robinhood found the earlier order and reports it as rejected. No order remains open."
+            | "Robinhood did not accept this trade. No order was opened, and the amount remains available within today's limit. Bluechip will try fresh matches again in 15 minutes." => {
+                Some("rejected")
+            }
+            _ => None,
+        },
+        AgentActivityKind::Error
+            if matches!(
+                record.message.as_str(),
+                UNCERTAIN_PLACEMENT_ACTIVITY | ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY
+            ) =>
+        {
+            Some("unknown")
+        }
+        _ => None,
     }
 }
 
@@ -1493,6 +1552,121 @@ pub fn recent_trading_activity(
         .recent_agent_activity(100)
         .map(|items| items.into_iter().map(activity_item).collect())
         .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")
+}
+
+#[derive(Serialize)]
+pub struct BluechipWatchState {
+    running: bool,
+    mode: &'static str,
+    message: String,
+    last_checked_at: Option<String>,
+    next_check_at: Option<String>,
+    budget_state: &'static str,
+    daily_limit_usd: Option<String>,
+    per_trade_limit_usd: Option<String>,
+    used_or_held_usd: Option<String>,
+    pending_usd: Option<String>,
+    committed_usd: Option<String>,
+    remaining_usd: Option<String>,
+    has_unresolved_real_order: bool,
+}
+
+#[tauri::command]
+pub fn bluechip_watch_state(
+    app: AppHandle,
+    runtime: tauri::State<'_, BluechipRuntime>,
+    ledger: tauri::State<'_, Ledger>,
+) -> BluechipWatchState {
+    let (status, config) = runtime.watch_context();
+    let account_scope = risk_scopes(&app).map(|(_, account_scope)| account_scope);
+    let has_unresolved_real_order = match &account_scope {
+        Ok(account_scope) => ledger
+            .has_unresolved_opening_submission(*account_scope, Venue::Robinhood)
+            .unwrap_or(true),
+        Err(_) => true,
+    };
+    let Some(config) = config.filter(|_| status.running) else {
+        return BluechipWatchState {
+            running: status.running,
+            mode: status.mode,
+            message: status.message,
+            last_checked_at: status.last_checked_at,
+            next_check_at: status.next_check_at,
+            budget_state: "paused",
+            daily_limit_usd: None,
+            per_trade_limit_usd: None,
+            used_or_held_usd: None,
+            pending_usd: None,
+            committed_usd: None,
+            remaining_usd: None,
+            has_unresolved_real_order,
+        };
+    };
+    let daily_limit_usd = Some(format!("{:.2}", config.daily_budget_usd));
+    let per_trade_limit_usd = Some(format!("{:.2}", config.max_per_trade_usd));
+    if config.mode == NativeTradingMode::Practice {
+        return BluechipWatchState {
+            running: true,
+            mode: "practice",
+            message: status.message,
+            last_checked_at: status.last_checked_at,
+            next_check_at: status.next_check_at,
+            budget_state: "practice",
+            daily_limit_usd,
+            per_trade_limit_usd,
+            used_or_held_usd: None,
+            pending_usd: None,
+            committed_usd: None,
+            remaining_usd: None,
+            has_unresolved_real_order,
+        };
+    }
+
+    let accounting = account_scope
+        .and_then(|account_scope| {
+            ledger
+                .daily_opening_notional_breakdown(account_scope, Venue::Robinhood, Utc::now())
+                .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")
+        })
+        .and_then(|breakdown| {
+            let remaining =
+                (config.daily_budget_usd - breakdown.used_or_held_usd).max(Decimal::ZERO);
+            (breakdown.used_or_held_usd == breakdown.committed_usd + breakdown.pending_usd)
+                .then_some((breakdown, remaining))
+                .ok_or("TRADING_HISTORY_UNAVAILABLE")
+        });
+    match accounting {
+        Ok((breakdown, remaining)) => BluechipWatchState {
+            running: true,
+            mode: "real",
+            message: status.message,
+            last_checked_at: status.last_checked_at,
+            next_check_at: status.next_check_at,
+            budget_state: "available",
+            daily_limit_usd,
+            per_trade_limit_usd,
+            used_or_held_usd: Some(format!("{:.2}", breakdown.used_or_held_usd)),
+            pending_usd: Some(format!("{:.2}", breakdown.pending_usd)),
+            committed_usd: Some(format!("{:.2}", breakdown.committed_usd)),
+            remaining_usd: Some(format!("{remaining:.2}")),
+            has_unresolved_real_order,
+        },
+        Err(_) => BluechipWatchState {
+            running: true,
+            mode: "real",
+            message: status.message,
+            last_checked_at: status.last_checked_at,
+            next_check_at: status.next_check_at,
+            budget_state: "unavailable",
+            daily_limit_usd,
+            per_trade_limit_usd,
+            used_or_held_usd: None,
+            pending_usd: None,
+            committed_usd: None,
+            remaining_usd: None,
+            has_unresolved_real_order,
+        },
+    }
 }
 
 #[cfg(test)]
