@@ -186,6 +186,8 @@ const errorCopy: Record<string, string> = {
   LICENSE_STORAGE_UNAVAILABLE: "This computer’s secure storage is unavailable. Real trading stayed off.",
   ACCOUNT_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to that saved account. Nothing was changed.",
   ROBINHOOD_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Robinhood connection. Nothing was changed.",
+  ROBINHOOD_OWNER_AUTHENTICATION_EXPIRED: "Your saved Robinhood sign-in has expired. Connect Robinhood again.",
+  ROBINHOOD_OWNER_IMPORT_INSECURE: "The saved Robinhood connection could not be imported safely. Connect Robinhood again.",
   COINBASE_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Coinbase connection. Nothing was changed.",
   OWNER_DEMO_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Kalshi connection. Nothing was changed.",
   POLYMARKET_US_OWNER_VAULT_UNAVAILABLE: "Mac Keychain did not allow access to the saved Polymarket connection. Nothing was changed.",
@@ -196,8 +198,12 @@ const errorCopy: Record<string, string> = {
 };
 
 function messageFromError(error: unknown) {
-  const key = String(error).replace(/^Error:\s*/, "");
+  const key = errorKey(error);
   return errorCopy[key] ?? "That did not work. Nothing was turned on. Try again or check Accounts.";
+}
+
+function errorKey(error: unknown) {
+  return String(error).replace(/^Error:\s*/, "");
 }
 
 function money(value: number) {
@@ -444,7 +450,15 @@ export function App() {
     setBusy(true);
     setNotice(null);
     try {
-      if (account === "Robinhood") await invoke("connect_robinhood");
+      if (account === "Robinhood") {
+        try {
+          await invoke("import_robinhood_owner_connection");
+        } catch (ownerImportError) {
+          const key = errorKey(ownerImportError);
+          if (key === "ROBINHOOD_OWNER_VAULT_UNAVAILABLE") throw ownerImportError;
+          await invoke("connect_robinhood");
+        }
+      }
       if (account === "Kalshi") await invoke("import_owner_demo_credentials");
       await Promise.all([refresh(), refreshAccount(account)]);
       setNotice(`${account} is connected.`);
