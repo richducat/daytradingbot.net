@@ -239,9 +239,9 @@ const emptyLicense: LicenseStatus = {
 
 const connectionCheckTimeoutMs = 16_000;
 const dailyLimitMinimum = 1;
-const dailyLimitMaximum = 25;
+const dailyLimitMaximum = 1_000_000;
 const perTradeMinimum = 1;
-const perTradeMaximum = 5;
+const perTradeMaximum = 1_000_000;
 export const watchSymbols = ["AAPL", "NVDA", "TSLA", "SPY", "QQQ", "AMD", "MSFT", "GOOGL"] as const;
 export type WatchSymbol = (typeof watchSymbols)[number];
 const tradingViewSymbols: Record<WatchSymbol, string> = {
@@ -355,8 +355,8 @@ const errorCopy: Record<string, string> = {
   ROBINHOOD_AUTHENTICATION_EXPIRED: "Reconnect Robinhood so Bluechip can continue.",
   ROBINHOOD_CONNECTION_TIMED_OUT: "Robinhood took too long to respond. Nothing was turned on. Check the connection and try again.",
   ADD_FUNDS_TO_ROBINHOOD: "Robinhood needs at least $1 of available buying power. Add money or free up buying power, then try again.",
-  DAILY_BUDGET_MUST_BE_BETWEEN_1_AND_25: "Choose a daily limit from $1 to $25 in Setup.",
-  TRADE_LIMIT_MUST_BE_BETWEEN_1_AND_5: "Choose $1 to $5 per trade, without going over your daily limit.",
+  DAILY_BUDGET_MUST_BE_POSITIVE: "Choose a positive whole-dollar daily limit in Setup.",
+  TRADE_LIMIT_MUST_BE_POSITIVE_AND_NOT_EXCEED_DAILY: "Choose a positive whole-dollar amount per trade that does not exceed your daily limit.",
   TRADING_LIMITS_INVALID: "Your saved limits were adjusted to the supported range. Review them in Setup, then try again.",
   TRADING_LIMITS_UNAVAILABLE: "Bluechip could not read your saved limits. Open Setup, choose them again, then restart.",
   ORDER_RECONCILIATION_REQUIRED: "One earlier Robinhood order needs to be checked before real trading can continue.",
@@ -2229,7 +2229,9 @@ export function App() {
                   <div><label htmlFor="daily-trading-limit">Daily trading limit</label><strong>{money(dailyBudget)}</strong></div>
                   <input
                     id="daily-trading-limit"
-                    type="range"
+                    className="money-limit-input"
+                    type="number"
+                    inputMode="numeric"
                     min={dailyLimitMinimum}
                     max={dailyLimitMaximum}
                     step="1"
@@ -2242,13 +2244,15 @@ export function App() {
                       setPerTrade(limits.perTrade);
                     }}
                   />
-                  <small id="daily-limit-help">{limitPlanCopy(dailyBudget, perTrade)}</small>
+                  <small id="daily-limit-help">{limitPlanCopy(dailyBudget, perTrade)} You choose this amount; Bluechip can use less when Robinhood buying power is lower.</small>
                 </div>
                 <div className="limit-control">
                   <div><label htmlFor="per-trade-limit">Most in one trade</label><strong>{money(perTrade)}</strong></div>
                   <input
                     id="per-trade-limit"
-                    type="range"
+                    className="money-limit-input"
+                    type="number"
+                    inputMode="numeric"
                     min={perTradeMinimum}
                     max={Math.min(perTradeMaximum, dailyBudget)}
                     step="1"

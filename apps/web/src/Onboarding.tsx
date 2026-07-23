@@ -133,9 +133,9 @@ const questions: Question[] = [
     help: "This is a ceiling. Choosing $10 doesn't mean the bot must spend $10.",
     why: "Why we ask: your answer gives us a concrete starting setup instead of handing you an empty box.",
     options: [
-      { value: "5", label: "$5 a day", detail: "The smallest available starting limit." },
-      { value: "10", label: "$10 a day", detail: "A middle starting point that can still be changed later." },
-      { value: "25", label: "$25 a day", detail: "The built-in maximum for new customer trades. It is never required." },
+      { value: "5", label: "$5 a day", detail: "A small starting suggestion. You can choose another amount in the app." },
+      { value: "10", label: "$10 a day", detail: "A middle starting suggestion that can be changed before trading." },
+      { value: "25", label: "$25 a day", detail: "A larger starting suggestion. Your actual limit is your choice and cannot exceed available buying power." },
     ],
   },
   {

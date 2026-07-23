@@ -4,11 +4,6 @@ export const siteConfig = {
   macosDownloadUrl: import.meta.env.VITE_MACOS_DOWNLOAD_URL
     ?? "https://releases.daytradingbot.net/stable/DayTradingBot-macos-universal.dmg",
   supportEmail: "support@daytradingbot.net",
-  limits: {
-    maxOpeningOrderUsd: 5,
-    maxDailyOpeningNotionalUsd: 25,
-    maxDailyLossUsd: 10,
-  },
   accounts: [
     { name: "Robinhood", market: "Stocks and ETFs", status: "Bluechip Practice and Real are available in the Mac app" },
     { name: "Coinbase", market: "Bitcoin and Ethereum", status: "Account connection is ready; trading agent comes next" },

@@ -1754,6 +1754,23 @@ svg {
   accent-color: var(--green);
 }
 
+.limit-control .money-limit-input {
+  min-height: 56px;
+  padding: 0 16px;
+  border: 1px solid #596354;
+  border-radius: 12px;
+  background: #151914;
+  color: var(--text);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 680;
+}
+
+.limit-control .money-limit-input:focus {
+  border-color: var(--green);
+  outline: 3px solid rgba(170, 255, 57, 0.16);
+}
+
 .limit-control small {
   display: block;
   max-width: 690px;

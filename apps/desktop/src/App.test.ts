@@ -41,22 +41,17 @@ function activityItem(overrides: Partial<ActivityItem> = {}): ActivityItem {
 }
 
 describe("customer trading limits", () => {
-  it("keeps every supported daily and per-trade combination unchanged", () => {
-    let tested = 0;
-    for (let dailyBudget = 1; dailyBudget <= 25; dailyBudget += 1) {
-      for (let perTrade = 1; perTrade <= Math.min(5, dailyBudget); perTrade += 1) {
-        expect(normalizeTradingLimits(dailyBudget, perTrade)).toEqual({
-          dailyBudget,
-          perTrade,
-        });
-        tested += 1;
-      }
+  it("keeps customer-selected dollar limits exact across retail account sizes", () => {
+    for (const [dailyBudget, perTrade] of [[1, 1], [25, 5], [500, 125], [25_000, 5_000]]) {
+      expect(normalizeTradingLimits(dailyBudget, perTrade)).toEqual({
+        dailyBudget,
+        perTrade,
+      });
     }
-    expect(tested).toBe(115);
   });
 
-  it("repairs stale or malformed saved values without exceeding the supported limits", () => {
-    expect(normalizeTradingLimits(99, 9)).toEqual({ dailyBudget: 25, perTrade: 5 });
+  it("repairs stale or malformed saved values without changing valid customer choices", () => {
+    expect(normalizeTradingLimits(99, 9)).toEqual({ dailyBudget: 99, perTrade: 9 });
     expect(normalizeTradingLimits(2, 5)).toEqual({ dailyBudget: 2, perTrade: 2 });
     expect(normalizeTradingLimits(20.9, 3.9)).toEqual({ dailyBudget: 20, perTrade: 3 });
     expect(normalizeTradingLimits("not-a-number", "not-a-number")).toEqual({

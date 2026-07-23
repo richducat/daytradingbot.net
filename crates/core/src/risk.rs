@@ -38,7 +38,7 @@ impl RiskEngine {
             return Err(PolicyError::NonPositiveLimit);
         }
 
-        let launch_maximums = RiskPolicy::default();
+        let launch_maximums = RiskPolicy::customer_configurable_maximums();
         let within_launch_maximums = candidate.max_opening_order_usd
             <= launch_maximums.max_opening_order_usd
             && candidate.max_daily_opening_notional_usd
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(engine.validate_customer_policy(&lower), Ok(()));
 
         let raised = RiskPolicy {
-            max_opening_order_usd: Decimal::new(501, 2),
+            max_opening_order_usd: Decimal::from(1_000_001_u64),
             ..RiskPolicy::default()
         };
         assert_eq!(

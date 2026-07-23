@@ -105,16 +105,16 @@ fn validate_request(request: StartSessionRequest) -> Result<ValidatedSession, &'
     }
     if !request.daily_budget_usd.is_finite()
         || request.daily_budget_usd < 1.0
-        || request.daily_budget_usd > 25.0
+        || request.daily_budget_usd > 1_000_000.0
     {
-        return Err("DAILY_BUDGET_MUST_BE_BETWEEN_1_AND_25");
+        return Err("DAILY_BUDGET_MUST_BE_POSITIVE");
     }
     if !request.max_per_trade_usd.is_finite()
         || request.max_per_trade_usd < 1.0
-        || request.max_per_trade_usd > 5.0
+        || request.max_per_trade_usd > 1_000_000.0
         || request.max_per_trade_usd > request.daily_budget_usd
     {
-        return Err("TRADE_LIMIT_MUST_BE_BETWEEN_1_AND_5");
+        return Err("TRADE_LIMIT_MUST_BE_POSITIVE_AND_NOT_EXCEED_DAILY");
     }
     if matches!(request.mode, TradingMode::Real)
         && request.real_confirmation.as_deref() != Some("START REAL TRADING")
@@ -726,10 +726,10 @@ mod tests {
     fn request_limits_are_bounded() {
         assert!(validate_request(request(TradingMode::Practice)).is_ok());
         let mut too_large = request(TradingMode::Practice);
-        too_large.daily_budget_usd = 25.01;
+        too_large.daily_budget_usd = 1_000_000.01;
         assert!(validate_request(too_large).is_err());
         let mut trade_too_large = request(TradingMode::Practice);
-        trade_too_large.max_per_trade_usd = 5.01;
+        trade_too_large.max_per_trade_usd = trade_too_large.daily_budget_usd + 0.01;
         assert!(validate_request(trade_too_large).is_err());
     }
 

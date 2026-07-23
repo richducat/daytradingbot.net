@@ -141,6 +141,22 @@ impl Default for RiskPolicy {
     }
 }
 
+impl RiskPolicy {
+    /// Technical ceiling for a customer-selected policy. The customer's own
+    /// daily and per-trade choices remain the operative limits.
+    #[must_use]
+    pub fn customer_configurable_maximums() -> Self {
+        Self {
+            max_opening_order_usd: Decimal::from(1_000_000_u64),
+            max_daily_opening_notional_usd: Decimal::from(1_000_000_u64),
+            max_venue_exposure_usd: Decimal::from(4_000_000_u64),
+            max_global_exposure_usd: Decimal::from(5_000_000_u64),
+            max_daily_loss_usd: Decimal::from(1_000_000_u64),
+            max_resting_entry_orders: 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SafetyState {
     pub global_kill_switch: bool,

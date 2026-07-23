@@ -1156,14 +1156,17 @@ fn settle_order(
 }
 
 fn validate_config(config: &BluechipConfig) -> Result<(), &'static str> {
-    if config.daily_budget_usd < Decimal::ONE || config.daily_budget_usd > Decimal::new(2_500, 2) {
-        return Err("DAILY_BUDGET_MUST_BE_BETWEEN_1_AND_25");
+    let customer_maximums = RiskPolicy::customer_configurable_maximums();
+    if config.daily_budget_usd < Decimal::ONE
+        || config.daily_budget_usd > customer_maximums.max_daily_opening_notional_usd
+    {
+        return Err("DAILY_BUDGET_MUST_BE_POSITIVE");
     }
     if config.max_per_trade_usd < Decimal::ONE
-        || config.max_per_trade_usd > Decimal::new(500, 2)
+        || config.max_per_trade_usd > customer_maximums.max_opening_order_usd
         || config.max_per_trade_usd > config.daily_budget_usd
     {
-        return Err("TRADE_LIMIT_MUST_BE_BETWEEN_1_AND_5");
+        return Err("TRADE_LIMIT_MUST_BE_POSITIVE_AND_NOT_EXCEED_DAILY");
     }
     RiskEngine::new()
         .validate_customer_policy(&risk_policy(config))
@@ -1178,7 +1181,7 @@ pub fn decimal_from_customer_amount(value: f64) -> Result<Decimal, &'static str>
 }
 
 fn risk_policy(config: &BluechipConfig) -> RiskPolicy {
-    let platform_maximums = RiskPolicy::default();
+    let platform_maximums = RiskPolicy::customer_configurable_maximums();
     RiskPolicy {
         max_opening_order_usd: config.max_per_trade_usd,
         max_daily_opening_notional_usd: config.daily_budget_usd,
@@ -1373,7 +1376,7 @@ fn risk_rejection_disposition(reason: RiskRejection) -> RiskRejectionDisposition
 fn risk_rejection_message(reason: RiskRejection) -> &'static str {
     match reason {
         RiskRejection::PolicyInvalid => {
-            "Your saved limits could not be used, so Real trading stopped. Open Setup, choose $1–$25 per day and $1–$5 per trade, then start again."
+            "Your saved limits could not be used, so Real trading stopped. Open Setup, choose a positive daily limit and a per-trade limit that does not exceed it, then start again."
         }
         RiskRejection::InvalidNotional | RiskRejection::OrderLimitExceeded => {
             "Bluechip found an invalid trade amount, so Real trading stopped. Open Setup to review your limits before starting again."
@@ -1677,47 +1680,40 @@ mod tests {
     fn customer_limits_are_exact_and_bounded() {
         let config = BluechipConfig {
             mode: NativeTradingMode::Real,
-            daily_budget_usd: Decimal::new(2_500, 2),
-            max_per_trade_usd: Decimal::new(500, 2),
+            daily_budget_usd: Decimal::from(25_000_u64),
+            max_per_trade_usd: Decimal::from(5_000_u64),
         };
         assert!(validate_config(&config).is_ok());
         let policy = risk_policy(&config);
         assert_eq!(
             policy.max_daily_opening_notional_usd,
-            Decimal::new(2_500, 2)
+            Decimal::from(25_000_u64)
         );
-        assert_eq!(policy.max_opening_order_usd, Decimal::new(500, 2));
-        assert_eq!(
-            policy.max_daily_loss_usd,
-            RiskPolicy::default().max_daily_loss_usd
-        );
+        assert_eq!(policy.max_opening_order_usd, Decimal::from(5_000_u64));
+        assert_eq!(policy.max_daily_loss_usd, Decimal::from(25_000_u64));
     }
 
     #[test]
     fn every_customer_selectable_limit_produces_a_valid_risk_policy() {
         let engine = RiskEngine::new();
-        let mut tested = 0_usize;
-        for daily_dollars in 1_i64..=25 {
-            for trade_dollars in 1_i64..=5_i64.min(daily_dollars) {
-                let config = BluechipConfig {
-                    mode: NativeTradingMode::Real,
-                    daily_budget_usd: Decimal::from(daily_dollars),
-                    max_per_trade_usd: Decimal::from(trade_dollars),
-                };
-                assert!(
-                    validate_config(&config).is_ok(),
-                    "daily={daily_dollars}, trade={trade_dollars}"
-                );
-                assert!(
-                    engine
-                        .validate_customer_policy(&risk_policy(&config))
-                        .is_ok(),
-                    "daily={daily_dollars}, trade={trade_dollars}"
-                );
-                tested = tested.saturating_add(1);
-            }
+        let customer_choices = [(1_i64, 1_i64), (25, 5), (500, 125), (25_000, 5_000)];
+        for (daily_dollars, trade_dollars) in customer_choices {
+            let config = BluechipConfig {
+                mode: NativeTradingMode::Real,
+                daily_budget_usd: Decimal::from(daily_dollars),
+                max_per_trade_usd: Decimal::from(trade_dollars),
+            };
+            assert!(
+                validate_config(&config).is_ok(),
+                "daily={daily_dollars}, trade={trade_dollars}"
+            );
+            assert!(
+                engine
+                    .validate_customer_policy(&risk_policy(&config))
+                    .is_ok(),
+                "daily={daily_dollars}, trade={trade_dollars}"
+            );
         }
-        assert_eq!(tested, 115);
     }
 
     #[test]
