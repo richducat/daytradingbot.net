@@ -255,6 +255,41 @@ impl Ledger {
             .map_err(LedgerError::from)
     }
 
+    /// Returns the durable opening notional already consumed for the venue day.
+    ///
+    /// This uses the same monotonic venue-day selection as `reserve`, so a
+    /// local clock rollback cannot make a customer budget appear available
+    /// again. The final reservation transaction still rechecks the cap
+    /// atomically after callers use this value for order sizing.
+    pub fn daily_opening_notional_usd(
+        &self,
+        account_scope: Uuid,
+        venue: Venue,
+        observed_at: DateTime<Utc>,
+    ) -> Result<Decimal, LedgerError> {
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let account_scope = account_scope.to_string();
+        let venue = venue_key(venue);
+        let venue_day = canonical_venue_day(
+            &tx,
+            &account_scope,
+            venue,
+            &observed_at.date_naive().to_string(),
+        )?;
+        let opening_notional_micros = tx
+            .query_row(
+                "SELECT opening_notional_micros FROM daily_usage
+                 WHERE account_scope = ?1 AND venue = ?2 AND venue_day = ?3",
+                params![account_scope, venue, venue_day],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .unwrap_or(0);
+        tx.commit()?;
+        Ok(micros_to_decimal(opening_notional_micros))
+    }
+
     /// Stores the connector's latest reconciled venue-day P&L so the next
     /// opening reservation evaluates the hard daily-loss stop durably.
     pub fn update_venue_pnl(
@@ -796,6 +831,186 @@ impl Ledger {
             &tx,
             Some(&intent_id),
             "submission_rejected",
+            Some(detail_code),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Atomically records an authoritative pre-acceptance rejection and
+    /// restores only the daily opening budget reserved for that never-accepted
+    /// order. This transition is intentionally limited to a `submitting`
+    /// opening intent with no fills; accepted, canceled, or possibly-filled
+    /// orders must use the normal reconciliation path and keep their daily
+    /// opening usage.
+    pub fn reject_open_submission_and_restore_budget(
+        &self,
+        intent_id: Uuid,
+        detail_code: &'static str,
+    ) -> Result<(), LedgerError> {
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let intent_id = intent_id.to_string();
+        let now = Utc::now().to_rfc3339();
+        let reservation = tx
+            .query_row(
+                "SELECT r.account_scope, r.venue, r.venue_day, r.opening_notional_micros,
+                        COUNT(f.fill_id)
+                   FROM intents i
+                   JOIN risk_reservations r ON r.intent_id = i.intent_id
+                   LEFT JOIN fills f ON f.intent_id = i.intent_id
+                  WHERE i.intent_id = ?1 AND i.purpose = 'open' AND i.state = 'submitting'
+                    AND r.active = 1
+                  GROUP BY r.account_scope, r.venue, r.venue_day, r.opening_notional_micros",
+                [&intent_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((account_scope, venue, venue_day, opening_notional_micros, fill_count)) =
+            reservation
+        else {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        };
+        if opening_notional_micros <= 0 || fill_count != 0 {
+            return Err(LedgerError::InvalidTerminalOutcome);
+        }
+
+        let changed = tx.execute(
+            "UPDATE submission_attempts
+             SET state = 'reconciled', reconciled_state = 'rejected',
+                 detail_code = ?2, updated_at = ?3
+             WHERE intent_id = ?1 AND state = 'submitting'",
+            params![intent_id, detail_code, now],
+        )?;
+        if changed != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        let released = tx.execute(
+            "UPDATE risk_reservations
+             SET active = 0, released_at = ?2
+             WHERE intent_id = ?1 AND active = 1",
+            params![intent_id, now],
+        )?;
+        if released != 1 {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        }
+        let restored = tx.execute(
+            "UPDATE daily_usage
+             SET opening_notional_micros = opening_notional_micros - ?4
+             WHERE account_scope = ?1 AND venue = ?2 AND venue_day = ?3
+               AND opening_notional_micros >= ?4",
+            params![account_scope, venue, venue_day, opening_notional_micros],
+        )?;
+        if restored != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        tx.execute(
+            "UPDATE orders SET state = 'rejected', updated_at = ?2 WHERE intent_id = ?1",
+            params![intent_id, now],
+        )?;
+        tx.execute(
+            "UPDATE intents SET state = 'rejected' WHERE intent_id = ?1",
+            [&intent_id],
+        )?;
+        insert_audit(
+            &tx,
+            Some(&intent_id),
+            "open_submission_rejected_budget_restored",
+            Some(detail_code),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Atomically cancels a reserved opening intent before any submission
+    /// attempt exists and restores its daily opening budget. This is the
+    /// pre-submission counterpart to
+    /// `reject_open_submission_and_restore_budget`.
+    pub fn reject_reserved_open_and_restore_budget(
+        &self,
+        intent_id: Uuid,
+        detail_code: &'static str,
+    ) -> Result<(), LedgerError> {
+        let mut connection = self.connection.lock().map_err(|_| LedgerError::Poisoned)?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let intent_id = intent_id.to_string();
+        let now = Utc::now().to_rfc3339();
+        let reservation = tx
+            .query_row(
+                "SELECT r.account_scope, r.venue, r.venue_day, r.opening_notional_micros,
+                        COUNT(f.fill_id)
+                   FROM intents i
+                   JOIN risk_reservations r ON r.intent_id = i.intent_id
+                   LEFT JOIN fills f ON f.intent_id = i.intent_id
+                  WHERE i.intent_id = ?1 AND i.purpose = 'open' AND i.state = 'reserved'
+                    AND r.active = 1
+                    AND NOT EXISTS (
+                        SELECT 1 FROM submission_attempts s WHERE s.intent_id = i.intent_id
+                    )
+                  GROUP BY r.account_scope, r.venue, r.venue_day, r.opening_notional_micros",
+                [&intent_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((account_scope, venue, venue_day, opening_notional_micros, fill_count)) =
+            reservation
+        else {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        };
+        if opening_notional_micros <= 0 || fill_count != 0 {
+            return Err(LedgerError::InvalidTerminalOutcome);
+        }
+
+        let released = tx.execute(
+            "UPDATE risk_reservations
+             SET active = 0, released_at = ?2
+             WHERE intent_id = ?1 AND active = 1",
+            params![intent_id, now],
+        )?;
+        if released != 1 {
+            return Err(LedgerError::MissingActiveOpeningReservation);
+        }
+        let restored = tx.execute(
+            "UPDATE daily_usage
+             SET opening_notional_micros = opening_notional_micros - ?4
+             WHERE account_scope = ?1 AND venue = ?2 AND venue_day = ?3
+               AND opening_notional_micros >= ?4",
+            params![account_scope, venue, venue_day, opening_notional_micros],
+        )?;
+        if restored != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        let changed = tx.execute(
+            "UPDATE intents SET state = 'rejected' WHERE intent_id = ?1 AND state = 'reserved'",
+            [&intent_id],
+        )?;
+        if changed != 1 {
+            return Err(LedgerError::InvalidSubmissionTransition);
+        }
+        tx.execute(
+            "UPDATE orders SET state = 'rejected', updated_at = ?2 WHERE intent_id = ?1",
+            params![intent_id, now],
+        )?;
+        insert_audit(
+            &tx,
+            Some(&intent_id),
+            "reserved_open_rejected_budget_restored",
             Some(detail_code),
         )?;
         tx.commit()?;
@@ -1919,6 +2134,106 @@ mod tests {
     }
 
     #[test]
+    fn daily_opening_notional_reports_consumed_budget_after_release() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let now = Utc::now();
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::ZERO
+        );
+
+        let intent = trade_intent(account, "sized-order");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+        ledger
+            .finalize_open_order(intent_id, OrderState::Canceled)
+            .unwrap();
+
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::new(500, 2)
+        );
+    }
+
+    #[test]
+    fn authoritative_pre_acceptance_rejection_restores_daily_budget_once() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let now = Utc::now();
+        let policy = RiskPolicy {
+            max_daily_opening_notional_usd: Decimal::new(500, 2),
+            ..RiskPolicy::default()
+        };
+        let intent = trade_intent(account, "provider-rejected");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &policy));
+        ledger
+            .begin_submission(intent_id, Uuid::new_v4(), &"a".repeat(64))
+            .unwrap();
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::new(500, 2)
+        );
+
+        ledger
+            .reject_open_submission_and_restore_budget(intent_id, "provider_rejected")
+            .unwrap();
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::ZERO
+        );
+        assert!(ledger.unresolved_submissions().unwrap().is_empty());
+
+        assert!(matches!(
+            ledger.reject_open_submission_and_restore_budget(intent_id, "duplicate_rejection"),
+            Err(LedgerError::MissingActiveOpeningReservation)
+                | Err(LedgerError::InvalidSubmissionTransition)
+        ));
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::ZERO
+        );
+
+        let next = trade_intent(account, "budget-restored");
+        expect_reserved(reserve_ready(&ledger, next, &policy));
+    }
+
+    #[test]
+    fn locally_canceled_reservation_restores_daily_budget_before_submission() {
+        let ledger = Ledger::open_in_memory().unwrap();
+        let account = Uuid::new_v4();
+        let now = Utc::now();
+        let intent = trade_intent(account, "paused-before-submission");
+        let intent_id = intent.intent_id;
+        expect_reserved(reserve_ready(&ledger, intent, &RiskPolicy::default()));
+
+        ledger
+            .reject_reserved_open_and_restore_budget(intent_id, "authorization_ended")
+            .unwrap();
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account, Venue::Coinbase, now)
+                .unwrap(),
+            Decimal::ZERO
+        );
+        assert!(matches!(
+            ledger.reject_reserved_open_and_restore_budget(intent_id, "duplicate_cancel"),
+            Err(LedgerError::MissingActiveOpeningReservation)
+        ));
+    }
+
+    #[test]
     fn two_connections_cannot_consume_same_intent() {
         let directory = tempdir().unwrap();
         let path = directory.path().join("ledger.sqlite3");
@@ -2237,6 +2552,13 @@ mod tests {
             ledger.unresolved_submissions().unwrap()[0].state,
             SubmissionAttemptState::Acknowledged
         );
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account_scope, Venue::Coinbase, Utc::now())
+                .unwrap(),
+            Decimal::new(500, 2),
+            "acknowledged broker orders must retain their consumed daily budget"
+        );
 
         ledger
             .record_open_fill(intent_id, &fill("venue-fill", Decimal::new(500, 2)))
@@ -2305,6 +2627,13 @@ mod tests {
             unresolved[0].detail_code.as_deref(),
             Some("response_timeout")
         );
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account_scope, Venue::Coinbase, Utc::now())
+                .unwrap(),
+            Decimal::new(500, 2),
+            "unknown broker responses must retain their consumed daily budget"
+        );
         assert!(matches!(
             ledger.acknowledge_submission(intent_id, "must-not-bypass-reconcile"),
             Err(LedgerError::InvalidSubmissionTransition)
@@ -2340,9 +2669,23 @@ mod tests {
         let unresolved = ledger.unresolved_submissions().unwrap();
         assert_eq!(unresolved.len(), 1);
         assert_eq!(unresolved[0].state, SubmissionAttemptState::Acknowledged);
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account_scope, Venue::Coinbase, Utc::now())
+                .unwrap(),
+            Decimal::new(500, 2),
+            "idempotently recovered acknowledgements must retain daily usage"
+        );
         ledger
             .finalize_acknowledged_open_order(intent_id, OrderState::Rejected)
             .unwrap();
         assert!(ledger.unresolved_submissions().unwrap().is_empty());
+        assert_eq!(
+            ledger
+                .daily_opening_notional_usd(account_scope, Venue::Coinbase, Utc::now())
+                .unwrap(),
+            Decimal::new(500, 2),
+            "an accepted order must not restore daily budget after later rejection"
+        );
     }
 }

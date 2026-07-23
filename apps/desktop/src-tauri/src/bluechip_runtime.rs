@@ -3,9 +3,10 @@ use crate::vault::{CredentialVault, VaultKey};
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, Timelike, Utc, Weekday};
 use chrono_tz::America::New_York;
 use daytradingbot_contracts::{
-    IntentPurpose, OrderSide, OrderState, OrderType, RiskPolicy, SafetyState, TradeIntent, Venue,
+    IntentPurpose, OrderSide, OrderState, OrderType, RiskPolicy, RiskRejection, SafetyState,
+    TradeIntent, Venue,
 };
-use daytradingbot_core::{IntentIdentity, deterministic_intent_id};
+use daytradingbot_core::{IntentIdentity, RiskEngine, deterministic_intent_id};
 use daytradingbot_ledger::{
     AgentActivityKind, AgentActivityMode, AgentActivityRecord, FillOutcome, FillRecord, Ledger,
     NewAgentActivity, ReservationOutcome, SubmissionAttemptState,
@@ -13,7 +14,7 @@ use daytradingbot_ledger::{
 use daytradingbot_licensing::LicenseGate;
 use daytradingbot_venues::robinhood::{
     RobinhoodAgenticClient, RobinhoodEquityOrder, RobinhoodEquityOrderState, RobinhoodEquityQuote,
-    RobinhoodPlacementError, RobinhoodTradingSession,
+    RobinhoodMcpError, RobinhoodPlacementError, RobinhoodTradingSession,
 };
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -34,7 +35,8 @@ const CYCLE_SECONDS: u64 = 15 * 60;
 const MAX_TRADES_PER_CYCLE: usize = 1;
 const START_PREFLIGHT_TIMEOUT_SECONDS: u64 = 25;
 const REAL_AUTHORIZATION_HOURS: i64 = 24;
-const UNCERTAIN_PLACEMENT_ACTIVITY: &str = "Robinhood has not confirmed whether this order was accepted. Before any new trade, Bluechip will safely check it again using the exact same Robinhood order reference.";
+const ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY: &str = "Robinhood accepted this order, but the app could not finish saving the result. Real trading stopped. Check Robinhood and Activity before starting again.";
+const UNCERTAIN_PLACEMENT_ACTIVITY: &str = "This order may have reached Robinhood, but Robinhood did not confirm it. Real trading stopped. Bluechip will check that exact order before it can trade again.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeTradingMode {
@@ -63,6 +65,20 @@ pub struct BluechipConfig {
     pub mode: NativeTradingMode,
     pub daily_budget_usd: Decimal,
     pub max_per_trade_usd: Decimal,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TradeAmountDecision {
+    Ready(Decimal),
+    DailyRemainderBelowMinimum(Decimal),
+    BuyingPowerBelowMinimum(Decimal),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RiskRejectionDisposition {
+    ContinueCandidate,
+    EndCycle,
+    StopReal,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -195,7 +211,7 @@ impl BluechipRuntime {
                     )? {
                         return Err("REAL_TRADING_LICENSE_REQUIRED");
                     }
-                    if buying_power < config.max_per_trade_usd {
+                    if buying_power < Decimal::ONE {
                         return Err("ADD_FUNDS_TO_ROBINHOOD");
                     }
                     let _ = reconcile_orders(
@@ -409,15 +425,34 @@ async fn run_cycle(
         .map(|order| order.symbol)
         .collect();
 
-    let mut candidates: Vec<_> = quotes
-        .into_iter()
-        .filter(|quote| quote.change_percent() <= Decimal::new(DIP_THRESHOLD_PERCENT_HUNDREDTHS, 2))
-        .filter(|quote| !held_symbols.contains(&quote.symbol))
-        .filter(|quote| !pending_symbols.contains(&quote.symbol))
-        .collect();
+    let mut matching_count = 0_usize;
+    let mut candidates = Vec::new();
+    for quote in quotes {
+        if quote.change_percent() > Decimal::new(DIP_THRESHOLD_PERCENT_HUNDREDTHS, 2) {
+            continue;
+        }
+        matching_count = matching_count.saturating_add(1);
+        if held_symbols.contains(&quote.symbol) || pending_symbols.contains(&quote.symbol) {
+            continue;
+        }
+        candidates.push(quote);
+    }
     candidates.sort_by_key(RobinhoodEquityQuote::change_percent);
     if candidates.is_empty() {
-        let message = "Market check finished. No new trade matched Bluechip's rules.";
+        let message = no_candidate_message(matching_count);
+        record_activity(
+            ledger.inner(),
+            config,
+            AgentActivityKind::Skipped,
+            None,
+            None,
+            &message,
+        )?;
+        return Ok(message);
+    }
+
+    if config.mode == NativeTradingMode::Real && !market_is_open(Utc::now()) {
+        let message = "Bluechip checked all eight stocks and found a price match, but the regular stock market is closed. It will keep checking and can trade after 9:30 a.m. Eastern on the next trading day.";
         record_activity(
             ledger.inner(),
             config,
@@ -429,37 +464,73 @@ async fn run_cycle(
         return Ok(message.into());
     }
 
-    let mut submitted = 0_usize;
+    let (risk_scope, account_scope, daily_opening_notional) =
+        if config.mode == NativeTradingMode::Real {
+            let (risk_scope, account_scope) = risk_scopes(app)?;
+            let daily_opening_notional = ledger
+                .daily_opening_notional_usd(account_scope, Venue::Robinhood, Utc::now())
+                .map_err(|_| "TRADING_LIMITS_UNAVAILABLE")?;
+            (risk_scope, account_scope, daily_opening_notional)
+        } else {
+            (Uuid::nil(), Uuid::nil(), Decimal::ZERO)
+        };
+    let sizing_buying_power = if config.mode == NativeTradingMode::Practice {
+        config.max_per_trade_usd
+    } else {
+        buying_power
+    };
+    let amount = match trade_amount(config, daily_opening_notional, sizing_buying_power) {
+        TradeAmountDecision::Ready(amount) => amount,
+        decision => {
+            let message = trade_amount_block_message(config, decision);
+            record_activity(
+                ledger.inner(),
+                config,
+                AgentActivityKind::Skipped,
+                None,
+                None,
+                &message,
+            )?;
+            return Ok(message);
+        }
+    };
+
+    let mut placement_calls = 0_usize;
+    let mut last_skip_message = None;
     for quote in candidates {
-        if submitted >= MAX_TRADES_PER_CYCLE {
-            break;
-        }
         let symbol = quote.symbol.clone();
-        let amount = config.max_per_trade_usd.min(buying_power);
-        if amount < Decimal::ONE {
-            record_activity(
-                ledger.inner(),
-                config,
-                AgentActivityKind::Skipped,
-                Some(symbol.as_str()),
-                None,
-                "A trade matched, but the connected Robinhood account needs more buying power.",
-            )?;
-            break;
-        }
-        let reviewed = session
-            .review_market_buy(&symbol, amount)
-            .await
-            .map_err(|_| "ROBINHOOD_ORDER_REVIEW_FAILED")?;
+        let reviewed = match session.review_market_buy(&symbol, amount).await {
+            Ok(reviewed) => reviewed,
+            Err(RobinhoodMcpError::InvalidOrder) => {
+                let message = format!(
+                    "Robinhood could not review the {symbol} trade. Bluechip skipped it and will check any other matching stocks. It will retry {symbol} with fresh market data in 15 minutes."
+                );
+                record_activity(
+                    ledger.inner(),
+                    config,
+                    AgentActivityKind::Skipped,
+                    Some(symbol.as_str()),
+                    Some(amount),
+                    &message,
+                )?;
+                last_skip_message = Some(message);
+                continue;
+            }
+            Err(_) => return Err("ROBINHOOD_ORDER_REVIEW_FAILED"),
+        };
         if !quote_is_fresh(&reviewed.quote, Utc::now()) {
+            let message = format!(
+                "{symbol} matched, but its latest price was too old to use. Bluechip skipped it and will check any other matches. It will retry all eight stocks in 15 minutes."
+            );
             record_activity(
                 ledger.inner(),
                 config,
                 AgentActivityKind::Skipped,
                 Some(symbol.as_str()),
                 None,
-                "A trade matched, but the latest price was too old to use safely.",
+                &message,
             )?;
+            last_skip_message = Some(message);
             continue;
         }
         let signal_message = format!(
@@ -490,20 +561,11 @@ async fn run_cycle(
                 Some(amount),
                 &message,
             )?;
-            submitted = submitted.saturating_add(1);
-            continue;
-        }
-
-        if !market_is_open(Utc::now()) {
-            record_activity(
-                ledger.inner(),
-                config,
-                AgentActivityKind::Skipped,
-                Some(symbol.as_str()),
-                None,
-                "A trade matched, but the regular stock market is closed.",
-            )?;
-            continue;
+            return Ok(format!(
+                "Practice check finished. Bluechip found one possible {} {} trade. No order was placed.",
+                money(amount),
+                symbol
+            ));
         }
         if !app
             .state::<BluechipRuntime>()
@@ -517,7 +579,6 @@ async fn run_cycle(
             app.state::<LicenseGate>().inner(),
             app.state::<CredentialVault>().inner(),
         )?;
-        let (risk_scope, account_scope) = risk_scopes(app)?;
         let safety = SafetyState {
             global_kill_switch: false,
             venue_paused: false,
@@ -577,18 +638,40 @@ async fn run_cycle(
             .reserve(intent, &policy)
             .map_err(|_| "TRADING_LIMITS_UNAVAILABLE")?
         {
-            ReservationOutcome::Duplicate => continue,
+            ReservationOutcome::Duplicate => {
+                last_skip_message = Some(
+                    "Bluechip already reviewed this matching price update. It will check any other matches and use fresh prices again in 15 minutes."
+                        .into(),
+                );
+                continue;
+            }
             ReservationOutcome::Rejected(reason) => {
+                let disposition = risk_rejection_disposition(reason);
                 let message = risk_rejection_message(reason);
                 record_activity(
                     ledger.inner(),
                     config,
-                    AgentActivityKind::Skipped,
+                    if disposition == RiskRejectionDisposition::StopReal {
+                        AgentActivityKind::Error
+                    } else {
+                        AgentActivityKind::Skipped
+                    },
                     Some(symbol.as_str()),
                     Some(amount),
                     message,
                 )?;
-                continue;
+                match disposition {
+                    RiskRejectionDisposition::ContinueCandidate => {
+                        last_skip_message = Some(message.into());
+                        continue;
+                    }
+                    RiskRejectionDisposition::EndCycle => return Ok(message.into()),
+                    RiskRejectionDisposition::StopReal => {
+                        app.state::<BluechipRuntime>()
+                            .stop_real_session(generation, message);
+                        return Ok(message.into());
+                    }
+                }
             }
             ReservationOutcome::Reserved(_) => {}
         }
@@ -599,8 +682,11 @@ async fn run_cycle(
             app.state::<BluechipRuntime>()
                 .expire_real_authorization(generation);
             ledger
-                .finalize_open_order(intent_id, OrderState::Rejected)
-                .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")?;
+                .reject_reserved_open_and_restore_budget(
+                    intent_id,
+                    "authorization_ended_before_submission",
+                )
+                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
             return Ok(
                 "Your 24-hour Robinhood permission ended before any new order was sent.".into(),
             );
@@ -625,84 +711,106 @@ async fn run_cycle(
                 runtime.expire_real_authorization(generation);
             }
             ledger
-                .reject_submission(intent_id, "paused_before_submission")
-                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-            ledger
-                .finalize_open_order(intent_id, OrderState::Rejected)
+                .reject_open_submission_and_restore_budget(intent_id, "paused_before_submission")
                 .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
             return Ok("Trading was paused before any new order was sent.".into());
         }
 
-        if !placement_call_allowed(config.mode, submitted) {
+        if !claim_placement_call(config.mode, &mut placement_calls) {
             ledger
-                .reject_submission(intent_id, "placement_mode_blocked")
-                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-            ledger
-                .finalize_open_order(intent_id, OrderState::Rejected)
+                .reject_open_submission_and_restore_budget(intent_id, "placement_mode_blocked")
                 .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
             return Err("ORDER_SUBMISSION_BLOCKED");
         }
         match session.place_reviewed_market_buy(reviewed, intent_id).await {
             Ok(placement) => {
-                ledger
+                if ledger
                     .acknowledge_submission(intent_id, &placement.order_id)
-                    .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
+                    .is_err()
+                {
+                    let _ = record_activity(
+                        ledger.inner(),
+                        config,
+                        AgentActivityKind::Error,
+                        Some(symbol.as_str()),
+                        Some(amount),
+                        ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+                    );
+                    return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
+                }
                 let message = format!(
                     "Bluechip sent a {} {} buy to Robinhood.",
                     money(amount),
                     symbol
                 );
-                record_activity(
+                if record_activity(
                     ledger.inner(),
                     config,
                     AgentActivityKind::OrderSubmitted,
                     Some(symbol.as_str()),
                     Some(amount),
                     &message,
-                )?;
-                if let Ok(Some(order)) = session.equity_order(&placement.order_id).await {
-                    settle_order(ledger.inner(), config, intent_id, &order)?;
+                )
+                .is_err()
+                {
+                    return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
                 }
-                submitted = submitted.saturating_add(1);
+                if let Ok(Some(order)) = session.equity_order(&placement.order_id).await
+                    && settle_order(ledger.inner(), config, intent_id, &order).is_err()
+                {
+                    let _ = record_activity(
+                        ledger.inner(),
+                        config,
+                        AgentActivityKind::Error,
+                        Some(symbol.as_str()),
+                        Some(amount),
+                        ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+                    );
+                    return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
+                }
+                return Ok("Market check finished. 1 order sent to Robinhood.".into());
             }
             Err(RobinhoodPlacementError::Rejected) => {
-                ledger
-                    .reject_submission(intent_id, "robinhood_rejected")
-                    .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                ledger
-                    .finalize_open_order(intent_id, OrderState::Rejected)
-                    .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                record_activity(
+                if ledger
+                    .reject_open_submission_and_restore_budget(intent_id, "robinhood_rejected")
+                    .is_err()
+                {
+                    return Err("ORDER_REJECTED_LOCAL_RECORD_FAILED");
+                }
+                let message = "Robinhood did not accept this trade. No order was opened, and the amount remains available within today's limit. Bluechip will try fresh matches again in 15 minutes.";
+                if record_activity(
                     ledger.inner(),
                     config,
                     AgentActivityKind::Skipped,
                     Some(symbol.as_str()),
                     Some(amount),
-                    "Robinhood did not accept this trade. No order was opened.",
-                )?;
+                    message,
+                )
+                .is_err()
+                {
+                    return Err("ORDER_REJECTED_LOCAL_RECORD_FAILED");
+                }
+                return Ok(message.into());
             }
             Err(RobinhoodPlacementError::Unknown) => {
-                ledger
-                    .mark_submission_unknown(intent_id, "robinhood_response_unknown")
-                    .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-                record_activity(
+                let _ = ledger.mark_submission_unknown(intent_id, "robinhood_response_unknown");
+                let _ = record_activity(
                     ledger.inner(),
                     config,
                     AgentActivityKind::Error,
                     Some(symbol.as_str()),
                     Some(amount),
                     UNCERTAIN_PLACEMENT_ACTIVITY,
-                )?;
-                return Err("ORDER_RECONCILIATION_REQUIRED");
+                );
+                return Err("ORDER_PLACEMENT_RESPONSE_UNCERTAIN");
             }
         }
     }
 
-    Ok(if config.mode == NativeTradingMode::Practice {
-        format!("Practice check finished. {submitted} possible trade(s) recorded.")
-    } else {
-        format!("Market check finished. {submitted} order(s) sent to Robinhood.")
-    })
+    Ok(last_skip_message.unwrap_or_else(|| {
+        "Bluechip checked every matching stock, but none could be used safely this time. It will check all eight again in 15 minutes."
+            .into()
+    }))
 }
 
 async fn reconcile_orders(
@@ -821,42 +929,70 @@ async fn recover_unknown_order(
     require_recovery_authorization(app, generation, config)?;
     match session.place_reviewed_market_buy(reviewed, ref_id).await {
         Ok(placement) => {
-            ledger
+            if ledger
                 .acknowledge_unknown_submission(attempt.intent_id, &placement.order_id)
-                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-            let order = session
-                .equity_order(&placement.order_id)
-                .await
-                .map_err(|_| "ROBINHOOD_ORDER_CHECK_FAILED")?
-                .ok_or("ORDER_RECONCILIATION_REQUIRED")?;
-            settle_order(ledger, config, attempt.intent_id, &order)?;
-            record_recovered_order_activity(ledger, config, attempt, &order)?;
+                .is_err()
+            {
+                let _ = record_activity(
+                    ledger,
+                    config,
+                    AgentActivityKind::Error,
+                    Some(attempt.instrument.as_str()),
+                    Some(attempt.notional_usd),
+                    ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+                );
+                return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
+            }
+            let order = match session.equity_order(&placement.order_id).await {
+                Ok(Some(order)) => order,
+                Ok(None) | Err(_) => return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED"),
+            };
+            if settle_order(ledger, config, attempt.intent_id, &order).is_err()
+                || record_recovered_order_activity(ledger, config, attempt, &order).is_err()
+            {
+                let _ = record_activity(
+                    ledger,
+                    config,
+                    AgentActivityKind::Error,
+                    Some(attempt.instrument.as_str()),
+                    Some(attempt.notional_usd),
+                    ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+                );
+                return Err("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
+            }
             Ok(RecoveryOutcome::Acknowledged)
         }
         Err(RobinhoodPlacementError::Rejected) => {
-            ledger
+            if ledger
                 .reject_unknown_open_submission(attempt.intent_id, "idempotent_recovery_rejected")
-                .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
-            record_activity(
+                .is_err()
+            {
+                return Err("ORDER_REJECTED_LOCAL_RECORD_FAILED");
+            }
+            if record_activity(
                 ledger,
                 config,
                 AgentActivityKind::Skipped,
                 Some(attempt.instrument.as_str()),
                 None,
                 "Robinhood confirmed the earlier order was not accepted. No order was opened.",
-            )?;
+            )
+            .is_err()
+            {
+                return Err("ORDER_REJECTED_LOCAL_RECORD_FAILED");
+            }
             Ok(RecoveryOutcome::Rejected)
         }
         Err(RobinhoodPlacementError::Unknown) => {
-            record_activity(
+            let _ = record_activity(
                 ledger,
                 config,
                 AgentActivityKind::Error,
                 Some(attempt.instrument.as_str()),
-                None,
-                "Robinhood still has not confirmed the earlier order. Bluechip stopped before sending any new trade.",
-            )?;
-            Err("ORDER_RECONCILIATION_REQUIRED")
+                Some(attempt.notional_usd),
+                UNCERTAIN_PLACEMENT_ACTIVITY,
+            );
+            Err("ORDER_PLACEMENT_RESPONSE_UNCERTAIN")
         }
     }
 }
@@ -1010,7 +1146,9 @@ fn validate_config(config: &BluechipConfig) -> Result<(), &'static str> {
     {
         return Err("TRADE_LIMIT_MUST_BE_BETWEEN_1_AND_5");
     }
-    Ok(())
+    RiskEngine::new()
+        .validate_customer_policy(&risk_policy(config))
+        .map_err(|_| "TRADING_LIMITS_INVALID")
 }
 
 pub fn decimal_from_customer_amount(value: f64) -> Result<Decimal, &'static str> {
@@ -1021,16 +1159,80 @@ pub fn decimal_from_customer_amount(value: f64) -> Result<Decimal, &'static str>
 }
 
 fn risk_policy(config: &BluechipConfig) -> RiskPolicy {
+    let platform_maximums = RiskPolicy::default();
     RiskPolicy {
         max_opening_order_usd: config.max_per_trade_usd,
         max_daily_opening_notional_usd: config.daily_budget_usd,
         max_venue_exposure_usd: (config.daily_budget_usd * Decimal::from(4_u8))
-            .min(Decimal::new(10_000, 2)),
+            .min(platform_maximums.max_venue_exposure_usd),
         max_global_exposure_usd: (config.daily_budget_usd * Decimal::from(5_u8))
-            .min(Decimal::new(20_000, 2)),
-        max_daily_loss_usd: config.daily_budget_usd,
+            .min(platform_maximums.max_global_exposure_usd),
+        max_daily_loss_usd: config
+            .daily_budget_usd
+            .min(platform_maximums.max_daily_loss_usd),
         max_resting_entry_orders: 2,
     }
+}
+
+fn trade_amount(
+    config: &BluechipConfig,
+    daily_opening_notional: Decimal,
+    buying_power: Decimal,
+) -> TradeAmountDecision {
+    let remaining_daily_budget =
+        (config.daily_budget_usd - daily_opening_notional).max(Decimal::ZERO);
+    if remaining_daily_budget < Decimal::ONE {
+        return TradeAmountDecision::DailyRemainderBelowMinimum(remaining_daily_budget);
+    }
+    let available_buying_power = buying_power.max(Decimal::ZERO);
+    if available_buying_power < Decimal::ONE {
+        return TradeAmountDecision::BuyingPowerBelowMinimum(available_buying_power);
+    }
+    TradeAmountDecision::Ready(
+        config
+            .max_per_trade_usd
+            .min(remaining_daily_budget)
+            .min(available_buying_power),
+    )
+}
+
+fn trade_amount_block_message(config: &BluechipConfig, decision: TradeAmountDecision) -> String {
+    match decision {
+        TradeAmountDecision::Ready(_) => {
+            "Bluechip found an available trade amount and will continue checking.".into()
+        }
+        TradeAmountDecision::DailyRemainderBelowMinimum(remaining)
+            if remaining == Decimal::ZERO =>
+        {
+            format!(
+                "Your {} daily limit is fully used. Bluechip will start fresh on the next trading day. To change it, pause trading and open Setup.",
+                money(config.daily_budget_usd)
+            )
+        }
+        TradeAmountDecision::DailyRemainderBelowMinimum(remaining) => format!(
+            "{} remains in today's limit, below Robinhood's $1.00 minimum. Bluechip will start fresh on the next trading day. To use more today, pause trading and raise the daily limit in Setup.",
+            money(remaining)
+        ),
+        TradeAmountDecision::BuyingPowerBelowMinimum(available) => format!(
+            "Robinhood has {} of available buying power, below its $1.00 minimum. Add money or free up buying power in the Agentic account, then Bluechip will retry when you start it again.",
+            money(available)
+        ),
+    }
+}
+
+fn no_candidate_message(matching_count: usize) -> String {
+    if matching_count == 0 {
+        return "Bluechip checked all eight stocks. None is down at least 1.50% today, so it did not force a trade. It will check again in 15 minutes."
+            .into();
+    }
+    let noun = if matching_count == 1 {
+        "price match"
+    } else {
+        "price matches"
+    };
+    format!(
+        "Bluechip checked all eight stocks and found {matching_count} {noun}, but each is already owned or has an open Robinhood order. It will check again in 15 minutes."
+    )
 }
 
 fn quote_is_fresh(quote: &RobinhoodEquityQuote, now: DateTime<Utc>) -> bool {
@@ -1057,6 +1259,14 @@ fn request_fingerprint(intent_id: Uuid, symbol: &str, amount: Decimal) -> String
 
 fn placement_call_allowed(mode: NativeTradingMode, submitted: usize) -> bool {
     mode == NativeTradingMode::Real && submitted < MAX_TRADES_PER_CYCLE
+}
+
+fn claim_placement_call(mode: NativeTradingMode, placement_calls: &mut usize) -> bool {
+    if !placement_call_allowed(mode, *placement_calls) {
+        return false;
+    }
+    *placement_calls = placement_calls.saturating_add(1);
+    true
 }
 
 fn risk_scopes(app: &AppHandle) -> Result<(Uuid, Uuid), &'static str> {
@@ -1115,33 +1325,91 @@ fn record_activity(
         .map_err(|_| "TRADING_HISTORY_UNAVAILABLE")
 }
 
-fn risk_rejection_message(reason: daytradingbot_contracts::RiskRejection) -> &'static str {
-    use daytradingbot_contracts::RiskRejection;
+fn risk_rejection_disposition(reason: RiskRejection) -> RiskRejectionDisposition {
     match reason {
-        RiskRejection::DailyOpeningLimitExceeded => {
-            "Your daily limit has been reached. No new trade was opened."
+        RiskRejection::IntentExpired
+        | RiskRejection::MarketDataStale
+        | RiskRejection::ExistingOwnedLot => RiskRejectionDisposition::ContinueCandidate,
+        RiskRejection::DailyOpeningLimitExceeded
+        | RiskRejection::VenueExposureLimitExceeded
+        | RiskRejection::GlobalExposureLimitExceeded
+        | RiskRejection::DailyLossStopReached
+        | RiskRejection::RestingEntryLimitExceeded => RiskRejectionDisposition::EndCycle,
+        RiskRejection::PolicyInvalid
+        | RiskRejection::InvalidNotional
+        | RiskRejection::ConnectorUnhealthy
+        | RiskRejection::KillSwitchActive
+        | RiskRejection::VenuePaused
+        | RiskRejection::StrategyDisabled
+        | RiskRejection::VenueIneligible
+        | RiskRejection::LicenseDisallowsEntry
+        | RiskRejection::OrderLimitExceeded
+        | RiskRejection::MissingOwnedLot
+        | RiskRejection::ReduceExceedsOwnedLot
+        | RiskRejection::ReduceWrongSide
+        | RiskRejection::InvalidPredictionOrder => RiskRejectionDisposition::StopReal,
+    }
+}
+
+fn risk_rejection_message(reason: RiskRejection) -> &'static str {
+    match reason {
+        RiskRejection::PolicyInvalid => {
+            "Your saved limits could not be used, so Real trading stopped. Open Setup, choose $1–$25 per day and $1–$5 per trade, then start again."
         }
-        RiskRejection::OrderLimitExceeded => {
-            "This trade was above your per-trade limit. No order was sent."
+        RiskRejection::InvalidNotional | RiskRejection::OrderLimitExceeded => {
+            "Bluechip found an invalid trade amount, so Real trading stopped. Open Setup to review your limits before starting again."
+        }
+        RiskRejection::IntentExpired => {
+            "This price moved before the trade was ready. Bluechip skipped it and will check any other matches. It will use fresh prices again in 15 minutes."
+        }
+        RiskRejection::ConnectorUnhealthy => {
+            "Robinhood stopped responding, so Real trading stopped. Open Accounts, check the connection, then start trading again."
+        }
+        RiskRejection::KillSwitchActive
+        | RiskRejection::VenuePaused
+        | RiskRejection::StrategyDisabled => {
+            "Real trading stopped because a safety setting is paused. Check Home and Accounts, then start Bluechip again when everything is ready."
+        }
+        RiskRejection::VenueIneligible => {
+            "Real trading stopped because this Robinhood account is not ready for a new Bluechip trade. Open Accounts to check the connection and Agentic account."
+        }
+        RiskRejection::DailyOpeningLimitExceeded => {
+            "Your daily limit is already used. Bluechip will start fresh on the next trading day. To change it, pause trading and open Setup."
         }
         RiskRejection::ExistingOwnedLot => {
-            "Bluechip already owns this stock, so it did not buy it again."
+            "Bluechip already owns this stock, so it skipped it and will check any other matches. It will try again in 15 minutes."
         }
         RiskRejection::RestingEntryLimitExceeded => {
-            "Two earlier orders are still open. Bluechip will wait before sending another."
+            "Two Robinhood orders are still open. Bluechip will check them again and retry automatically."
         }
         RiskRejection::LicenseDisallowsEntry => {
-            "Real trading authorization is not current. No order was sent."
+            "Real trading stopped because your app activation or 24-hour trading permission needs attention. Return to Home and review Real trading again."
         }
         RiskRejection::MarketDataStale => {
-            "The latest price was too old to use safely. No order was sent."
+            "The latest price was too old to use. Bluechip skipped it and will check any other matches. It will retry all eight stocks in 15 minutes."
         }
-        _ => "A safety check stopped this trade before any order was sent.",
+        RiskRejection::VenueExposureLimitExceeded | RiskRejection::GlobalExposureLimitExceeded => {
+            "Your open Bluechip positions already use the current built-in allowance. Bluechip will retry automatically after room becomes available."
+        }
+        RiskRejection::DailyLossStopReached => {
+            "Bluechip's built-in loss protection stopped new trades for today. It will reset on the next trading day."
+        }
+        RiskRejection::MissingOwnedLot
+        | RiskRejection::ReduceExceedsOwnedLot
+        | RiskRejection::ReduceWrongSide
+        | RiskRejection::InvalidPredictionOrder => {
+            "Real trading stopped because this trade did not match the account position Bluechip expected. Check Activity before starting again."
+        }
     }
 }
 
 fn plain_cycle_error(error: &'static str) -> &'static str {
     match error {
+        "ORDER_ACCEPTED_LOCAL_RECORD_FAILED" => ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+        "ORDER_PLACEMENT_RESPONSE_UNCERTAIN" => UNCERTAIN_PLACEMENT_ACTIVITY,
+        "ORDER_REJECTED_LOCAL_RECORD_FAILED" => {
+            "Robinhood rejected this trade, but the app could not finish saving the result. Real trading stopped. Check Robinhood and Activity before starting again."
+        }
         "ORDER_RECONCILIATION_REQUIRED" => {
             "One earlier Robinhood order needs to be checked before Bluechip can trade again."
         }
@@ -1152,9 +1420,26 @@ fn plain_cycle_error(error: &'static str) -> &'static str {
             "Robinhood needs to be reconnected before Bluechip can continue."
         }
         "ADD_FUNDS_TO_ROBINHOOD" => {
-            "The connected Robinhood account needs more buying power before Bluechip can trade."
+            "Robinhood needs at least $1.00 of available buying power. Add money or free up buying power, then start Bluechip again."
         }
-        _ => "Bluechip could not finish this market check. No new order was sent.",
+        "TRADING_LIMITS_UNAVAILABLE" | "TRADING_LIMITS_INVALID" => {
+            "Bluechip could not read your saved limits. Real trading stopped before any order was sent. Open Setup, choose the limits again, then restart."
+        }
+        "ROBINHOOD_QUOTES_UNAVAILABLE"
+        | "ROBINHOOD_POSITION_CHECK_FAILED"
+        | "ROBINHOOD_ORDER_CHECK_FAILED"
+        | "ROBINHOOD_ACCOUNT_CHECK_FAILED" => {
+            "Robinhood account or market data was unavailable. Real trading stopped before any order was sent. Check Accounts, then start again."
+        }
+        "ROBINHOOD_ORDER_REVIEW_FAILED" => {
+            "Robinhood could not price the matched trade. Real trading stopped before any order was sent. Check Accounts, then start again."
+        }
+        "ROBINHOOD_ORDER_RECOVERY_QUOTE_STALE" => {
+            "An earlier trade needs a fresh Robinhood price before it can be checked. Real trading stopped; start again after prices update."
+        }
+        _ => {
+            "Bluechip could not finish this market check. Real trading stopped before any new order was sent. Check Activity, then start again."
+        }
     }
 }
 
@@ -1228,13 +1513,253 @@ mod tests {
             Decimal::new(2_500, 2)
         );
         assert_eq!(policy.max_opening_order_usd, Decimal::new(500, 2));
+        assert_eq!(
+            policy.max_daily_loss_usd,
+            RiskPolicy::default().max_daily_loss_usd
+        );
     }
 
     #[test]
-    fn practice_cannot_reach_placement_and_real_is_one_per_cycle() {
-        assert!(!placement_call_allowed(NativeTradingMode::Practice, 0));
-        assert!(placement_call_allowed(NativeTradingMode::Real, 0));
-        assert!(!placement_call_allowed(NativeTradingMode::Real, 1));
+    fn every_customer_selectable_limit_produces_a_valid_risk_policy() {
+        let engine = RiskEngine::new();
+        let mut tested = 0_usize;
+        for daily_dollars in 1_i64..=25 {
+            for trade_dollars in 1_i64..=5_i64.min(daily_dollars) {
+                let config = BluechipConfig {
+                    mode: NativeTradingMode::Real,
+                    daily_budget_usd: Decimal::from(daily_dollars),
+                    max_per_trade_usd: Decimal::from(trade_dollars),
+                };
+                assert!(
+                    validate_config(&config).is_ok(),
+                    "daily={daily_dollars}, trade={trade_dollars}"
+                );
+                assert!(
+                    engine
+                        .validate_customer_policy(&risk_policy(&config))
+                        .is_ok(),
+                    "daily={daily_dollars}, trade={trade_dollars}"
+                );
+                tested = tested.saturating_add(1);
+            }
+        }
+        assert_eq!(tested, 115);
+    }
+
+    #[test]
+    fn non_divisible_daily_budget_uses_a_final_smaller_trade() {
+        let config = BluechipConfig {
+            mode: NativeTradingMode::Real,
+            daily_budget_usd: Decimal::from(20),
+            max_per_trade_usd: Decimal::from(3),
+        };
+        assert_eq!(
+            trade_amount(&config, Decimal::from(18), Decimal::from(100)),
+            TradeAmountDecision::Ready(Decimal::from(2))
+        );
+        assert_eq!(
+            trade_amount(&config, Decimal::from(20), Decimal::from(100)),
+            TradeAmountDecision::DailyRemainderBelowMinimum(Decimal::ZERO)
+        );
+        assert_eq!(
+            trade_amount(&config, Decimal::ZERO, Decimal::new(250, 2)),
+            TradeAmountDecision::Ready(Decimal::new(250, 2))
+        );
+    }
+
+    #[test]
+    fn practice_cannot_claim_placement_and_real_claims_only_one_per_cycle() {
+        let mut practice_calls = 0;
+        assert!(!claim_placement_call(
+            NativeTradingMode::Practice,
+            &mut practice_calls
+        ));
+        assert_eq!(practice_calls, 0);
+
+        let mut real_calls = 0;
+        assert!(claim_placement_call(
+            NativeTradingMode::Real,
+            &mut real_calls
+        ));
+        assert_eq!(real_calls, 1);
+        assert!(!claim_placement_call(
+            NativeTradingMode::Real,
+            &mut real_calls
+        ));
+        assert_eq!(real_calls, 1);
+    }
+
+    #[test]
+    fn no_trade_copy_names_the_reason_and_next_step() {
+        let no_match = no_candidate_message(0);
+        assert!(no_match.contains("checked all eight"));
+        assert!(no_match.contains("did not force a trade"));
+        assert!(no_match.contains("check again in 15 minutes"));
+
+        let held = no_candidate_message(2);
+        assert!(held.contains("already owned or has an open Robinhood order"));
+        assert!(held.contains("check again in 15 minutes"));
+
+        let config = BluechipConfig {
+            mode: NativeTradingMode::Real,
+            daily_budget_usd: Decimal::from(20),
+            max_per_trade_usd: Decimal::from(3),
+        };
+        let remainder = trade_amount_block_message(
+            &config,
+            TradeAmountDecision::DailyRemainderBelowMinimum(Decimal::new(75, 2)),
+        );
+        assert!(remainder.contains("$0.75 remains"));
+        assert!(remainder.contains("below Robinhood's $1.00 minimum"));
+        assert!(remainder.contains("pause trading and raise the daily limit in Setup"));
+
+        let buying_power = trade_amount_block_message(
+            &config,
+            TradeAmountDecision::BuyingPowerBelowMinimum(Decimal::new(50, 2)),
+        );
+        assert!(buying_power.contains("$0.50 of available buying power"));
+        assert!(buying_power.contains("Add money or free up buying power"));
+
+        assert!(
+            risk_rejection_message(daytradingbot_contracts::RiskRejection::PolicyInvalid)
+                .contains("Open Setup")
+        );
+    }
+
+    #[test]
+    fn every_risk_rejection_has_an_explicit_cycle_disposition() {
+        let expectations = [
+            (
+                RiskRejection::PolicyInvalid,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::InvalidNotional,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::IntentExpired,
+                RiskRejectionDisposition::ContinueCandidate,
+            ),
+            (
+                RiskRejection::ConnectorUnhealthy,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::KillSwitchActive,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::VenuePaused,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::StrategyDisabled,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::VenueIneligible,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::MarketDataStale,
+                RiskRejectionDisposition::ContinueCandidate,
+            ),
+            (
+                RiskRejection::LicenseDisallowsEntry,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::OrderLimitExceeded,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::DailyOpeningLimitExceeded,
+                RiskRejectionDisposition::EndCycle,
+            ),
+            (
+                RiskRejection::VenueExposureLimitExceeded,
+                RiskRejectionDisposition::EndCycle,
+            ),
+            (
+                RiskRejection::GlobalExposureLimitExceeded,
+                RiskRejectionDisposition::EndCycle,
+            ),
+            (
+                RiskRejection::DailyLossStopReached,
+                RiskRejectionDisposition::EndCycle,
+            ),
+            (
+                RiskRejection::RestingEntryLimitExceeded,
+                RiskRejectionDisposition::EndCycle,
+            ),
+            (
+                RiskRejection::ExistingOwnedLot,
+                RiskRejectionDisposition::ContinueCandidate,
+            ),
+            (
+                RiskRejection::MissingOwnedLot,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::ReduceExceedsOwnedLot,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::ReduceWrongSide,
+                RiskRejectionDisposition::StopReal,
+            ),
+            (
+                RiskRejection::InvalidPredictionOrder,
+                RiskRejectionDisposition::StopReal,
+            ),
+        ];
+
+        assert_eq!(expectations.len(), 21);
+        for (reason, expected) in expectations {
+            assert_eq!(risk_rejection_disposition(reason), expected, "{reason:?}");
+        }
+        assert_eq!(
+            expectations
+                .into_iter()
+                .filter(|(_, disposition)| {
+                    *disposition == RiskRejectionDisposition::ContinueCandidate
+                })
+                .count(),
+            3
+        );
+    }
+
+    #[test]
+    fn post_placement_failures_never_claim_no_order_was_sent() {
+        let accepted = plain_cycle_error("ORDER_ACCEPTED_LOCAL_RECORD_FAILED");
+        assert!(accepted.contains("Robinhood accepted this order"));
+        assert!(accepted.contains("Real trading stopped"));
+
+        let uncertain = plain_cycle_error("ORDER_PLACEMENT_RESPONSE_UNCERTAIN");
+        assert!(uncertain.contains("may have reached Robinhood"));
+        assert!(uncertain.contains("check that exact order"));
+
+        let rejected = plain_cycle_error("ORDER_REJECTED_LOCAL_RECORD_FAILED");
+        assert!(rejected.contains("Robinhood rejected this trade"));
+        assert!(rejected.contains("Real trading stopped"));
+
+        for message in [
+            accepted,
+            uncertain,
+            rejected,
+            ACCEPTED_PLACEMENT_LOCAL_RECORD_ACTIVITY,
+            UNCERTAIN_PLACEMENT_ACTIVITY,
+        ] {
+            let normalized = message.to_ascii_lowercase();
+            assert!(!normalized.contains("no order was sent"), "{message}");
+            assert!(
+                !normalized.contains("before any new order was sent"),
+                "{message}"
+            );
+            assert!(!normalized.contains("reconcile"), "{message}");
+            assert!(!normalized.contains("local record"), "{message}");
+        }
     }
 
     #[test]
@@ -1314,7 +1839,7 @@ mod tests {
 
     #[test]
     fn uncertain_and_recovered_order_copy_is_truthful() {
-        assert!(UNCERTAIN_PLACEMENT_ACTIVITY.contains("exact same Robinhood order reference"));
+        assert!(UNCERTAIN_PLACEMENT_ACTIVITY.contains("check that exact order"));
         assert!(!UNCERTAIN_PLACEMENT_ACTIVITY.contains("will not retry"));
 
         assert!(

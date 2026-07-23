@@ -145,6 +145,48 @@ const emptyLicense: LicenseStatus = {
 };
 
 const connectionCheckTimeoutMs = 16_000;
+const dailyLimitMinimum = 1;
+const dailyLimitMaximum = 25;
+const perTradeMinimum = 1;
+const perTradeMaximum = 5;
+
+export type TradingLimits = {
+  dailyBudget: number;
+  perTrade: number;
+};
+
+function boundedWholeDollars(value: unknown, minimum: number, maximum: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.floor(parsed)));
+}
+
+export function normalizeTradingLimits(dailyInput: unknown, perTradeInput: unknown): TradingLimits {
+  const dailyBudget = boundedWholeDollars(
+    dailyInput,
+    dailyLimitMinimum,
+    dailyLimitMaximum,
+    15,
+  );
+  const perTrade = boundedWholeDollars(
+    perTradeInput,
+    perTradeMinimum,
+    Math.min(perTradeMaximum, dailyBudget),
+    Math.min(3, dailyBudget),
+  );
+  return { dailyBudget, perTrade };
+}
+
+function storedTradingLimits(): TradingLimits {
+  try {
+    return normalizeTradingLimits(
+      localStorage.getItem("dtb.dailyBudget") ?? 15,
+      localStorage.getItem("dtb.perTrade") ?? 3,
+    );
+  } catch {
+    return normalizeTradingLimits(15, 3);
+  }
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -170,7 +212,11 @@ const errorCopy: Record<string, string> = {
   ROBINHOOD_AGENTIC_ACCOUNT_REQUIRED: "Robinhood needs one dedicated Agentic account for Bluechip.",
   ROBINHOOD_AUTHENTICATION_EXPIRED: "Reconnect Robinhood so Bluechip can continue.",
   ROBINHOOD_CONNECTION_TIMED_OUT: "Robinhood took too long to respond. Nothing was turned on. Check the connection and try again.",
-  ADD_FUNDS_TO_ROBINHOOD: "Add at least the per-trade amount to your Robinhood Agentic account.",
+  ADD_FUNDS_TO_ROBINHOOD: "Robinhood needs at least $1 of available buying power. Add money or free up buying power, then try again.",
+  DAILY_BUDGET_MUST_BE_BETWEEN_1_AND_25: "Choose a daily limit from $1 to $25 in Setup.",
+  TRADE_LIMIT_MUST_BE_BETWEEN_1_AND_5: "Choose $1 to $5 per trade, without going over your daily limit.",
+  TRADING_LIMITS_INVALID: "Your saved limits were adjusted to the supported range. Review them in Setup, then try again.",
+  TRADING_LIMITS_UNAVAILABLE: "Bluechip could not read your saved limits. Open Setup, choose them again, then restart.",
   ORDER_RECONCILIATION_REQUIRED: "One earlier Robinhood order needs to be checked before real trading can continue.",
   SIMMER_ACCOUNT_NOT_CONNECTED: "Connect your Polymarket or Kalshi trading wallet before starting this agent.",
   AGENT_INSTALLATION_INCOMPLETE: "One selected trading agent is not installed yet.",
@@ -214,6 +260,17 @@ function money(value: number) {
   }).format(value);
 }
 
+export function limitPlanCopy(dailyInput: unknown, perTradeInput: unknown) {
+  const { dailyBudget, perTrade } = normalizeTradingLimits(dailyInput, perTradeInput);
+  const remainder = dailyBudget % perTrade;
+  if (remainder > 0) {
+    return `Bluechip uses up to ${money(perTrade)} per trade. If ${money(remainder)} remains near your daily limit, it can make one smaller trade instead of stopping.`;
+  }
+  return `Bluechip uses up to ${money(perTrade)} per trade and automatically stops before it goes over your ${money(dailyBudget)} daily limit.`;
+}
+
+export const setupRiskCopy = "Your daily limit is a maximum, not a promise to spend it all. Before every trade, Bluechip checks its signal, the market, your Robinhood account, and your remaining limit. If a check stops a trade, the app explains why. Every trade can lose its full value.";
+
 function accountInitial(name: string) {
   return name === "Robinhood" ? "R" : name === "Coinbase" ? "C" : name === "Kalshi" ? "K" : "P";
 }
@@ -239,8 +296,8 @@ export function App() {
       return [];
     }
   });
-  const [dailyBudget, setDailyBudget] = useState(() => Number(localStorage.getItem("dtb.dailyBudget") ?? 15));
-  const [perTrade, setPerTrade] = useState(() => Number(localStorage.getItem("dtb.perTrade") ?? 3));
+  const [dailyBudget, setDailyBudget] = useState(() => storedTradingLimits().dailyBudget);
+  const [perTrade, setPerTrade] = useState(() => storedTradingLimits().perTrade);
   const [mode, setMode] = useState<TradingMode>(() => (localStorage.getItem("dtb.mode") === "real" ? "real" : "practice"));
   const [setupOpen, setSetupOpen] = useState(() => localStorage.getItem("dtb.setupComplete") !== "yes");
   const [setupStep, setSetupStep] = useState(1);
@@ -255,6 +312,9 @@ export function App() {
   const [activationOpen, setActivationOpen] = useState(false);
   const [purchaseCode, setPurchaseCode] = useState("");
   const renewalAttempted = useRef(false);
+  const setupBackdrop = useRef<HTMLDivElement>(null);
+  const setupDialog = useRef<HTMLElement>(null);
+  const setupClose = useRef<HTMLButtonElement>(null);
   const realReviewBackdrop = useRef<HTMLDivElement>(null);
   const realReviewDialog = useRef<HTMLElement>(null);
   const realReviewCancel = useRef<HTMLButtonElement>(null);
@@ -331,6 +391,59 @@ export function App() {
       .then(setLicense)
       .catch(() => undefined);
   }, [license.renewal_needed]);
+
+  useEffect(() => {
+    const setupIsTopmost = setupOpen
+      && !realReviewOpen
+      && credentialAccount === null
+      && !activationOpen;
+    if (!setupIsTopmost) return;
+
+    const backdrop = setupBackdrop.current;
+    const dialog = setupDialog.current;
+    if (!backdrop || !dialog) return;
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const siblings = Array.from(backdrop.parentElement?.children ?? [])
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== backdrop)
+      .map((element) => ({ element, wasInert: element.inert }));
+    siblings.forEach(({ element }) => { element.inert = true; });
+    const focusFrame = window.requestAnimationFrame(() => setupClose.current?.focus());
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSetupOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])"));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      siblings.forEach(({ element, wasInert }) => { element.inert = wasInert; });
+      previouslyFocused?.focus();
+    };
+  }, [activationOpen, credentialAccount, realReviewOpen, setupOpen]);
 
   useEffect(() => {
     if (!realReviewOpen) return;
@@ -503,6 +616,14 @@ export function App() {
   };
 
   const start = async (confirmed = false) => {
+    const normalizedLimits = normalizeTradingLimits(dailyBudget, perTrade);
+    if (
+      normalizedLimits.dailyBudget !== dailyBudget
+      || normalizedLimits.perTrade !== perTrade
+    ) {
+      setDailyBudget(normalizedLimits.dailyBudget);
+      setPerTrade(normalizedLimits.perTrade);
+    }
     if (!selectedIds.length) {
       setNotice("Choose a trading agent first, or use Pick for me.");
       setView("agents");
@@ -525,8 +646,8 @@ export function App() {
         request: {
           agent_ids: selectedIds,
           mode,
-          daily_budget_usd: dailyBudget,
-          max_per_trade_usd: perTrade,
+          daily_budget_usd: normalizedLimits.dailyBudget,
+          max_per_trade_usd: normalizedLimits.perTrade,
           real_confirmation: mode === "real" ? "START REAL TRADING" : null,
         },
       });
@@ -739,11 +860,11 @@ export function App() {
       </main>
 
       {setupOpen ? (
-        <div className="modal-backdrop" role="presentation">
-          <section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+        <div className="modal-backdrop" role="presentation" ref={setupBackdrop}>
+          <section className="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title" ref={setupDialog} tabIndex={-1}>
             <header>
               <div><p>Step {setupStep} of 4</p><h2 id="setup-title">{setupStep === 1 ? "Connect your accounts" : setupStep === 2 ? "Choose your trading agent" : setupStep === 3 ? "Set your limits" : "Choose how to start"}</h2></div>
-              <button type="button" onClick={() => setSetupOpen(false)} aria-label="Close setup">×</button>
+              <button type="button" onClick={() => setSetupOpen(false)} aria-label="Close setup" ref={setupClose}>×</button>
             </header>
             <div className="setup-progress" aria-hidden="true">{[1, 2, 3, 4].map((step) => <span className={step <= setupStep ? "complete" : ""} key={step} />)}</div>
 
@@ -780,9 +901,45 @@ export function App() {
 
             {setupStep === 3 ? (
               <div className="setup-body limits-body">
-                <div className="limit-control"><div><span>Amount at risk today</span><strong>{money(dailyBudget)}</strong></div><input type="range" min="1" max="25" step="1" value={dailyBudget} onChange={(event) => { const value = Number(event.target.value); setDailyBudget(value); if (perTrade > value) setPerTrade(value); }} /><small>When the agents reach this amount, they cannot open another trade that day.</small></div>
-                <div className="limit-control"><div><span>Most in one trade</span><strong>{money(perTrade)}</strong></div><input type="range" min="1" max={Math.min(5, dailyBudget)} step="1" value={perTrade} onChange={(event) => setPerTrade(Number(event.target.value))} /><small>No agent can put more than this amount into one new trade.</small></div>
-                <p className="risk-line">The full amount you put at risk can be lost. Start smaller until you are comfortable with how the agents trade.</p>
+                <div className="limit-control">
+                  <div><label htmlFor="daily-trading-limit">Daily trading limit</label><strong>{money(dailyBudget)}</strong></div>
+                  <input
+                    id="daily-trading-limit"
+                    type="range"
+                    min={dailyLimitMinimum}
+                    max={dailyLimitMaximum}
+                    step="1"
+                    value={dailyBudget}
+                    aria-valuetext={`${money(dailyBudget)} daily maximum`}
+                    aria-describedby="daily-limit-help"
+                    onChange={(event) => {
+                      const limits = normalizeTradingLimits(Number(event.target.value), perTrade);
+                      setDailyBudget(limits.dailyBudget);
+                      setPerTrade(limits.perTrade);
+                    }}
+                  />
+                  <small id="daily-limit-help">{limitPlanCopy(dailyBudget, perTrade)}</small>
+                </div>
+                <div className="limit-control">
+                  <div><label htmlFor="per-trade-limit">Most in one trade</label><strong>{money(perTrade)}</strong></div>
+                  <input
+                    id="per-trade-limit"
+                    type="range"
+                    min={perTradeMinimum}
+                    max={Math.min(perTradeMaximum, dailyBudget)}
+                    step="1"
+                    value={perTrade}
+                    aria-valuetext={`${money(perTrade)} maximum per trade`}
+                    aria-describedby="per-trade-help"
+                    onChange={(event) => {
+                      const limits = normalizeTradingLimits(dailyBudget, Number(event.target.value));
+                      setDailyBudget(limits.dailyBudget);
+                      setPerTrade(limits.perTrade);
+                    }}
+                  />
+                  <small id="per-trade-help">This is a maximum, not a required amount. Bluechip automatically uses less when your remaining daily limit or Robinhood buying power is lower.</small>
+                </div>
+                <p className="risk-line">{setupRiskCopy}</p>
               </div>
             ) : null}
 
