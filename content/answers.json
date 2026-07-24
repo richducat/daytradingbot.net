@@ -326,7 +326,7 @@
       "status": "published",
       "queueOrder": 5,
       "datePublished": "2026-07-11",
-      "dateModified": "2026-07-18"
+      "dateModified": "2026-07-23"
     },
     {
       "slug": "can-a-trading-bot-promise-results",
@@ -516,7 +516,7 @@
       "status": "published",
       "queueOrder": 8,
       "datePublished": "2026-07-18",
-      "dateModified": "2026-07-18"
+      "dateModified": "2026-07-23"
     },
     {
       "slug": "how-do-trading-bot-vendors-charge",
@@ -760,10 +760,10 @@
         "what-does-not-a-fund-mean-for-trading-software",
         "what-rules-apply-to-retail-algorithmic-trading"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 12,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-23",
+      "dateModified": "2026-07-23"
     },
     {
       "slug": "how-much-money-does-automated-trading-require",
