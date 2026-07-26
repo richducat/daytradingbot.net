@@ -75,7 +75,7 @@
       "status": "published",
       "queueOrder": 1,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-25"
     },
     {
       "slug": "are-trading-bots-legal-in-the-us",
@@ -578,7 +578,7 @@
       "status": "published",
       "queueOrder": 9,
       "datePublished": "2026-07-19",
-      "dateModified": "2026-07-19"
+      "dateModified": "2026-07-25"
     },
     {
       "slug": "should-a-trading-bot-have-its-own-account",
@@ -883,10 +883,10 @@
         "what-is-a-public-trade-tape",
         "can-a-trading-bot-promise-results"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 14,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-25",
+      "dateModified": "2026-07-25"
     },
     {
       "slug": "can-you-stop-a-trading-bot-instantly",
