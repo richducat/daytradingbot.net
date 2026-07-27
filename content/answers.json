@@ -203,7 +203,7 @@
       "status": "published",
       "queueOrder": 3,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-26"
     },
     {
       "slug": "how-to-verify-a-trading-bots-track-record",
@@ -640,7 +640,7 @@
       "status": "published",
       "queueOrder": 10,
       "datePublished": "2026-07-21",
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-26"
     },
     {
       "slug": "what-is-a-public-trade-tape",
@@ -945,10 +945,10 @@
         "should-a-trading-bot-have-its-own-account",
         "what-is-paper-trading-mode"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 15,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-26",
+      "dateModified": "2026-07-26"
     },
     {
       "slug": "are-trading-bot-screenshots-real",
