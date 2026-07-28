@@ -141,7 +141,7 @@
       "status": "published",
       "queueOrder": 2,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-22"
+      "dateModified": "2026-07-27"
     },
     {
       "slug": "robinhood-agentic-trading-api-explained",
@@ -449,7 +449,7 @@
       "status": "published",
       "queueOrder": 7,
       "datePublished": "2026-07-17",
-      "dateModified": "2026-07-22"
+      "dateModified": "2026-07-27"
     },
     {
       "slug": "how-do-trading-bot-scams-work",
@@ -1007,10 +1007,10 @@
         "what-is-a-public-trade-tape",
         "how-do-trading-bot-scams-work"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 16,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-27",
+      "dateModified": "2026-07-27"
     },
     {
       "slug": "what-rules-apply-to-retail-algorithmic-trading",
