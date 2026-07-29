@@ -326,7 +326,7 @@
       "status": "published",
       "queueOrder": 5,
       "datePublished": "2026-07-11",
-      "dateModified": "2026-07-23"
+      "dateModified": "2026-07-28"
     },
     {
       "slug": "can-a-trading-bot-promise-results",
@@ -702,7 +702,7 @@
       "status": "published",
       "queueOrder": 11,
       "datePublished": "2026-07-22",
-      "dateModified": "2026-07-22"
+      "dateModified": "2026-07-28"
     },
     {
       "slug": "is-a-trading-bot-the-same-as-financial-advice",
@@ -1073,10 +1073,10 @@
         "is-a-trading-bot-the-same-as-financial-advice",
         "robinhood-agentic-trading-api-explained"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 17,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-28",
+      "dateModified": "2026-07-28"
     },
     {
       "slug": "what-is-review-only-mode-in-agentic-trading",
