@@ -109,7 +109,6 @@ struct StoredActivation {
 #[derive(Debug, Serialize, Deserialize)]
 struct StoredOwnerDemoActivation {
     version: u16,
-    device_public_key: [u8; 32],
 }
 
 fn unix_now() -> i64 {
@@ -184,16 +183,12 @@ fn read_owner_demo_activation(
 }
 
 #[cfg(feature = "owner-demo-license")]
-fn write_owner_demo_activation(
-    app: &AppHandle,
-    device_public_key: [u8; 32],
-) -> Result<(), &'static str> {
+fn write_owner_demo_activation(app: &AppHandle) -> Result<(), &'static str> {
     let path = owner_demo_activation_path(app)?;
     let parent = path.parent().ok_or("LICENSE_STORAGE_UNAVAILABLE")?;
     fs::create_dir_all(parent).map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
     let bytes = serde_json::to_vec(&StoredOwnerDemoActivation {
         version: OWNER_DEMO_MARKER_VERSION,
-        device_public_key,
     })
     .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
     fs::write(&path, bytes).map_err(|_| "LICENSE_STORAGE_UNAVAILABLE")?;
@@ -235,13 +230,12 @@ fn owner_demo_code_matches(code: &str) -> bool {
 
 #[cfg(feature = "owner-demo-license")]
 fn restore_owner_demo(app: &AppHandle) -> Result<bool, &'static str> {
-    let Some(activation) = read_owner_demo_activation(app)? else {
+    // Owner-demo builds are private, development-signed artifacts. They restore
+    // from the 0600 marker so opening the demo never requests a macOS Keychain
+    // password. Customer release builds do not compile this feature.
+    let Some(_) = read_owner_demo_activation(app)? else {
         return Ok(false);
     };
-    let signing_key = load_or_create_owner_demo_device_key(app.state::<CredentialVault>().inner())?;
-    if signing_key.verifying_key().to_bytes() != activation.device_public_key {
-        return Err("LICENSE_ACTIVATION_INVALID");
-    }
     app.state::<LicenseGate>()
         .install_owner_demo()
         .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
@@ -258,13 +252,6 @@ fn owner_demo_ready(app: &AppHandle) -> bool {
 
 fn load_or_create_device_key(vault: &CredentialVault) -> Result<SigningKey, &'static str> {
     load_or_create_signing_key(vault, VaultKey::DeviceSigningKey)
-}
-
-#[cfg(feature = "owner-demo-license")]
-fn load_or_create_owner_demo_device_key(
-    vault: &CredentialVault,
-) -> Result<SigningKey, &'static str> {
-    load_or_create_signing_key(vault, VaultKey::OwnerDemoDeviceSigningKey)
 }
 
 fn load_or_create_signing_key(
@@ -407,10 +394,7 @@ pub async fn activate_license(
     }
     #[cfg(feature = "owner-demo-license")]
     if owner_demo_code_matches(&request.license_code) {
-        let signing_key =
-            load_or_create_owner_demo_device_key(app.state::<CredentialVault>().inner())?;
-        let device_public_key = signing_key.verifying_key().to_bytes();
-        write_owner_demo_activation(&app, device_public_key)?;
+        write_owner_demo_activation(&app)?;
         app.state::<LicenseGate>()
             .install_owner_demo()
             .map_err(|_| "LICENSE_ACTIVATION_INVALID")?;
@@ -501,5 +485,19 @@ mod tests {
             &hash,
         ));
         assert!(!owner_demo_code_matches_with_hash(code, "not-a-hash"));
+    }
+
+    #[cfg(feature = "owner-demo-license")]
+    #[test]
+    fn legacy_owner_demo_marker_restores_without_a_keychain_field() {
+        let marker = r#"{"version":1,"device_public_key":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}"#;
+        let activation: StoredOwnerDemoActivation =
+            serde_json::from_str(marker).expect("legacy marker remains readable");
+
+        assert_eq!(activation.version, OWNER_DEMO_MARKER_VERSION);
+        assert_eq!(
+            serde_json::to_string(&activation).expect("owner marker serializes"),
+            r#"{"version":1}"#
+        );
     }
 }

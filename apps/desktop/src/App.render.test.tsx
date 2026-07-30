@@ -244,6 +244,40 @@ afterEach(() => {
 });
 
 describe("rendered fail-closed readbacks", () => {
+  it("does not open saved account credentials when the app launches", async () => {
+    render(<App />);
+
+    await screen.findByRole("button", { name: "Start Practice" });
+    for (const command of [
+      "robinhood_owner_demo_status",
+      "coinbase_owner_demo_status",
+      "kalshi_owner_demo_status",
+      "polymarket_us_owner_demo_status",
+    ]) {
+      expect(commandCallCount(command)).toBe(0);
+    }
+    expect(screen.queryByText("No password prompt until you choose to check it.")).not.toBeNull();
+  });
+
+  it("waits for an explicit activation refresh before reading its saved token", async () => {
+    commandHandlers.set("entry_license_status", () => ({
+      ...activeLicense,
+      renewal_needed: true,
+    }));
+    allowMockCommand("renew_license", () => activeLicense);
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    const activation = await screen.findByRole("button", { name: "App activated" });
+    expect(commandCallCount("renew_license")).toBe(0);
+    await user.click(activation);
+    await user.click(await screen.findByRole("button", { name: "Refresh activation" }));
+
+    await screen.findByText("Activation was refreshed.");
+    expect(commandCallCount("renew_license")).toBe(1);
+  });
+
   it("offers only a read-only status check when the watch state is unknown", async () => {
     commandHandlers.set(
       "bluechip_watch_state",
@@ -418,6 +452,7 @@ describe("rendered trading controls", () => {
     const coinbaseLabel = await screen.findByText("Coinbase");
     const coinbaseRow = coinbaseLabel.closest("article");
     expect(coinbaseRow).not.toBeNull();
+    await user.click(within(coinbaseRow!).getByRole("button", { name: "Check" }));
     const openCredentials = await within(coinbaseRow!).findByRole("button", {
       name: "Add account",
     });
@@ -535,6 +570,11 @@ describe("second-pass safety regressions", () => {
     const user = userEvent.setup();
 
     render(<App />);
+    await user.click(screen.getByRole("button", { name: "Accounts" }));
+    const robinhoodRow = screen.getByText("Robinhood").closest("article");
+    await user.click(within(robinhoodRow!).getByRole("button", { name: "Check" }));
+    await within(robinhoodRow!).findByText("Ready");
+    await user.click(screen.getByRole("button", { name: "Watch" }));
     const review = await screen.findByRole("button", { name: "Review Real Trading" });
     await user.click(review);
     const dialog = await screen.findByRole("alertdialog", {
@@ -603,6 +643,8 @@ describe("second-pass safety regressions", () => {
       name: "Use the accounts you already have",
     }).closest("section");
     const coinbaseRow = within(accountsView!).getByText("Coinbase").closest("article");
+    await user.click(within(coinbaseRow!).getByRole("button", { name: "Check" }));
+    await within(coinbaseRow!).findByRole("button", { name: "Add account" });
     await user.click(within(coinbaseRow!).getByRole("button", { name: "Add account" }));
     const dialog = await screen.findByRole("dialog", { name: "Coinbase" });
     await user.type(within(dialog).getByLabelText("API key name"), "fixture-key");
@@ -685,18 +727,20 @@ describe("second-pass safety regressions", () => {
 
     const practice = await screen.findByRole("button", { name: "Start Practice" });
     expect(isDisabled(practice)).toBe(false);
-    expect(await screen.findByText("Robinhood is connected · funding needed before Real Trading.")).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Accounts" }));
     const accountsView = screen.getByRole("heading", {
       name: "Use the accounts you already have",
     }).closest("section");
     const robinhoodRow = within(accountsView!).getByText("Robinhood").closest("article");
+    await user.click(within(robinhoodRow!).getByRole("button", { name: "Check" }));
+    expect(await screen.findByText("Robinhood is connected · funding needed before Real Trading.")).not.toBeNull();
     expect(within(robinhoodRow!).queryByText("Ready")).toBeNull();
     expect(within(robinhoodRow!).queryByText("Connected · funding needed")).not.toBeNull();
     expect(within(robinhoodRow!).queryByText(/funding needed before Real Trading/i)).not.toBeNull();
 
     const polymarketRow = within(accountsView!).getByText("Polymarket").closest("article");
+    await user.click(within(polymarketRow!).getByRole("button", { name: "Check" }));
     expect(within(polymarketRow!).queryByRole("button", { name: "Add API key" })).not.toBeNull();
     expect(within(polymarketRow!).queryByText(/wallet/i)).toBeNull();
 
