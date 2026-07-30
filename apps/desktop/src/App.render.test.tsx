@@ -284,6 +284,10 @@ describe("rendered fail-closed readbacks", () => {
     expect(screen.queryByText("No recorded outcomes yet")).toBeNull();
     expect(screen.queryByRole("button", { name: "Try activity again" })).not.toBeNull();
 
+    await user.click(screen.getByRole("button", { name: "Trading Room" }));
+    await screen.findByRole("heading", { name: "What Bluechip recorded" });
+    expect(screen.queryByText("The Trading Room could not load its records")).not.toBeNull();
+
     await user.click(screen.getByRole("button", { name: "History" }));
     await screen.findByRole("heading", { name: "Practice and Real stay separate" });
 

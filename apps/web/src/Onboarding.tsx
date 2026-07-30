@@ -121,7 +121,7 @@ const questions: Question[] = [
     help: "Activity shows every check, skipped trade, and order so you can see what happened while you were away.",
     why: "Why we ask: if you won't review it often, Practice is a better place to begin.",
     options: [
-      { value: "daily", label: "Every trading day", detail: "I can review Activity and account notices daily." },
+      { value: "daily", label: "Every trading day", detail: "I can review the Trading Room and account notices daily." },
       { value: "few_times_week", label: "A few times a week", detail: "I will check regularly, just not every day." },
       { value: "rarely", label: "Only once in a while", detail: "I want to turn it on and leave it alone for long stretches." },
     ],
@@ -262,7 +262,7 @@ function MatchView({ result, onEdit, onReset }: { result: MatchResult; onEdit: (
           <p className="eyebrow">{available ? "One-time price" : "An honest answer"}</p>
           <h2>{available ? "One payment. Bluechip is yours to use on one Mac." : `${result.agent} is not for sale yet. Bluechip is.`}</h2>
           <p>{available
-            ? "The $98 license includes the Mac app, Bluechip, Practice, Real trading controls, guided setup, Activity, and version 1 updates. Your trading money stays in Robinhood."
+            ? "The $98 license includes the Mac app, Bluechip, Practice, Real trading controls, guided setup, the Trading Room, and version 1 updates. Your trading money stays in Robinhood."
             : `Based on your answers, ${result.agent} fits better than Bluechip. If you also want a Robinhood stock bot, you may still choose Bluechip. We will not pretend it is the same strategy.`}</p>
           <a className="text-link dark-link" href="/#example">See exactly what Bluechip does <span aria-hidden="true">→</span></a>
         </div>
