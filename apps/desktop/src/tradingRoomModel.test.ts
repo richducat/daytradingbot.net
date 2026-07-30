@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  answerTradingRoomQuestion,
   buildTradingRoomMessages,
   type TradingRoomActivity,
   tradingRoomStageForActivity,
@@ -111,7 +112,148 @@ describe("Trading Room ordering and channels", () => {
       .toEqual(["new-aapl", "old-aapl"]);
   });
 
+  it("supports explicit stage and symbol channels", () => {
+    expect(buildTradingRoomMessages(items, "stage:market").map((item) => item.id))
+      .toEqual(["new-qqq", "new-aapl", "old-aapl"]);
+    expect(buildTradingRoomMessages(items, "symbol:AAPL").map((item) => item.id))
+      .toEqual(["new-aapl", "old-aapl"]);
+  });
+
+  it("can render the recorded conversation from oldest to newest", () => {
+    expect(buildTradingRoomMessages(items, "all", "oldest").map((item) => item.id))
+      .toEqual(["old-aapl", "new-aapl", "new-qqq"]);
+  });
+
+  it("assigns each recorded stage to its visible speaker", () => {
+    const speakers = buildTradingRoomMessages([
+      activity({ id: "market", kind: "market_check" }),
+      activity({ id: "decision", kind: "signal" }),
+      activity({ id: "limits", kind: "reviewed" }),
+      activity({ id: "account", kind: "order_submitted", recorded_order_state: "submitted" }),
+    ], "all", "oldest").map((item) => item.speaker);
+    expect(speakers).toEqual(["Market Scout", "Bluechip", "Limit Guide", "Robinhood"]);
+  });
+
   it("orders room channels by their most recent recorded activity", () => {
     expect(tradingRoomSymbols(items)).toEqual(["QQQ", "AAPL"]);
+  });
+});
+
+describe("Trading Room questions", () => {
+  const input = {
+    activity: [
+      activity({
+        id: "review-qqq",
+        kind: "reviewed" as const,
+        recorded_order_state: "practice_review" as const,
+        symbol: "QQQ",
+        amount_usd: "20.00",
+        message: "Practice reviewed QQQ and sent no real order.",
+      }),
+    ],
+    status: "practice" as const,
+    nextCheckLabel: "Next check at 10:15 AM",
+    dailyLimitLabel: "$100",
+    perTradeLimitLabel: "$20",
+    remainingLimitLabel: "$80",
+  };
+
+  it("explains the selected customer limits", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      question: "How much can be traded?",
+    })).toEqual({
+      speaker: "Limit Guide",
+      stage: "limits",
+      message: "Your current ceiling is $20 for one trade and $100 in new trades for the day. The app currently reports $80 remaining for new trades today.",
+    });
+  });
+
+  it("answers from the latest recorded order without inventing a live order", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      question: "Did you place a real trade?",
+    })).toEqual({
+      speaker: "Bluechip",
+      stage: "decision",
+      message: "Practice reviewed QQQ and sent no real order.",
+    });
+  });
+
+  it("explains a stock from its latest recorded message", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      question: "Why did you review QQQ?",
+    })).toEqual({
+      speaker: "Limit Guide",
+      stage: "limits",
+      message: "Practice reviewed QQQ and sent no real order.",
+    });
+  });
+
+  it("does not claim a schedule when live status is unavailable", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      status: "unavailable",
+      question: "When is the next check?",
+    })).toEqual({
+      speaker: "Bluechip",
+      stage: "decision",
+      message: "I cannot confirm the schedule because the current trading status is unavailable. Try loading the room again before relying on a next-check time.",
+    });
+  });
+
+  it("answers why from the latest recorded decision instead of a later market update", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      activity: [
+        activity({
+          id: "decision-qqq",
+          kind: "skipped",
+          symbol: "QQQ",
+          message: "QQQ was skipped because the setup no longer matched.",
+          occurred_at: "2026-07-29T10:00:00-04:00",
+        }),
+        activity({
+          id: "later-scan-qqq",
+          kind: "market_check",
+          symbol: "QQQ",
+          message: "QQQ was checked again.",
+          occurred_at: "2026-07-29T10:05:00-04:00",
+        }),
+      ],
+      question: "Why did you skip QQQ?",
+    })).toEqual({
+      speaker: "Bluechip",
+      stage: "decision",
+      message: "QQQ was skipped because the setup no longer matched.",
+    });
+  });
+
+  it("answers a skip question from the skip event even after a later decision", () => {
+    expect(answerTradingRoomQuestion({
+      ...input,
+      activity: [
+        activity({
+          id: "skip-qqq",
+          kind: "skipped",
+          symbol: "QQQ",
+          message: "QQQ was skipped because the price moved outside the setup.",
+          occurred_at: "2026-07-29T10:00:00-04:00",
+        }),
+        activity({
+          id: "later-review-qqq",
+          kind: "reviewed",
+          symbol: "QQQ",
+          message: "QQQ passed a later limit review.",
+          occurred_at: "2026-07-29T10:10:00-04:00",
+        }),
+      ],
+      question: "Why did you skip QQQ?",
+    })).toEqual({
+      speaker: "Bluechip",
+      stage: "decision",
+      message: "QQQ was skipped because the price moved outside the setup.",
+    });
   });
 });

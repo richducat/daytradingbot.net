@@ -319,7 +319,7 @@ describe("rendered fail-closed readbacks", () => {
     expect(screen.queryByRole("button", { name: "Try activity again" })).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Trading Room" }));
-    await screen.findByRole("heading", { name: "What Bluechip recorded" });
+    await screen.findByRole("heading", { name: "What the team is doing" });
     expect(screen.queryByText("The Trading Room could not load its records")).not.toBeNull();
 
     await user.click(screen.getByRole("button", { name: "History" }));

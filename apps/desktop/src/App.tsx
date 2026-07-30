@@ -2156,6 +2156,19 @@ export function App() {
                 activityState={activityState}
                 status={activeMode}
                 nextCheckLabel={watchTime(watch.next_check_at, "Waiting for the next check")}
+                dailyLimitLabel={activeMode === "unavailable"
+                  ? "Unavailable"
+                  : watch.daily_limit_usd
+                    ? money(Number(watch.daily_limit_usd))
+                    : money(dailyBudget)}
+                perTradeLimitLabel={activeMode === "unavailable"
+                  ? "Unavailable"
+                  : watch.per_trade_limit_usd
+                    ? money(Number(watch.per_trade_limit_usd))
+                    : money(perTrade)}
+                remainingLimitLabel={watch.budget_state === "available" && watch.remaining_usd
+                  ? money(Number(watch.remaining_usd))
+                  : null}
                 onRetry={() => void loadActivity(true).catch(() => undefined)}
                 onOpenWatch={(symbol) => {
                   if (symbol && isWatchSymbol(symbol)) {

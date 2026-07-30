@@ -25,7 +25,7 @@ pnpm check
 pnpm build
 ```
 
-The production topology is documented in `docs/hosting-namecheap.md` and is intentionally not deployed until the Namecheap account inventory and launch gates are complete.
+The production topology is documented in `docs/hosting-namecheap.md`. The public site and commerce/licensing API are deployed through GitHub Pages and the existing Namecheap shared-hosting account. Trading and brokerage credentials remain on the customer’s Mac. See `docs/production-launch-status.md` for the current release gates.
 
 ## Direct Kalshi founder canary
 
