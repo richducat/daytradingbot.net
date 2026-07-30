@@ -37,7 +37,7 @@ type View = "watch" | "agents" | "accounts" | "activity";
 type TradingMode = "practice" | "real";
 type ActivityFilter = "all" | TradingMode;
 type ActivityPanel = "room" | "history";
-type ConnectionReadback = "checking" | "available" | "unavailable";
+type ConnectionReadback = "not_checked" | "checking" | "available" | "unavailable";
 export type DataLifecycle = "loading" | "ready" | "unavailable";
 export type LicenseReadback = "checking" | "available" | "unavailable";
 type AccountName = "Robinhood" | "Coinbase" | "Kalshi" | "Polymarket";
@@ -557,6 +557,7 @@ export function groupActivityByDay(
 export type LiveBotState = "checking" | "waiting" | "paused" | "unavailable";
 
 export function connectionStatusLabel(readback: ConnectionReadback, connected: boolean) {
+  if (readback === "not_checked") return "Check when you’re ready";
   if (readback === "checking") return "Checking saved connection…";
   if (readback === "unavailable") return "Connection status unavailable";
   return connected ? "Connection verified" : "Not connected";
@@ -598,6 +599,9 @@ export function realTradingAccountReadiness(
   connected: boolean,
   funded: boolean,
 ) {
+  if (readback === "not_checked") {
+    return { ready: false, message: "Check Robinhood before reviewing Real Trading." };
+  }
   if (readback === "checking") {
     return { ready: false, message: "Checking Robinhood before Real Trading can be reviewed." };
   }
@@ -853,10 +857,10 @@ export function App() {
   const [checkingConnections, setCheckingConnections] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [connectionReadback, setConnectionReadback] = useState<Record<AccountName, ConnectionReadback>>({
-    Robinhood: "checking",
-    Coinbase: "checking",
-    Kalshi: "checking",
-    Polymarket: "checking",
+    Robinhood: "not_checked",
+    Coinbase: "not_checked",
+    Kalshi: "not_checked",
+    Polymarket: "not_checked",
   });
   const [startPending, setStartPending] = useState(false);
   const [pausePending, setPausePending] = useState(false);
@@ -877,8 +881,6 @@ export function App() {
   const pausePendingRef = useRef(false);
   const credentialSavePendingRef = useRef(false);
   const activationPendingRef = useRef(false);
-  const renewalAttempted = useRef(false);
-  const initialConnectionCheckStarted = useRef(false);
   const setupBackdrop = useRef<HTMLDivElement>(null);
   const setupDialog = useRef<HTMLElement>(null);
   const setupClose = useRef<HTMLButtonElement>(null);
@@ -927,8 +929,10 @@ export function App() {
   const loadLicense = async (showChecking = false) => {
     if (showChecking) setLicenseReadback("checking");
     try {
-      setLicense(await invoke<LicenseStatus>("entry_license_status"));
+      const result = await invoke<LicenseStatus>("entry_license_status");
+      setLicense(result);
       setLicenseReadback("available");
+      return result;
     } catch (error) {
       setLicenseReadback("unavailable");
       throw error;
@@ -981,8 +985,16 @@ export function App() {
   const checkLicense = async () => {
     setNotice(null);
     try {
-      await loadLicense(true);
-      setNotice("Activation status is up to date. Nothing was changed.");
+      const current = await loadLicense(true);
+      if (current.renewal_needed) {
+        setLicenseReadback("checking");
+        const renewed = await invoke<LicenseStatus>("renew_license");
+        setLicense(renewed);
+        setLicenseReadback("available");
+        setNotice("Activation was refreshed.");
+      } else {
+        setNotice("Activation status is up to date. Nothing was changed.");
+      }
     } catch {
       setNotice("The app still couldn’t confirm activation status. Real Trading stays off.");
     }
@@ -1035,10 +1047,6 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-    if (!initialConnectionCheckStarted.current) {
-      initialConnectionCheckStarted.current = true;
-      void checkAllConnections(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -1066,18 +1074,6 @@ export function App() {
     localStorage.setItem("dtb.perTrade", String(perTrade));
     localStorage.setItem("dtb.mode", mode);
   }, [selectedIds, dailyBudget, perTrade, mode]);
-
-  useEffect(() => {
-    if (!license.renewal_needed || renewalAttempted.current) return;
-    renewalAttempted.current = true;
-    setLicenseReadback("checking");
-    void invoke<LicenseStatus>("renew_license")
-      .then((result) => {
-        setLicense(result);
-        setLicenseReadback("available");
-      })
-      .catch(() => setLicenseReadback("unavailable"));
-  }, [license.renewal_needed]);
 
   useEffect(() => {
     const setupIsTopmost = setupOpen
@@ -1413,7 +1409,7 @@ export function App() {
         }
       }
       if (account === "Kalshi") await invoke("import_owner_demo_credentials");
-      await Promise.all([refresh(), refreshAccount(account)]);
+      await refreshAccount(account);
       setNotice(`${account} is connected.`);
     } catch (error) {
       setNotice(messageFromError(error));
@@ -1452,7 +1448,7 @@ export function App() {
       setCredentialFields({ first: "", second: "" });
       setCredentialAccount(null);
       setNotice(`${account} is connected.`);
-      await Promise.all([refresh(), refreshAccount(account)]);
+      await refreshAccount(account);
     } catch (error) {
       setNotice(messageFromError(error));
     } finally {
@@ -1662,7 +1658,9 @@ export function App() {
             ? "Bluechip needs the trading engine"
             : !bluechipSelected
               ? "Choose Bluechip to continue"
-              : robinhoodAccount?.readback === "checking"
+              : robinhoodAccount?.readback === "not_checked"
+                ? "Check your Robinhood connection when you are ready"
+                : robinhoodAccount?.readback === "checking"
                 ? "Checking your Robinhood connection"
                 : robinhoodAccount?.readback === "unavailable"
                   ? "Robinhood connection status is unavailable"
@@ -1685,17 +1683,19 @@ export function App() {
             ? "Install the local trading engine before starting Bluechip."
             : !bluechipSelected
               ? "Open Agents and select Bluechip before starting."
-              : robinhoodAccount?.readback === "checking"
-          ? "Checking saved connection…"
-          : robinhoodAccount?.readback === "unavailable"
-            ? "Connection status unavailable. Nothing was changed."
-            : robinhoodAccount?.connected
-              ? controlMode === "practice"
-                ? "Connection verified. Bluechip will not start a new check until you start Practice."
-                : robinhoodAccount.funded
-                  ? "Connection and available buying power verified. Bluechip will not start until you review Real Trading."
-                  : "Connection verified, but Real Trading needs available Robinhood buying power."
-              : "Connect Robinhood before starting Bluechip.";
+              : robinhoodAccount?.readback === "not_checked"
+                ? "The app will check Robinhood only when you ask it to."
+                : robinhoodAccount?.readback === "checking"
+                  ? "Checking saved connection…"
+                  : robinhoodAccount?.readback === "unavailable"
+                    ? "Connection status unavailable. Nothing was changed."
+                    : robinhoodAccount?.connected
+                      ? controlMode === "practice"
+                        ? "Connection verified. Bluechip will not start a new check until you start Practice."
+                        : robinhoodAccount.funded
+                          ? "Connection and available buying power verified. Bluechip will not start until you review Real Trading."
+                          : "Connection verified, but Real Trading needs available Robinhood buying power."
+                      : "Connect Robinhood before starting Bluechip.";
   const liveStateCopy: Record<LiveBotState, { title: string; detail: string }> = {
     checking: { title: "Checking the market", detail: "A market check is recorded" },
     waiting: { title: "Waiting for the next check", detail: watchTime(watch.next_check_at, "Scheduled by Bluechip") },
@@ -1783,7 +1783,9 @@ export function App() {
               )}
             </strong>
             <small>
-              {robinhoodAccount?.readback === "unavailable"
+              {robinhoodAccount?.readback === "not_checked"
+                ? "No password prompt until you choose to check it."
+                : robinhoodAccount?.readback === "unavailable"
                 ? "Nothing was changed."
                 : robinhoodAccount?.connected && robinhoodAccount.funded
                   ? "Robinhood connection and buying power are verified."
@@ -2052,17 +2054,19 @@ export function App() {
                 const account = accounts.find((item) => item.name === agent.account);
                 const connected = account?.readback === "available" && account.connected;
                 const funded = connected && Boolean(account?.funded);
-                const accountCopy = account?.readback === "checking"
-                  ? "Checking saved connection…"
-                  : account?.readback === "unavailable"
-                    ? "Connection status unavailable"
-                    : !agent.customer_ready
-                      ? "Coming next"
-                      : connected
-                        ? funded
-                          ? "Ready for Real Trading"
-                          : "Connected · funding needed for Real Trading"
-                        : `Connect ${agent.account}`;
+                const accountCopy = account?.readback === "not_checked"
+                  ? "Check saved connection when ready"
+                  : account?.readback === "checking"
+                    ? "Checking saved connection…"
+                    : account?.readback === "unavailable"
+                      ? "Connection status unavailable"
+                      : !agent.customer_ready
+                        ? "Coming next"
+                        : connected
+                          ? funded
+                            ? "Ready for Real Trading"
+                            : "Connected · funding needed for Real Trading"
+                          : `Connect ${agent.account}`;
                 return (
                   <button className={selected ? "agent-row selected" : "agent-row"} type="button" key={agent.id} onClick={() => toggleAgent(agent.id)} disabled={!engineReadbackAvailable || running || !agent.customer_ready}>
                     <span className="agent-avatar"><IconRobot aria-hidden="true" /></span>
@@ -2081,10 +2085,10 @@ export function App() {
         {view === "accounts" ? (
           <section className="accounts-view">
             <div className="view-intro">
-              <div><p className="eyebrow">Connection status</p><h2>Use the accounts you already have</h2><p>Saved accounts are checked automatically when the app opens. If a check fails, the app says so instead of telling you the account was disconnected.</p></div>
+              <div><p className="eyebrow">Connection status</p><h2>Use the accounts you already have</h2><p>DayTradingBot checks saved accounts only when you ask it to, so opening the app does not trigger a string of Mac password prompts.</p></div>
               <button className="pick-button" type="button" disabled={checkingConnections} onClick={() => void checkAllConnections()}>
                 <IconRefresh className={checkingConnections ? "spin" : ""} aria-hidden="true" />
-                {checkingConnections ? "Checking accounts…" : "Check again"}
+                {checkingConnections ? "Checking accounts…" : "Check saved accounts"}
               </button>
             </div>
             <div className="account-list">
@@ -2100,8 +2104,10 @@ export function App() {
                   </div>
                   {account.readback === "checking" ? (
                     <button className="secondary-button" type="button" disabled>Checking…</button>
-                  ) : account.readback === "unavailable" ? (
-                    <button className="secondary-button" type="button" disabled={checkingConnections} onClick={() => void refreshAccount(account.name)}>Try again</button>
+                  ) : account.readback === "not_checked" || account.readback === "unavailable" ? (
+                    <button className="secondary-button" type="button" disabled={checkingConnections} onClick={() => void refreshAccount(account.name)}>
+                      {account.readback === "not_checked" ? "Check" : "Try again"}
+                    </button>
                   ) : account.connected && account.funded ? (
                     <span className="ready-label"><IconCircleCheck aria-hidden="true" />Ready</span>
                   ) : account.connected ? (
@@ -2242,7 +2248,9 @@ export function App() {
                       <div>
                         <strong>{account.name}</strong>
                         <small>
-                          {account.readback === "checking"
+                          {account.readback === "not_checked"
+                            ? "Check this saved connection when you are ready"
+                            : account.readback === "checking"
                             ? "Checking saved connection…"
                             : account.readback === "unavailable"
                               ? "Connection status unavailable"
@@ -2260,8 +2268,8 @@ export function App() {
                           className="setup-connect"
                           type="button"
                           disabled={busy || checkingConnections}
-                          onClick={() => void (account.readback === "unavailable" ? refreshAccount(account.name) : connectAccount(account.name))}
-                        >{account.readback === "unavailable" ? "Try again" : account.action}</button>
+                          onClick={() => void (account.readback === "not_checked" || account.readback === "unavailable" ? refreshAccount(account.name) : connectAccount(account.name))}
+                        >{account.readback === "not_checked" ? "Check" : account.readback === "unavailable" ? "Try again" : account.action}</button>
                       )}
                     </div>
                   ))}
@@ -2413,7 +2421,9 @@ export function App() {
             ) : licensePresentation.state === "unavailable" ? (
               <p role="alert">The app could not confirm whether this copy is activated. Real Trading stays off until activation status is available.</p>
             ) : licensePresentation.realTradingReady ? (
-              <p>This app is activated for real trading on this computer. Practice and real trading are both available.</p>
+              <p>{license.renewal_needed
+                ? "This app is activated. Refresh it before access expires; your Mac may ask permission to read the saved activation when you press the button."
+                : "This app is activated for real trading on this computer. Practice and real trading are both available."}</p>
             ) : (
               <>
                 <p>Enter your access code. One code can be active on one computer at a time.</p>
@@ -2428,6 +2438,7 @@ export function App() {
               <button className="back-button" type="button" onClick={() => { if (activationPending) return; setPurchaseCode(""); setActivationOpen(false); }} disabled={activationPending}>Close</button>
               {running ? <button className="pause-button" type="button" onClick={pause} disabled={pausePending}><IconPlayerPause aria-hidden="true" />{pauseActionLabel}</button> : null}
               {!activationPending && licensePresentation.state === "unavailable" ? <button className="continue-button" type="button" onClick={() => void checkLicense()}>Check activation again</button> : null}
+              {!activationPending && licensePresentation.realTradingReady && license.renewal_needed ? <button className="continue-button" type="button" onClick={() => void checkLicense()}>Refresh activation</button> : null}
               {activationPending ? <button className="continue-button" type="button" disabled>Activating…</button> : licensePresentation.state === "not-activated" ? <button className="continue-button" type="button" disabled={busy} onClick={() => void activate()}>Activate app</button> : null}
             </footer>
           </section>
