@@ -1124,11 +1124,38 @@ fn settle_order(
             )
             .map_err(|_| "ORDER_HISTORY_UNAVAILABLE")?;
         if outcome == FillOutcome::Recorded {
-            let message = format!(
-                "Robinhood filled {} of the {} trade.",
-                money(notional),
-                order.symbol
-            );
+            let message = match order.state {
+                RobinhoodEquityOrderState::Filled => format!(
+                    "Robinhood reports the {} order as filled, including {} in this execution.",
+                    order.symbol,
+                    money(notional)
+                ),
+                RobinhoodEquityOrderState::PartiallyFilled => format!(
+                    "Robinhood filled {} of the {} order. The order remains partially filled.",
+                    money(notional),
+                    order.symbol
+                ),
+                RobinhoodEquityOrderState::Canceled => format!(
+                    "Robinhood recorded {} of the {} order before the order was canceled.",
+                    money(notional),
+                    order.symbol
+                ),
+                RobinhoodEquityOrderState::Rejected => format!(
+                    "Robinhood recorded {} of the {} order before reporting the order as rejected.",
+                    money(notional),
+                    order.symbol
+                ),
+                RobinhoodEquityOrderState::Pending => format!(
+                    "Robinhood recorded {} of the {} order. The current order status is pending.",
+                    money(notional),
+                    order.symbol
+                ),
+                RobinhoodEquityOrderState::Unknown => format!(
+                    "Robinhood recorded {} of the {} order, but its current status is still updating.",
+                    money(notional),
+                    order.symbol
+                ),
+            };
             record_activity(
                 ledger,
                 config,
@@ -1526,10 +1553,36 @@ fn activity_order_state(record: &AgentActivityRecord) -> Option<&'static str> {
             }
             _ => Some("submitted"),
         },
-        AgentActivityKind::Filled => Some("filled"),
+        AgentActivityKind::Filled => {
+            if record.message.starts_with("Robinhood reports the ")
+                && record.message.contains(" order as filled, including ")
+            {
+                Some("filled")
+            } else if record
+                .message
+                .ends_with("The order remains partially filled.")
+            {
+                Some("partially_filled")
+            } else if record.message.ends_with("before the order was canceled.") {
+                Some("canceled")
+            } else if record
+                .message
+                .ends_with("before reporting the order as rejected.")
+            {
+                Some("rejected")
+            } else if record
+                .message
+                .ends_with("The current order status is pending.")
+            {
+                Some("pending")
+            } else {
+                Some("unknown")
+            }
+        }
         AgentActivityKind::Skipped => match record.message.as_str() {
             "Robinhood found the earlier order and reports it as canceled." => Some("canceled"),
             "Robinhood found the earlier order and reports it as rejected. No order remains open."
+            | "Robinhood confirmed the earlier order was not accepted. No order was opened."
             | "Robinhood did not accept this trade. No order was opened, and the amount remains available within today's limit. Bluechip will try fresh matches again in 15 minutes." => {
                 Some("rejected")
             }
@@ -2031,6 +2084,77 @@ mod tests {
         assert_eq!(rejected_kind, AgentActivityKind::Skipped);
         assert!(rejected_message.contains("rejected"));
         assert!(!rejected_message.contains("order_id"));
+    }
+
+    #[test]
+    fn fill_activity_never_claims_a_terminal_fill_without_terminal_evidence() {
+        let record = |message: &str| AgentActivityRecord {
+            event_id: Uuid::new_v4(),
+            agent_id: "bluechip".into(),
+            mode: AgentActivityMode::Real,
+            kind: AgentActivityKind::Filled,
+            symbol: Some("AAPL".into()),
+            amount_usd: Some(Decimal::new(500, 2)),
+            message: message.into(),
+            occurred_at: Utc::now(),
+        };
+
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood reports the AAPL order as filled, including $5.00 in this execution."
+            )),
+            Some("filled")
+        );
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood filled $5.00 of the AAPL order. The order remains partially filled."
+            )),
+            Some("partially_filled")
+        );
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood recorded $5.00 of the AAPL order before the order was canceled."
+            )),
+            Some("canceled")
+        );
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood recorded $5.00 of the AAPL order before reporting the order as rejected."
+            )),
+            Some("rejected")
+        );
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood recorded $5.00 of the AAPL order. The current order status is pending."
+            )),
+            Some("pending")
+        );
+        assert_eq!(
+            activity_order_state(&record(
+                "Robinhood recorded $5.00 of the AAPL order, but its current status is still updating."
+            )),
+            Some("unknown")
+        );
+        assert_eq!(
+            activity_order_state(&record("Robinhood filled $5.00 of the AAPL trade.")),
+            Some("unknown")
+        );
+    }
+
+    #[test]
+    fn idempotent_recovery_rejection_is_exposed_as_rejected() {
+        let record = AgentActivityRecord {
+            event_id: Uuid::new_v4(),
+            agent_id: "bluechip".into(),
+            mode: AgentActivityMode::Real,
+            kind: AgentActivityKind::Skipped,
+            symbol: Some("AAPL".into()),
+            amount_usd: None,
+            message: "Robinhood confirmed the earlier order was not accepted. No order was opened."
+                .into(),
+            occurred_at: Utc::now(),
+        };
+        assert_eq!(activity_order_state(&record), Some("rejected"));
     }
 
     #[test]

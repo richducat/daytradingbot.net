@@ -197,7 +197,7 @@ export function WebApp() {
         <div>
           <p className="browser-eyebrow"><span /> Your Bluechip access is active</p>
           <h1>Trade through Robinhood from the Mac app.</h1>
-          <p>Download DayTradingBot on the Mac you will use. That is where you connect Robinhood, choose Bluechip, set your dollar limits, and start Practice or Real.</p>
+          <p>Download DayTradingBot on the Mac you will use. Connect Robinhood, choose Bluechip, set your dollar limits, then watch every recorded handoff in the Trading Room.</p>
           <div className="access-actions">
             <a className="access-primary" href={siteConfig.macosDownloadUrl}>Download DayTradingBot for Mac</a>
             <a className="access-secondary" href={`mailto:${siteConfig.supportEmail}?subject=DayTradingBot%20Mac%20setup`}>Get setup help</a>
@@ -207,7 +207,7 @@ export function WebApp() {
         <aside className="access-why">
           <p>Why the Mac app?</p>
           <h2>Your Robinhood connection stays with you.</h2>
-          <p>The website confirms your license. The Mac app keeps your Robinhood connection and trading history on your computer instead of storing them on DayTradingBot's website.</p>
+          <p>The website confirms your license. The Mac app keeps your Robinhood connection and Trading Room records on your computer instead of storing them on DayTradingBot's website.</p>
         </aside>
       </section>
 
@@ -233,7 +233,7 @@ export function WebApp() {
           </li>
           <li>
             <span>04</span>
-            <div><strong>Press Start</strong><p>Start with Practice to watch current decisions without sending an order. Choose Real only when you are ready.</p></div>
+            <div><strong>Press Start and open the Trading Room</strong><p>Start with Practice to watch the market check, decision, limit check, and result without sending an order.</p></div>
           </li>
         </ol>
       </section>

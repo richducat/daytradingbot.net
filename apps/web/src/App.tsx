@@ -15,7 +15,7 @@ const productFlow = [
   ["You stop refreshing charts", "Bluechip checks eight popular stocks and ETFs about every 15 minutes while the Mac app is running."],
   ["The rule stays the same", "It waits for a specific pullback. It does not get impatient, chase a price, or change the plan halfway through the day."],
   ["You choose the maximum dollars", "Set a limit for each trade and another for the whole day. Bluechip cannot open a trade above either one."],
-  ["You can see every decision", "Open Activity in the Mac app to see what Bluechip checked, why it waited, and whether an order was sent."],
+  ["You can see what happened", "Open the Trading Room to follow the market check, Bluechip’s decision, the limit check, and the final account update in plain English."],
 ] as const;
 
 const screeningReasons = [
@@ -28,7 +28,7 @@ const screeningReasons = [
 ] as const;
 
 const faqs = [
-  ["So what am I actually buying?", "A personal license for the DayTradingBot Mac app. It includes Bluechip, Practice, Real trading controls, your activity history, guided setup, and version 1 updates."],
+  ["So what am I actually buying?", "A personal license for the DayTradingBot Mac app. It includes Bluechip, Practice, Real trading controls, the Trading Room, guided setup, and version 1 updates."],
   ["What does Bluechip do while I am at work?", "When it is running, Bluechip checks eight stocks and ETFs about every 15 minutes. If one falls enough to meet its rule, it checks the current price, your open positions, pending orders, and the dollar limits you chose before it does anything."],
   ["Can I watch it before it touches real money?", "Yes. Practice uses current market information and shows what Bluechip would do without sending an order. You decide if and when to switch to Real."],
   ["Do I send my trading money to DayTradingBot?", "No. Your trading money stays in the dedicated Robinhood Agentic account you control. DayTradingBot is software. It is not a bank, broker, exchange, or place to deposit funds."],
@@ -98,7 +98,7 @@ export function App() {
         <div className="product-statement">
           <p className="eyebrow">What changes for you</p>
           <h2>Let Bluechip do the watching. You make the money decisions.</h2>
-          <p>You don't build an algorithm or run a server. In the Mac app, you connect Robinhood, choose the dollars, and decide whether Bluechip is practicing or placing real trades. Bluechip keeps checking while you're doing something else.</p>
+          <p>You don't build an algorithm or run a server. Connect Robinhood, choose the dollars, and decide whether Bluechip is practicing or placing real trades. The Trading Room puts every recorded step in one clear timeline.</p>
         </div>
         <div className="product-flow">
           {productFlow.map(([title, body], index) => (
@@ -156,7 +156,7 @@ export function App() {
             <li><span>02</span><div><h3>Buy the software</h3><p>Pay $98 once through Stripe. Your access code appears as soon as payment is confirmed.</p></div></li>
             <li><span>03</span><div><h3>Download the Mac app</h3><p>Enter your access code once. Your website account stays available for license and download help.</p></div></li>
             <li><span>04</span><div><h3>Connect Robinhood in the app</h3><p>Robinhood handles the approval. Your connection and trading history stay on your Mac, and your money stays at Robinhood.</p></div></li>
-            <li><span>05</span><div><h3>Choose your limits and press Start</h3><p>Start with Practice. If you choose Real, review the dollars per trade and per day; permission ends within 24 hours.</p></div></li>
+            <li><span>05</span><div><h3>Choose your limits and press Start</h3><p>Start with Practice, then open the Trading Room to watch every handoff. If you choose Real, permission ends within 24 hours.</p></div></li>
           </ol>
         </div>
       </section>
@@ -173,7 +173,7 @@ export function App() {
               <li>Bluechip for Robinhood stocks and ETFs</li>
               <li>Practice with current market information before using real money</li>
               <li>Real trading controls with per-trade and daily dollar limits</li>
-              <li>A plain-English history of every check, skip, and order</li>
+              <li>A Trading Room that explains every market check, decision, limit check, and order update</li>
               <li>The Mac app, guided setup, and version 1 updates</li>
             </ul>
             <a className="button offer-button" href="/get-started/">See my setup before I buy</a>

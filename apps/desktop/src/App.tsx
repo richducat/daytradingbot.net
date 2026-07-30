@@ -16,6 +16,7 @@ import {
   IconInfoCircle,
   IconLoader2,
   IconLock,
+  IconMessages,
   IconPlayerPause,
   IconPlayerPlay,
   IconRefresh,
@@ -30,10 +31,12 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import dtbBrandMark from "./assets/dtb-brand-mark-512.png";
+import { TradingRoom } from "./TradingRoom";
 
 type View = "watch" | "agents" | "accounts" | "activity";
 type TradingMode = "practice" | "real";
 type ActivityFilter = "all" | TradingMode;
+type ActivityPanel = "room" | "history";
 type ConnectionReadback = "checking" | "available" | "unavailable";
 export type DataLifecycle = "loading" | "ready" | "unavailable";
 export type LicenseReadback = "checking" | "available" | "unavailable";
@@ -861,6 +864,7 @@ export function App() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [activityState, setActivityState] = useState<DataLifecycle>("loading");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [activityPanel, setActivityPanel] = useState<ActivityPanel>("room");
   const [watch, setWatch] = useState<BluechipWatchState>(emptyWatch);
   const [selectedSymbol, setSelectedSymbol] = useState<WatchSymbol>("AAPL");
   const [followLatest, setFollowLatest] = useState(true);
@@ -1704,14 +1708,14 @@ export function App() {
       ? "Choose the approach that fits you"
       : view === "accounts"
         ? "Your accounts, clearly connected"
-        : "Your complete trading history";
+        : "See what Bluechip is doing";
   const screenSupport = view === "watch"
     ? watchSupportCopy
     : view === "agents"
       ? "Pick an agent yourself, or let DayTradingBot recommend one from the accounts you connect."
       : view === "accounts"
         ? "Your money stays with your broker, exchange, or wallet. DayTradingBot never needs withdrawal access."
-        : "Filter Practice and Real records, then open any day to see what Bluechip recorded.";
+        : "Follow every recorded handoff from the market check through the final account update.";
 
   return (
     <div className="app-shell">
@@ -1733,9 +1737,9 @@ export function App() {
             <IconWallet aria-hidden="true" />
             <span>Accounts</span>
           </button>
-          <button className={view === "activity" ? "nav-item active" : "nav-item"} type="button" onClick={() => setView("activity")} aria-label="History" aria-current={view === "activity" ? "page" : undefined}>
-            <IconHistory aria-hidden="true" />
-            <span>History</span>
+          <button className={view === "activity" ? "nav-item active" : "nav-item"} type="button" onClick={() => setView("activity")} aria-label="Trading Room" aria-current={view === "activity" ? "page" : undefined}>
+            <IconMessages aria-hidden="true" />
+            <span>Trading Room</span>
           </button>
         </nav>
         <button className="setup-link" type="button" onClick={() => setSetupOpen(true)} aria-label="Setup">
@@ -1973,7 +1977,16 @@ export function App() {
             <section className="recent-outcomes" aria-labelledby="recent-outcomes-title">
               <div className="section-heading">
                 <div><p className="eyebrow">Recorded results</p><h2 id="recent-outcomes-title">Recent outcomes</h2></div>
-                <button className="text-button" type="button" onClick={() => setView("activity")}>Open History <IconChevronRight aria-hidden="true" /></button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    setActivityPanel("room");
+                    setView("activity");
+                  }}
+                >
+                  Open Trading Room <IconChevronRight aria-hidden="true" />
+                </button>
               </div>
               {activityState !== "ready" ? (
                 <div className="empty-panel" role={activityState === "unavailable" ? "alert" : "status"}>
@@ -2110,7 +2123,45 @@ export function App() {
 
         {view === "activity" ? (
           <section className="activity-view">
-            <div className="history-toolbar">
+            <div className="activity-panel-tabs" aria-label="Trading Room view">
+              <button
+                className={activityPanel === "room" ? "active" : ""}
+                type="button"
+                aria-pressed={activityPanel === "room"}
+                onClick={() => setActivityPanel("room")}
+              >
+                <IconMessages aria-hidden="true" />
+                Trading Room
+              </button>
+              <button
+                className={activityPanel === "history" ? "active" : ""}
+                type="button"
+                aria-pressed={activityPanel === "history"}
+                onClick={() => setActivityPanel("history")}
+              >
+                <IconHistory aria-hidden="true" />
+                History
+              </button>
+            </div>
+
+            {activityPanel === "room" ? (
+              <TradingRoom
+                activity={activity}
+                activityState={activityState}
+                status={activeMode}
+                nextCheckLabel={watchTime(watch.next_check_at, "Waiting for the next check")}
+                onRetry={() => void loadActivity(true).catch(() => undefined)}
+                onOpenWatch={(symbol) => {
+                  if (symbol && isWatchSymbol(symbol)) {
+                    setSelectedSymbol(symbol);
+                    setFollowLatest(false);
+                  }
+                  setView("watch");
+                }}
+              />
+            ) : (
+              <>
+              <div className="history-toolbar">
               <div><p className="eyebrow">Recorded activity</p><h2>Practice and Real stay separate</h2></div>
               <div className="history-filters" aria-label="Filter trading history">
                 {(["all", "practice", "real"] as ActivityFilter[]).map((filter) => (
@@ -2152,9 +2203,21 @@ export function App() {
                 </section>
               ))}
               {activityState === "ready" && !historyGroups.length ? (
-                <div className="empty-panel"><IconHistory aria-hidden="true" /><strong>No {activityFilter === "all" ? "" : activityFilter === "practice" ? "Practice " : "Real "}records yet</strong><p>{activityFilter === "real" ? "Real trading records will appear only after you explicitly review and start Real Trading." : "Start Practice to see Bluechip work without using real money."}</p></div>
+                <div className="empty-panel">
+                  <IconHistory aria-hidden="true" />
+                  <strong>
+                    {activityFilter === "all"
+                      ? "No records yet"
+                      : activityFilter === "practice"
+                        ? "No Practice records yet"
+                        : "No Real records yet"}
+                  </strong>
+                  <p>{activityFilter === "real" ? "Real trading records will appear only after you explicitly review and start Real Trading." : "Start Practice to see Bluechip work without using real money."}</p>
+                </div>
               ) : null}
             </div>
+              </>
+            )}
           </section>
         ) : null}
       </main>
