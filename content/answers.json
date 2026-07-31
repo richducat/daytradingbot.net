@@ -265,7 +265,7 @@
       "status": "published",
       "queueOrder": 4,
       "datePublished": "2026-07-10",
-      "dateModified": "2026-07-24"
+      "dateModified": "2026-07-30"
     },
     {
       "slug": "what-is-paper-trading-mode",
@@ -387,7 +387,7 @@
       "status": "published",
       "queueOrder": 6,
       "datePublished": "2026-07-12",
-      "dateModified": "2026-07-24"
+      "dateModified": "2026-07-30"
     },
     {
       "slug": "what-is-a-kill-switch-in-automated-trading",
@@ -1197,10 +1197,10 @@
         "is-an-ai-trading-bot-safe",
         "how-do-trading-bot-scams-work"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 19,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-30",
+      "dateModified": "2026-07-30"
     },
     {
       "slug": "what-does-not-a-fund-mean-for-trading-software",
