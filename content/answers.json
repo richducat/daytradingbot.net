@@ -75,7 +75,7 @@
       "status": "published",
       "queueOrder": 1,
       "datePublished": "2026-07-09",
-      "dateModified": "2026-07-25"
+      "dateModified": "2026-07-31"
     },
     {
       "slug": "are-trading-bots-legal-in-the-us",
@@ -824,7 +824,7 @@
       "status": "published",
       "queueOrder": 13,
       "datePublished": "2026-07-24",
-      "dateModified": "2026-07-24"
+      "dateModified": "2026-07-31"
     },
     {
       "slug": "what-happens-when-a-trading-bot-loses-money",
@@ -1258,10 +1258,10 @@
         "is-a-trading-bot-the-same-as-financial-advice",
         "is-an-ai-trading-bot-safe"
       ],
-      "status": "queued",
+      "status": "published",
       "queueOrder": 20,
-      "datePublished": null,
-      "dateModified": null
+      "datePublished": "2026-07-31",
+      "dateModified": "2026-07-31"
     }
   ]
 }
